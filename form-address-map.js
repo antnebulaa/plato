@@ -1,5 +1,4 @@
-
-  <script>
+ <script>
   function initMapAdresse() {
     const elements = {
       userInput: document.getElementById("user-input-adresse"),
@@ -175,6 +174,6 @@
     console.log("initMapAdresse exécutée"); // Ajout d'un log pour vérifier
   }
 
-initMapAdresse();
+document.addEventListener('DOMContentLoaded', initMapAdresse);
 
 </script>
