@@ -1,7 +1,4 @@
-<!-- FORM -->
-<!-- Script principal qui gère les attributs personnalisés -->
-<
-script >
+
   // ==========================================
   // == Script Xano Unifié (Formulaires + Données) ==
   // ==========================================
@@ -972,5 +969,5 @@ function getCookie(name) {
     }
   }
   return null;
-} <
-/script>
+} 
+
