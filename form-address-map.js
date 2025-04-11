@@ -1,6 +1,14 @@
 
 <script>
   function initMapAdresse() {
+    console.log("Fonction initMapAdresse appelée");
+
+// Vérification de la disponibilité de l'API Google Maps
+  if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
+    console.error("L'API Google Maps n'est pas chargée");
+    return;
+  }
+    
     const elements = {
       userInput: document.getElementById("user-input-adresse"),
       autocompleteInput: document.getElementById("autocomplete-input-adresse"),
@@ -19,6 +27,12 @@
       }
     };
 
+ // Vérification des éléments essentiels
+  if (!elements.mapElement || !elements.userInput) {
+    console.error("Éléments DOM essentiels non trouvés");
+    return;
+  }
+    
     // Initialisation de la carte
     const mapAdresse = new google.maps.Map(elements.mapElement, {
       center: { lat: 46.227638, lng: 2.213749 },
