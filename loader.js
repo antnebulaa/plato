@@ -1,4 +1,3 @@
-<script>
 window.mapLoader = function() {
   if (typeof initMapAdresse === 'function') {
     initMapAdresse();
@@ -6,4 +5,3 @@ window.mapLoader = function() {
     console.error("Fonction initMapAdresse non trouvée");
   }
 };
-</script
