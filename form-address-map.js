@@ -1,5 +1,4 @@
 
-<script>
   function initMapAdresse() {
     console.log("Fonction initMapAdresse appelée");
     
@@ -196,4 +195,3 @@
 
 initMapAdresse();
 
-</script>
