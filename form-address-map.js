@@ -2,6 +2,11 @@
 <script>
   function initMapAdresse() {
     console.log("Fonction initMapAdresse appelée");
+    
+    if (!document.getElementById("map-adresse")) {
+    console.error("Élément #map-adresse introuvable");
+    return;
+  }
 
 // Vérification de la disponibilité de l'API Google Maps
   if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
