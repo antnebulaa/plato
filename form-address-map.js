@@ -1,8 +1,5 @@
 
 <!-- FORM ADDRESS & MAP -->
-<script async src ="https://maps.googleapis.com/maps/api/js?key=AIzaSyB6us_k0AsU1gFWfwKvaidQ3tsS0dubjiA&libraries=places" >
-  </script>
-
   <script>
   function initMapAdresse() {
     const elements = {
