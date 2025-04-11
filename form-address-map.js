@@ -1,5 +1,3 @@
-
-<!-- FORM ADDRESS & MAP -->
   <script>
   function initMapAdresse() {
     const elements = {
