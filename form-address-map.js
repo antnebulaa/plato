@@ -177,6 +177,6 @@
     setupAutocomplete();
   }
 
-document.addEventListener('DOMContentLoaded', initMapAdresse);
+initMapAdresse();
 
 </script>
