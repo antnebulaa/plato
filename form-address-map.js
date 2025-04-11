@@ -1,4 +1,3 @@
-Map property edit
 
   <script>
   function initMapAdresse() {
