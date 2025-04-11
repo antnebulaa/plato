@@ -172,6 +172,8 @@
 
     // Initialisation finale
     setupAutocomplete();
+    
+    console.log("initMapAdresse exécutée"); // Ajout d'un log pour vérifier
   }
 
 initMapAdresse();
