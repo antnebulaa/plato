@@ -175,6 +175,6 @@
     console.log("initMapAdresse exécutée"); // Ajout d'un log pour vérifier
   }
 
-document.addEventListener('DOMContentLoaded', initMapAdresse);
+initMapAdresse();
 
 </script>
