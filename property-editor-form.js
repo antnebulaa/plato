@@ -844,7 +844,7 @@ function setupCreatedRoomSelection() {
 
   // Cible le formulaire d'upload photo via son attribut data-xano-form
   const photoUploadForm = document.querySelector(
-  '[data-xano-form="property_photos"]'); // !! Remplace par le VRAI nom de ton endpoint d'upload !!
+  '[data-xano-form="upload_multiple_photos"]'); // !! Remplace par le VRAI nom de ton endpoint d'upload !!
 
   // Cible l'input caché POUR L'ID DE LA PIECE dans ce formulaire d'upload
   const roomDbIdInput = photoUploadForm ? photoUploadForm.querySelector(
