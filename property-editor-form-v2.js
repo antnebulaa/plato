@@ -6,7 +6,7 @@
   // Date: 2025-04-13 16h45
 
 let xanoClient; // Déclarez xanoClient ici
-
+ 
   function setupRoomTypeSelection() {
     // Cible le conteneur de ta Collection List (ajuste le sélecteur si besoin)
     const roomTypesListWrapper = document.querySelector(
@@ -877,7 +877,7 @@ function setupCreatedRoomSelection(client) {
   console.log(
     "setupCreatedRoomSelection: Initialisation écouteur de clics sur la liste des pièces créées.");
 
-  listContainer.addEventListener('click', async function (event) {
+  listContainer.addEventListener('click', function (event) {
     // Trouve l'élément cliqué (ou parent) qui a l'attribut data-action="select-created-room" ET data-room-id
     const selectedElement = event.target.closest(
       '[data-action="select-created-room"][data-room-id]');
