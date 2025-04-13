@@ -2,7 +2,7 @@
   // ==========================================
   // == Script Xano Unifié (Formulaires + Données) ==
   // ==========================================
-  // Date: 2025-04-13
+  // Date: 2025-04-13 15H40
 
   function setupRoomTypeSelection() {
     // Cible le conteneur de ta Collection List (ajuste le sélecteur si besoin)
