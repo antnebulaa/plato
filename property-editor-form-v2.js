@@ -3,8 +3,6 @@
   // == Script Xano Unifié (Formulaires + Données) ==
   // ==========================================
   // Date: 2025-04-13
-   
-  let xanoClientInstance = null;
 
   function setupRoomTypeSelection() {
     // Cible le conteneur de ta Collection List (ajuste le sélecteur si besoin)
@@ -75,18 +73,18 @@
 // Modifie ton écouteur DOMContentLoaded pour appeler la nouvelle fonction
 document.addEventListener('DOMContentLoaded', function () {
   // --- Configuration ---
-  xanoClientInstance = new XanoClient({
+  const xanoClient = new XanoClient({
     apiGroupBaseUrl: 'https://xwxl-obyg-b3e3.p7.xano.io/api:qom0bt4V',
   });
 
   // --- Initialisation ---
   const authToken = getCookie('xano_auth_token');
   if (authToken) {
-    xanoClientInstance.setAuthToken(authToken);
+    xanoClient.setAuthToken(authToken);
   }
 
-  initXanoForms(xanoClientInstance); // Initialise tes formulaires existants
-  initXanoDataEndpoints(xanoClientInstance); // Charge les données éventuelles
+  initXanoForms(xanoClient); // Initialise tes formulaires existants
+  initXanoDataEndpoints(xanoClient); // Charge les données éventuelles
 
   // --- NOUVEAU : Active la sélection des types de pièces ---
   setupRoomTypeSelection();
@@ -98,7 +96,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // Appelée ici, en supposant que initXanoDataEndpoints a eu le temps de rendre la liste.
   // Si le rendu est très lent ou asynchrone, il faudrait peut-être l'appeler
   // en réponse à l'événement 'xano:data-loaded' émis par fetchXanoData.
-  setupCreatedRoomSelection();
+  setupCreatedRoomSelection(xanoClient);
   // -------------------------------------------------------
 
   console.log("Initialisation UNIFIÉE terminée.");
@@ -838,7 +836,7 @@ function bindDataToElement(element, data) {
 // ============================================================
 // == Fonctions pour Sélection Pièces (Types CMS & Créées) ==
 // ============================================================
-function setupCreatedRoomSelection() {
+function setupCreatedRoomSelection(client) {
   // Cible le conteneur où renderListData affiche les pièces créées
   // Utilise l'attribut que tu as mis sur le conteneur qui a data-xano-list / data-xano-list-container
   const listContainer = document.querySelector('[data-xano-list-container]') || document
@@ -873,27 +871,17 @@ function setupCreatedRoomSelection() {
     "setupCreatedRoomSelection: Initialisation écouteur de clics sur la liste des pièces créées.");
 
   listContainer.addEventListener('click', function (event) {
-    console.log("DEBUG: Click event started on listContainer."); // <-- LOG 1
-    
     // Trouve l'élément cliqué (ou parent) qui a l'attribut data-action="select-created-room" ET data-room-id
     const selectedElement = event.target.closest(
       '[data-action="select-created-room"][data-room-id]');
 
-      console.log("DEBUG: Clicked element found:", selectedElement); // <-- LOG 2
-
     if (selectedElement) {
-      console.log("DEBUG: Element has required attributes."); // <-- LOG 3
-      const roomDbId = selectedElement.getAttribute('data-room-id'); // Récupère l'ID de la pièce
-      console.log(`DEBUG: Room ID found: ${roomDbId}`); // <-- LOG 4
+      const roomDbId = selectedElement.getAttribute(
+      'data-room-id'); // Récupère l'ID de la pièce
       console.log(`setupCreatedRoomSelection: Pièce créée sélectionnée ID = ${roomDbId}`);
 
       // Met à jour la valeur de l'input caché pour l'upload photo
-      if (roomDbIdInput) {
-            roomDbIdInput.value = roomDbId;
-            console.log("DEBUG: Hidden input value set."); // <-- LOG 5
-        } else {
-            console.error("DEBUG: roomDbIdInput is null!"); // <-- LOG ERREUR INPUT
-        }
+      roomDbIdInput.value = roomDbId;
 
       // Gère le feedback visuel (classe 'is-selected')
       listContainer.querySelectorAll('[data-action="select-created-room"][data-room-id]')
@@ -901,40 +889,23 @@ function setupCreatedRoomSelection() {
           el.classList.remove('is-selected'); // Adapte le nom de classe CSS si besoin
         });
       selectedElement.classList.add('is-selected');
-      console.log("DEBUG: 'is-selected' class managed."); // <-- LOG 6
 
       // Optionnel : Afficher le formulaire d'upload si caché, etc.
-        if (photoUploadForm) {
-            photoUploadForm.style.display = '';
-            console.log("DEBUG: Photo upload form displayed."); // <-- LOG 7
-        } else {
-             console.error("DEBUG: photoUploadForm is null!"); // <-- LOG ERREUR FORM
-        }
+      photoUploadForm.style.display = ''; // Ou 'block'
 
-    // --- Vérification et Appel ---
-        console.log("DEBUG: About to check xanoClientInstance."); // <-- LOG 8 (Juste avant le point d'erreur probable)
-      
-     // Vérifie que xanoClientInstance existe avant de l'utiliser
-     if (xanoClientInstance) {
-    displayPhotosForRoom(roomDbId, xanoClientInstance);
-} else {
-    console.error("xanoClientInstance n'est pas disponible!");
-}
-} else {
-        console.log("DEBUG: Clicked element does not match selector or missing data-room-id."); // <-- LOG 11 (Si le clic n'est pas sur le bon élément)
+        // --- NOUVEL AJOUT ICI ---
+    // Appelle la fonction pour afficher les photos de cette pièce
+    // On passe l'ID de la pièce et l'instance de xanoClient
+    displayPhotosForRoom(roomDbId, client);
+    // ------------------------
     }
-     console.log("DEBUG: Click event handler finished."); // <-- LOG 12
-
-      
-    }
-  );
+  });
 }
 
 // --- NOUVEAU : Fonction pour afficher les photos d'une pièce ---
-async function displayPhotosForRoom(roomId) {
+async function displayPhotosForRoom(roomId, client) {
     console.log(`displayPhotosForRoom: Récupération des photos pour Room ID = ${roomId}`);
 
-    
     // Adapte les sélecteurs si tu as utilisé d'autres noms
     const photoListContainer = document.querySelector('[data-element="photo-list-container"]');
     const photoTemplate = document.querySelector('[data-element="photo-item-template"]');
@@ -958,9 +929,9 @@ async function displayPhotosForRoom(roomId) {
     const endpoint = `room/${roomId}/photos`; // Utilise l'URL définie dans Xano
 
     try {
-       // Utiliser le paramètre client passé à la fonction
-        const photos = await client.get(endpoint); // Utiliser client, pas Client
-      
+        // Appeler l'API GET avec le client Xano
+        const photos = await client.get(endpoint); // La fonction client.get gère l'URL de base et l'auth
+
         // if(photoLoader) photoLoader.style.display = 'none'; // Cacher le loader
 
         console.log(`displayPhotosForRoom: Photos reçues pour Room ID ${roomId}:`, photos);
@@ -1007,6 +978,7 @@ async function displayPhotosForRoom(roomId) {
     }
 }
 // --- FIN NOUVELLE FONCTION ---
+
 // -----------------------------------------------------------------
 
 // ==========================================
