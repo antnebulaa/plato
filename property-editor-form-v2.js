@@ -840,100 +840,100 @@ function bindDataToElement(element, data) {
 // ============================================================
 // == Fonctions pour Sélection Pièces (Types CMS & Créées) ==
 // ============================================================
+// === Version Corrigée de setupCreatedRoomSelection pour V2 ===
 function setupCreatedRoomSelection(client) {
-  // Cible le conteneur où renderListData affiche les pièces créées
-  // Utilise l'attribut que tu as mis sur le conteneur qui a data-xano-list / data-xano-list-container
-  const listContainer = document.querySelector('[data-xano-list-container]') || document
-    .querySelector('[data-xano-list]'); // Adapte si nécessaire
+    // Sélection des éléments essentiels
+    const listContainer = document.querySelector('[data-xano-list-container]') ||
+                          document.querySelector('[data-xano-list]');
+    const photoUploadForm = document.querySelector('[data-xano-form="upload_multiple_photos"]');
+    const photoDisplayContainer = document.querySelector('#room-photos-display'); // Conteneur pour les photos
 
-  // Cible le formulaire d'upload photo via son attribut data-xano-form
-  const photoUploadForm = document.querySelector(
-  '[data-xano-form="upload_multiple_photos"]'); // !! Remplace par le VRAI nom de ton endpoint d'upload !!
+    // --- Vérifications CRITIQUES avant d'attacher l'écouteur ---
 
-  // Cible l'input caché POUR L'ID DE LA PIECE dans ce formulaire d'upload
-  const roomDbIdInput = photoUploadForm ? photoUploadForm.querySelector(
-    '[data-xano-field-name="property_photos_rooms_id"]') :
-  null; // !! Vérifie que cet attribut correspond bien à l'input Xano pour l'ID de la pièce !!
-
-// NOUVEAU: Cible le conteneur d'affichage des photos
-  const photoDisplayContainer = document.querySelector('#room-photos-display'); // <-- Votre ID de conteneur photo
-  const photoLoadingIndicator = photoDisplayContainer ? photoDisplayContainer.querySelector('[data-xano-loading]') : null; // <-- Chargement DANS le conteneur photo 
-  
-  // Vérifications initiales
-  if (!listContainer) {
-    console.warn("setupCreatedRoomSelection: Conteneur de liste des pièces créées non trouvé.");
-    return;
-  }
-  if (!photoUploadForm) {
-    console.warn("setupCreatedRoomSelection: Formulaire d'upload photo non trouvé.");
-    return;
-  }
-  // NOUVEAU: Vérifier le conteneur photo
-  if (!photoDisplayContainer) {
-    console.error("setupCreatedRoomSelection: Conteneur d'affichage des photos (#room-photos-display) non trouvé !");
-    return; // Important d'avoir cette zone
-  }
-
-  console.log(
-    "setupCreatedRoomSelection: Initialisation écouteur de clics sur la liste des pièces créées.");
-
-  listContainer.addEventListener('click', function (event) {
-    // Trouve l'élément cliqué (ou parent) qui a l'attribut data-action="select-created-room" ET data-room-id
-    const selectedElement = event.target.closest(
-      '[data-action="select-created-room"][data-room-id]');
-
-    if (selectedElement) {
-      const roomDbId = selectedElement.getAttribute(
-      'data-room-id'); // Récupère l'ID de la pièce
-      console.log(`setupCreatedRoomSelection: Pièce créée sélectionnée ID = ${roomDbId}`);
-
-      // Met à jour la valeur de l'input caché pour l'upload photo
-      roomDbIdInput.value = roomDbId;
-
-      // Gère le feedback visuel (classe 'is-selected')
-      listContainer.querySelectorAll('[data-action="select-created-room"][data-room-id]')
-        .forEach(el => {
-          el.classList.remove('is-selected'); // Adapte le nom de classe CSS si besoin
-        });
-      selectedElement.classList.add('is-selected');
-
-      // Optionnel : Afficher le formulaire d'upload si caché, etc.
-      photoUploadForm.style.display = ''; // Ou 'block'
-     // 4. NOUVEAU: Fetcher et afficher les photos pour cette room
-      if (client && photoDisplayContainer) { // Assurez-vous que le client et le conteneur existent
-         // Affiche le loading AVANT de lancer le fetch
-        if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'block';
-        // Cache une éventuelle ancienne erreur
-        const errorElement = photoDisplayContainer.querySelector('[data-xano-error]');
-        if (errorElement) errorElement.style.display = 'none';
-
-        const photoEndpoint = 'property_photos/photos'; // <-- !! REMPLACEZ par le nom de votre endpoint Xano qui retourne les photos filtrées par ID de room
-        const params = {
-          property_photos_rooms_id: roomDbId // <-- !! VÉRIFIEZ que ce nom de paramètre est attendu par votre endpoint Xano
-        };
-
-        try {
-          // Utilise fetchXanoData pour récupérer et rendre les photos
-          // client = xanoClient passé en argument
-          // photoEndpoint = l'API à appeler
-          // 'GET' = méthode
-          // params = les filtres (l'ID de la room)
-          // photoDisplayContainer = l'élément qui a les attributs data-xano-list, data-xano-list-container etc.
-          // photoLoadingIndicator = l'indicateur de chargement à cacher après le fetch
-          await fetchXanoData(client, photoEndpoint, 'GET', params, photoDisplayContainer, photoLoadingIndicator);
-          console.log(`Photos pour la room ${roomDbId} chargées.`);
-        } catch (error) {
-           console.error(`Erreur lors du chargement des photos pour la room ${roomDbId}:`, error);
-           // fetchXanoData devrait gérer l'affichage de l'erreur dans photoDisplayContainer via [data-xano-error]
-        } finally {
-             // Assurez-vous que le loading est bien caché même si fetchXanoData a une erreur interne non gérée
-            if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'none';
-        }
-      } else {
-         console.warn("setupCreatedRoomSelection: Impossible de fetcher les photos - client Xano ou conteneur photo manquant.");
-      }
+    // 1. Le conteneur des rooms cliquables doit exister
+    if (!listContainer) {
+        console.error("ERREUR SETUP: Impossible de trouver le conteneur des rooms créées ([data-xano-list-container] ou [data-xano-list]). L'écouteur de clic ne sera PAS attaché.");
+        return;
     }
-  });
+
+    // 2. Le formulaire d'upload doit exister pour trouver l'input dedans
+    if (!photoUploadForm) {
+        console.error("ERREUR SETUP: Formulaire d'upload ([data-xano-form=\"upload_multiple_photos\"]) introuvable. Impossible de mettre à jour l'ID de la room.");
+        return; // Bloquant pour la fonctionnalité initiale
+    }
+
+    // 3. L'input DANS le formulaire d'upload doit exister (Remise de la vérification V1)
+    const roomDbIdInput = photoUploadForm.querySelector('[data-xano-field-name="property_photos_rooms_id"]');
+    if (!roomDbIdInput) {
+        console.error("ERREUR SETUP: Input caché ([data-xano-field-name=\"property_photos_rooms_id\"]) introuvable dans le formulaire d'upload! Vérifiez ce sélecteur.");
+        return; // Bloquant pour la fonctionnalité initiale
+    }
+
+    // 4. Le conteneur pour afficher les photos doit exister (Vérification V2)
+    if (!photoDisplayContainer) {
+        console.error("ERREUR SETUP: Conteneur d'affichage des photos (#room-photos-display) introuvable ! Créez cet élément HTML pour afficher les photos.");
+        return; // Bloquant pour la nouvelle fonctionnalité
+    }
+
+    // Sélection des éléments secondaires (après confirmation des parents)
+    const photoLoadingIndicator = photoDisplayContainer.querySelector('[data-xano-loading]');
+
+    // Si tout est OK, on attache l'écouteur
+    console.log("setupCreatedRoomSelection: Vérifications initiales OK. Attachement de l'écouteur de clics sur:", listContainer);
+
+    listContainer.addEventListener('click', async function (event) {
+        console.log("Clic détecté dans listContainer."); // Log de base
+        const selectedElement = event.target.closest('[data-action="select-created-room"][data-room-id]');
+
+        if (selectedElement) {
+            const roomDbId = selectedElement.getAttribute('data-room-id');
+            console.log(`Room sélectionnée: ID=${roomDbId}`);
+
+            // --- Mise à jour de l'input (Partie qui ne fonctionne plus) ---
+            try {
+                 console.log("Tentative de mise à jour de l'input:", roomDbIdInput, "avec la valeur:", roomDbId);
+                 roomDbIdInput.value = roomDbId; // L'action clé
+                 console.log("Valeur de l'input après tentative:", roomDbIdInput.value); // Vérifier si ça a pris
+            } catch(e) {
+                 // Si une erreur se produit ici, elle DEVRAIT s'afficher
+                 console.error("!!! ERREUR lors de la mise à jour de l'input roomDbIdInput:", e);
+            }
+            // --- Fin de la partie ---
+
+            // Gère le feedback visuel
+            listContainer.querySelectorAll('[data-action="select-created-room"][data-room-id]')
+                .forEach(el => el.classList.remove('is-selected'));
+            selectedElement.classList.add('is-selected');
+            console.log("Feedback visuel appliqué.");
+
+            // Optionnel : Afficher le formulaire d'upload
+            // photoUploadForm.style.display = '';
+
+            // Fetcher et afficher les photos (Nouvelle partie)
+            console.log("Préparation du fetch des photos...");
+            if (client) { // photoDisplayContainer est déjà vérifié plus haut
+                if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'block';
+                const errorElement = photoDisplayContainer.querySelector('[data-xano-error]');
+                if (errorElement) errorElement.style.display = 'none';
+
+                const photoEndpoint = 'photos_by_room'; // À REMPLACER
+                const params = { property_photos_rooms_id: roomDbId }; // À VÉRIFIER
+
+                try {
+                    await fetchXanoData(client, photoEndpoint, 'GET', params, photoDisplayContainer, photoLoadingIndicator);
+                    console.log(`Workspace terminé pour photos de la room ${roomDbId}.`);
+                } catch (error) {
+                    console.error(`Erreur fetchXanoData pour room ${roomDbId}:`, error);
+                } finally {
+                    if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'none';
+                }
+            } else {
+                console.warn("Client Xano manquant, impossible de fetcher les photos.");
+            }
+        } else {
+            console.log("Clic détecté, mais l'élément cliqué ne correspond pas à [data-action='select-created-room'][data-room-id].");
+        }
+    });
 }
 // -----------------------------------------------------------------
 
