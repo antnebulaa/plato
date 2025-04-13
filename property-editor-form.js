@@ -895,10 +895,14 @@ function setupCreatedRoomSelection() {
       // Optionnel : Afficher le formulaire d'upload si caché, etc.
       photoUploadForm.style.display = ''; // Ou 'block'
 
-     // Appelle la fonction pour afficher les photos de cette pièce
-     // On passe l'ID de la pièce et l'instance de xanoClient
-     displayPhotosForRoom(roomDbId);
-     // ------------------------
+    
+     // Vérifie que xanoClientInstance existe avant de l'utiliser
+     if (xanoClientInstance) {
+          displayPhotosForRoom(roomDbId, xanoClientInstance); // <-- Passez xanoClientInstance ici
+     } else {
+          console.error("setupCreatedRoomSelection: xanoClientInstance n'est pas disponible au moment du clic !");
+     }
+
 
       
     }
@@ -906,7 +910,7 @@ function setupCreatedRoomSelection() {
 }
 
 // --- NOUVEAU : Fonction pour afficher les photos d'une pièce ---
-async function displayPhotosForRoom(roomId) {
+async function displayPhotosForRoom(roomId, client) {
     console.log(`displayPhotosForRoom: Récupération des photos pour Room ID = ${roomId}`);
 
     // Adapte les sélecteurs si tu as utilisé d'autres noms
@@ -934,8 +938,8 @@ async function displayPhotosForRoom(roomId) {
     try {
         // Appeler l'API GET avec le client Xano
        // Utilise l'instance globale DIRECTEMENT
-        if (!xanoClientInstance) throw new Error("xanoClientInstance non initialisé !");
-        const photos = await xanoClientInstance.get(endpoint); // La fonction client.get gère l'URL de base et l'auth
+        if (!client) throw new Error("Instance XanoClient non initialisé !");
+        const photos = await Client.get(endpoint); // La fonction client.get gère l'URL de base et l'auth
 
         // if(photoLoader) photoLoader.style.display = 'none'; // Cacher le loader
 
