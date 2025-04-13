@@ -907,7 +907,7 @@ function setupCreatedRoomSelection(client) {
         const errorElement = photoDisplayContainer.querySelector('[data-xano-error]');
         if (errorElement) errorElement.style.display = 'none';
 
-        const photoEndpoint = 'photos_by_room'; // <-- !! REMPLACEZ par le nom de votre endpoint Xano qui retourne les photos filtrées par ID de room
+        const photoEndpoint = 'property_photos/photos'; // <-- !! REMPLACEZ par le nom de votre endpoint Xano qui retourne les photos filtrées par ID de room
         const params = {
           property_photos_rooms_id: roomDbId // <-- !! VÉRIFIEZ que ce nom de paramètre est attendu par votre endpoint Xano
         };
