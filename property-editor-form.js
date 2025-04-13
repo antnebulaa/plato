@@ -929,7 +929,7 @@ async function displayPhotosForRoom(roomId) {
     // if(photoLoader) photoLoader.style.display = 'block';
 
     // Construire l'URL de l'endpoint Xano
-    const endpoint = `property_photos/get`; // Utilise l'URL définie dans Xano
+    const endpoint = `room/${roomId}/photos`; // Utilise l'URL définie dans Xano
 
     try {
         // Appeler l'API GET avec le client Xano
