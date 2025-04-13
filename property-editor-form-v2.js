@@ -931,10 +931,10 @@ function setupCreatedRoomSelection(client) {
         const selectedElement = event.target.closest('[data-action="select-created-room"][data-room-id]');
 
         if (selectedElement) {
-            const roomDbId = selectedElement.getAttribute('data-room-id');
+            const roomDbId = selectedElement.getAttribute('data-room-id'); // ex: 13
             console.log(`Room sélectionnée: ID=${roomDbId}`);
 
-            // --- Mise à jour de l'input (Partie qui ne fonctionne plus) ---
+            // --- Mise à jour de l'input  ---
             try {
                  console.log("Tentative de mise à jour de l'input:", roomDbIdInput, "avec la valeur:", roomDbId);
                  roomDbIdInput.value = roomDbId; // L'action clé
@@ -956,19 +956,19 @@ function setupCreatedRoomSelection(client) {
 
             // Fetcher et afficher les photos (Nouvelle partie)
             console.log("Préparation du fetch des photos...");
-            if (client) { // photoDisplayContainer est déjà vérifié plus haut
+            if (client && photoDisplayContainer) { //  est déjà vérifié plus haut
                 if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'block';
                 const errorElement = photoDisplayContainer.querySelector('[data-xano-error]');
                 if (errorElement) errorElement.style.display = 'none';
 
-                const photoEndpoint = 'property_photos/photos'; // À REMPLACER
-                const params = { property_photos_rooms_id: roomDbId }; // À VÉRIFIER
+                const photoEndpoint = `property_photos/photos/${roomDbId}`; // À REMPLACER
+                const params = null; // À VÉRIFIER
 
                 try {
                     await fetchXanoData(client, photoEndpoint, 'GET', params, photoDisplayContainer, photoLoadingIndicator);
-                    console.log(`Workspace terminé pour photos de la room ${roomDbId}.`);
+                    console.log(`Photos pour la room ${roomDbId} chargées.`);
                 } catch (error) {
-                    console.error(`Erreur fetchXanoData pour room ${roomDbId}:`, error);
+                    console.error(`Erreur lors du chargement des photos pour la room ${roomDbId}:`, error);
                 } finally {
                     if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'none';
                 }
