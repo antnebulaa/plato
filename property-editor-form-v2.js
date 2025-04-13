@@ -5,7 +5,7 @@
   // ==========================================
   // Date: 2025-04-13 16h45
 
-
+let xanoClient; // Déclarez xanoClient ici
  
   function setupRoomTypeSelection() {
     // Cible le conteneur de ta Collection List (ajuste le sélecteur si besoin)
@@ -100,7 +100,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // Appelée ici, en supposant que initXanoDataEndpoints a eu le temps de rendre la liste.
   // Si le rendu est très lent ou asynchrone, il faudrait peut-être l'appeler
   // en réponse à l'événement 'xano:data-loaded' émis par fetchXanoData.
-  setupCreatedRoomSelection();
+  setupCreatedRoomSelection(xanoClient);
   // -------------------------------------------------------
 
   console.log("Initialisation UNIFIÉE terminée.");
@@ -841,7 +841,7 @@ function bindDataToElement(element, data) {
 // == Fonctions pour Sélection Pièces (Types CMS & Créées) ==
 // ============================================================
 // === Version Corrigée de setupCreatedRoomSelection pour V2 ===
-function setupCreatedRoomSelection() {
+function setupCreatedRoomSelection(client) {
     // Sélection des éléments essentiels
     const listContainer = document.querySelector('[data-xano-list-container]') ||
                           document.querySelector('[data-xano-list]');
