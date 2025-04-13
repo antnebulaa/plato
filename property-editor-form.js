@@ -2,9 +2,7 @@
   // ==========================================
   // == Script Xano Unifié (Formulaires + Données) ==
   // ==========================================
-  // Date: 2025-04-13
-   
-  let xanoClientInstance = null;
+  // Date: 2025-03-30
 
   function setupRoomTypeSelection() {
     // Cible le conteneur de ta Collection List (ajuste le sélecteur si besoin)
@@ -75,18 +73,18 @@
 // Modifie ton écouteur DOMContentLoaded pour appeler la nouvelle fonction
 document.addEventListener('DOMContentLoaded', function () {
   // --- Configuration ---
-  xanoClientInstance = new XanoClient({
+  const xanoClient = new XanoClient({
     apiGroupBaseUrl: 'https://xwxl-obyg-b3e3.p7.xano.io/api:qom0bt4V',
   });
 
   // --- Initialisation ---
   const authToken = getCookie('xano_auth_token');
   if (authToken) {
-    xanoClientInstance.setAuthToken(authToken);
+    xanoClient.setAuthToken(authToken);
   }
 
-  initXanoForms(xanoClientInstance); // Initialise tes formulaires existants
-  initXanoDataEndpoints(xanoClientInstance); // Charge les données éventuelles
+  initXanoForms(xanoClient); // Initialise tes formulaires existants
+  initXanoDataEndpoints(xanoClient); // Charge les données éventuelles
 
   // --- NOUVEAU : Active la sélection des types de pièces ---
   setupRoomTypeSelection();
@@ -873,27 +871,17 @@ function setupCreatedRoomSelection() {
     "setupCreatedRoomSelection: Initialisation écouteur de clics sur la liste des pièces créées.");
 
   listContainer.addEventListener('click', function (event) {
-    console.log("DEBUG: Click event started on listContainer."); // <-- LOG 1
-    
     // Trouve l'élément cliqué (ou parent) qui a l'attribut data-action="select-created-room" ET data-room-id
     const selectedElement = event.target.closest(
       '[data-action="select-created-room"][data-room-id]');
 
-      console.log("DEBUG: Clicked element found:", selectedElement); // <-- LOG 2
-
     if (selectedElement) {
-      console.log("DEBUG: Element has required attributes."); // <-- LOG 3
-      const roomDbId = selectedElement.getAttribute('data-room-id'); // Récupère l'ID de la pièce
-      console.log(`DEBUG: Room ID found: ${roomDbId}`); // <-- LOG 4
+      const roomDbId = selectedElement.getAttribute(
+      'data-room-id'); // Récupère l'ID de la pièce
       console.log(`setupCreatedRoomSelection: Pièce créée sélectionnée ID = ${roomDbId}`);
 
       // Met à jour la valeur de l'input caché pour l'upload photo
-      if (roomDbIdInput) {
-            roomDbIdInput.value = roomDbId;
-            console.log("DEBUG: Hidden input value set."); // <-- LOG 5
-        } else {
-            console.error("DEBUG: roomDbIdInput is null!"); // <-- LOG ERREUR INPUT
-        }
+      roomDbIdInput.value = roomDbId;
 
       // Gère le feedback visuel (classe 'is-selected')
       listContainer.querySelectorAll('[data-action="select-created-room"][data-room-id]')
@@ -901,112 +889,12 @@ function setupCreatedRoomSelection() {
           el.classList.remove('is-selected'); // Adapte le nom de classe CSS si besoin
         });
       selectedElement.classList.add('is-selected');
-      console.log("DEBUG: 'is-selected' class managed."); // <-- LOG 6
 
       // Optionnel : Afficher le formulaire d'upload si caché, etc.
-        if (photoUploadForm) {
-            photoUploadForm.style.display = '';
-            console.log("DEBUG: Photo upload form displayed."); // <-- LOG 7
-        } else {
-             console.error("DEBUG: photoUploadForm is null!"); // <-- LOG ERREUR FORM
-        }
-
-    // --- Vérification et Appel ---
-        console.log("DEBUG: About to check xanoClientInstance."); // <-- LOG 8 (Juste avant le point d'erreur probable)
-      
-     // Vérifie que xanoClientInstance existe avant de l'utiliser
-     if (xanoClientInstance) {
-    displayPhotosForRoom(roomDbId, xanoClientInstance);
-} else {
-    console.error("xanoClientInstance n'est pas disponible!");
-}
-} else {
-        console.log("DEBUG: Clicked element does not match selector or missing data-room-id."); // <-- LOG 11 (Si le clic n'est pas sur le bon élément)
-    }
-     console.log("DEBUG: Click event handler finished."); // <-- LOG 12
-
-      
+      photoUploadForm.style.display = ''; // Ou 'block'
     }
   });
 }
-
-// --- NOUVEAU : Fonction pour afficher les photos d'une pièce ---
-async function displayPhotosForRoom(roomId) {
-    console.log(`displayPhotosForRoom: Récupération des photos pour Room ID = ${roomId}`);
-
-    
-    // Adapte les sélecteurs si tu as utilisé d'autres noms
-    const photoListContainer = document.querySelector('[data-element="photo-list-container"]');
-    const photoTemplate = document.querySelector('[data-element="photo-item-template"]');
-    // Optionnel: élément pour message d'erreur/vide spécifique aux photos
-    const photoEmptyState = document.querySelector('[data-element="photo-empty-state"]');
-
-    if (!photoListContainer || !photoTemplate) {
-        console.error("displayPhotosForRoom: Conteneur [data-element='photo-list-container'] ou template [data-element='photo-item-template'] non trouvé !");
-        return;
-    }
-
-    // Préparatifs UI
-    photoTemplate.style.display = 'none';
-    if (photoEmptyState) photoEmptyState.style.display = 'none';
-    photoListContainer.innerHTML = ''; // Vide les anciennes photos
-    // Afficher un loader ?
-    // const photoLoader = document.querySelector('[data-element="photo-loader"]');
-    // if(photoLoader) photoLoader.style.display = 'block';
-
-    // Construire l'URL de l'endpoint Xano
-    const endpoint = `room/${roomId}/photos`; // Utilise l'URL définie dans Xano
-
-    try {
-       // Utiliser le paramètre client passé à la fonction
-        const photos = await client.get(endpoint); // Utiliser client, pas Client
-      
-        // if(photoLoader) photoLoader.style.display = 'none'; // Cacher le loader
-
-        console.log(`displayPhotosForRoom: Photos reçues pour Room ID ${roomId}:`, photos);
-
-        // Vérifier si la réponse est bien un tableau (Xano retourne directement la liste normalement)
-        if (Array.isArray(photos) && photos.length > 0) {
-            photos.forEach(photo => {
-                const newItem = photoTemplate.cloneNode(true);
-                newItem.style.display = ''; // Afficher
-
-                // Utiliser bindDataToElement (qui existe déjà dans ton script)
-                // pour peupler les éléments à l'intérieur du clone.
-                // Important : Assure-toi que les clés ('image.url', 'photo_description')
-                // correspondent bien à la structure des objets 'photo' retournés par Xano.
-                const boundElements = newItem.querySelectorAll('[data-xano-bind]');
-                boundElements.forEach(boundElement => {
-                    bindDataToElement(boundElement, photo);
-                });
-                 // Si le clone lui-même a data-xano-bind (moins probable pour une photo)
-                 if (newItem.hasAttribute('data-xano-bind')){
-                     bindDataToElement(newItem, photo);
-                 }
-
-                 // Optionnel : Ajouter un data-attribut avec l'ID de la photo si besoin pour d'autres actions
-                 // newItem.setAttribute('data-photo-id', photo.id);
-
-                photoListContainer.appendChild(newItem);
-            });
-        } else {
-            console.log("displayPhotosForRoom: Aucune photo trouvée pour cette pièce.");
-            if (photoEmptyState) {
-                photoEmptyState.textContent = "Aucune photo dans cet album.";
-                photoEmptyState.style.display = '';
-            }
-        }
-
-    } catch (error) {
-        console.error(`displayPhotosForRoom: Erreur lors de la récupération/affichage des photos pour Room ID ${roomId}:`, error);
-        // if(photoLoader) photoLoader.style.display = 'none';
-        if (photoEmptyState) {
-            photoEmptyState.textContent = `Erreur: ${error.message}`;
-            photoEmptyState.style.display = '';
-        }
-    }
-}
-// --- FIN NOUVELLE FONCTION ---
 // -----------------------------------------------------------------
 
 // ==========================================
@@ -1082,4 +970,3 @@ function getCookie(name) {
   }
   return null;
 } 
-
