@@ -882,8 +882,14 @@ function setupCreatedRoomSelection(client) {
     console.log("   Client reçu:", client); // Vérifier que l'objet est passé
     // === FIN VÉRIFICATION D'ENTRÉE ===
   
-    const listContainer = document.querySelector('[data-xano-list-container]') ||
-                          document.querySelector('[data-xano-list]');
+    //const listContainer = document.querySelector('[data-xano-list-container]') ||
+    //                    document.querySelector('[data-xano-list]');
+
+  // Nouveau sélecteur (spécifique à votre structure) :
+    const listContainer = document.querySelector('[data-xano-list-container="true"]');
+    // =======================
+
+  
     const photoUploadForm = document.querySelector('[data-xano-form="upload_multiple_photos"]');
     const photoDisplayContainer = document.querySelector('#room-photos-display'); // Conteneur pour les photos
 
@@ -891,7 +897,7 @@ function setupCreatedRoomSelection(client) {
 
     // 1. Le conteneur des rooms cliquables doit exister
     if (!listContainer) {
-        console.error("ERREUR SETUP: Impossible de trouver le conteneur des rooms créées ([data-xano-list-container] ou [data-xano-list]). L'écouteur de clic ne sera PAS attaché.");
+        console.error("ERREUR SETUP: Conteneur des rooms ([data-xano-list-container=\"true\"]) introuvable ! Vérifiez l'attribut.");
         return;
     }
 
@@ -918,7 +924,7 @@ function setupCreatedRoomSelection(client) {
     const photoLoadingIndicator = photoDisplayContainer.querySelector('[data-xano-loading]');
 
     // Si tout est OK, on attache l'écouteur
-    console.log("setupCreatedRoomSelection: Vérifications initiales OK. Attachement de l'écouteur de clics sur:", listContainer);
+    console.log("setupCreatedRoomSelection: Vérifications OK. Attachement écouteur sur:", listContainer); // Ce log devrait maintenant montrer le bon élément
 
     listContainer.addEventListener('click', async function (event) {
         console.log("Clic détecté dans listContainer."); // Log de base
