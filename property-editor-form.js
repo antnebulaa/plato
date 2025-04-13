@@ -931,7 +931,7 @@ function setupCreatedRoomSelection() {
 }
 
 // --- NOUVEAU : Fonction pour afficher les photos d'une pièce ---
-async function displayPhotosForRoom(roomId, client) {
+async function displayPhotosForRoom(roomId) {
     console.log(`displayPhotosForRoom: Récupération des photos pour Room ID = ${roomId}`);
 
     // Vérification que client est bien défini
