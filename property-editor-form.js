@@ -873,17 +873,27 @@ function setupCreatedRoomSelection() {
     "setupCreatedRoomSelection: Initialisation écouteur de clics sur la liste des pièces créées.");
 
   listContainer.addEventListener('click', function (event) {
+    console.log("DEBUG: Click event started on listContainer."); // <-- LOG 1
+    
     // Trouve l'élément cliqué (ou parent) qui a l'attribut data-action="select-created-room" ET data-room-id
     const selectedElement = event.target.closest(
       '[data-action="select-created-room"][data-room-id]');
 
+      console.log("DEBUG: Clicked element found:", selectedElement); // <-- LOG 2
+
     if (selectedElement) {
-      const roomDbId = selectedElement.getAttribute(
-      'data-room-id'); // Récupère l'ID de la pièce
+      console.log("DEBUG: Element has required attributes."); // <-- LOG 3
+      const roomDbId = selectedElement.getAttribute('data-room-id'); // Récupère l'ID de la pièce
+      console.log(`DEBUG: Room ID found: ${roomDbId}`); // <-- LOG 4
       console.log(`setupCreatedRoomSelection: Pièce créée sélectionnée ID = ${roomDbId}`);
 
       // Met à jour la valeur de l'input caché pour l'upload photo
-      roomDbIdInput.value = roomDbId;
+      if (roomDbIdInput) {
+            roomDbIdInput.value = roomDbId;
+            console.log("DEBUG: Hidden input value set."); // <-- LOG 5
+        } else {
+            console.error("DEBUG: roomDbIdInput is null!"); // <-- LOG ERREUR INPUT
+        }
 
       // Gère le feedback visuel (classe 'is-selected')
       listContainer.querySelectorAll('[data-action="select-created-room"][data-room-id]')
@@ -891,18 +901,31 @@ function setupCreatedRoomSelection() {
           el.classList.remove('is-selected'); // Adapte le nom de classe CSS si besoin
         });
       selectedElement.classList.add('is-selected');
+      console.log("DEBUG: 'is-selected' class managed."); // <-- LOG 6
 
       // Optionnel : Afficher le formulaire d'upload si caché, etc.
-      photoUploadForm.style.display = ''; // Ou 'block'
+        if (photoUploadForm) {
+            photoUploadForm.style.display = '';
+            console.log("DEBUG: Photo upload form displayed."); // <-- LOG 7
+        } else {
+             console.error("DEBUG: photoUploadForm is null!"); // <-- LOG ERREUR FORM
+        }
 
-    
+    // --- Vérification et Appel ---
+        console.log("DEBUG: About to check xanoClientInstance."); // <-- LOG 8 (Juste avant le point d'erreur probable)
+      
      // Vérifie que xanoClientInstance existe avant de l'utiliser
      if (xanoClientInstance) {
+       console.log("DEBUG: xanoClientInstance exists. Calling displayPhotosForRoom..."); // <-- LOG 9
           displayPhotosForRoom(roomDbId, xanoClientInstance); // <-- Passez xanoClientInstance ici
+       console.log("DEBUG: displayPhotosForRoom function finished."); // <-- LOG 10
      } else {
-          console.error("setupCreatedRoomSelection: xanoClientInstance n'est pas disponible au moment du clic !");
+          console.error("DEBUG: xanoClientInstance is NOT available at click time!"); // <-- LOG ERREUR INSTANCE
      }
-
+} else {
+        console.log("DEBUG: Clicked element does not match selector or missing data-room-id."); // <-- LOG 11 (Si le clic n'est pas sur le bon élément)
+    }
+     console.log("DEBUG: Click event handler finished."); // <-- LOG 12
 
       
     }
