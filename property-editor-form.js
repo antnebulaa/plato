@@ -3,7 +3,7 @@
   // == Script Xano Unifié (Formulaires + Données) ==
   // ==========================================
   // Date: 2025-04-13
-  
+   
   let xanoClientInstance = null;
 
   function setupRoomTypeSelection() {
