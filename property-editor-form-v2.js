@@ -76,25 +76,49 @@ let xanoClient; // Déclarez xanoClient ici
 // Modifie ton écouteur DOMContentLoaded pour appeler la nouvelle fonction
 document.addEventListener('DOMContentLoaded', function () {
   // --- Configuration ---
+   try { // Ajout d'un try/catch global pour l'init
   // Assignez la variable déclarée plus haut
   xanoClient = new XanoClient({ // Pas de 'const' ici
     apiGroupBaseUrl: 'https://xwxl-obyg-b3e3.p7.xano.io/api:qom0bt4V',
   });
-
+ console.log("1. Instance xanoClient créée.");
+     
   // --- Initialisation ---
   const authToken = getCookie('xano_auth_token');
   if (authToken) {
     xanoClient.setAuthToken(authToken);
-  }
+  console.log("2. Auth Token appliqué à xanoClient.");
+    } else {
+      console.log("2. Pas d'Auth Token trouvé.");
+    }
 
   initXanoForms(xanoClient); // Initialise tes formulaires existants
+       console.log("3. initXanoForms appelé.");
   initXanoDataEndpoints(xanoClient); // Charge les données éventuelles
+     console.log("4. initXanoDataEndpoints appelé.");
 
   // --- NOUVEAU : Active la sélection des types de pièces ---
   setupRoomTypeSelection();
+     console.log("5. setupRoomTypeSelection appelé.");
   // ------------------------------------------------------
 
   initXanoLinkHandlers();
+     console.log("6. initXanoLinkHandlers appelé.");
+
+
+     // --- Vérification avant appel critique ---
+    console.log("7. PRÊT à appeler setupCreatedRoomSelection.");
+    console.log("   Vérification de xanoClient juste avant l'appel:", xanoClient); // Est-ce un objet valide ?
+
+    if (typeof setupCreatedRoomSelection !== 'function') {
+         console.error("ERREUR CRITIQUE: setupCreatedRoomSelection n'est pas une fonction !");
+         return;
+    }
+    if (!xanoClient) {
+         console.error("ERREUR CRITIQUE: xanoClient est undefined/null avant l'appel !");
+         return;
+    }
+
 
   // --- NOUVEAU : Active la sélection des pièces créées ---
   // Appelée ici, en supposant que initXanoDataEndpoints a eu le temps de rendre la liste.
@@ -103,8 +127,15 @@ document.addEventListener('DOMContentLoaded', function () {
   setupCreatedRoomSelection(xanoClient);
   // -------------------------------------------------------
 
-  console.log("Initialisation UNIFIÉE terminée.");
+  console.log("8. Appel à setupCreatedRoomSelection TERMINÉ (ne signifie pas qu'elle a réussi).");
+    // --- Fin Vérification ---
 
+    console.log("9. Initialisation UNIFIÉE terminée (fin du bloc try DOMContentLoaded).");
+
+  } catch (initError) {
+      console.error("ERREUR GLOBALE DANS DOMContentLoaded:", initError);
+      // Une erreur ici pourrait empêcher setupCreatedRoomSelection d'être appelée
+  }
 });
 
 // ==========================================
@@ -842,7 +873,15 @@ function bindDataToElement(element, data) {
 // ============================================================
 // === Version Corrigée de setupCreatedRoomSelection pour V2 ===
 function setupCreatedRoomSelection(client) {
-    // Sélection des éléments essentiels
+    // === VÉRIFICATION D'ENTRÉE ===
+    console.log("--- Entrée dans setupCreatedRoomSelection ---");
+    if (!client) {
+        console.error("ERREUR DANS setupCreatedRoomSelection: Le 'client' reçu est null ou undefined !");
+        return; // Ne pas continuer si client invalide
+    }
+    console.log("   Client reçu:", client); // Vérifier que l'objet est passé
+    // === FIN VÉRIFICATION D'ENTRÉE ===
+  
     const listContainer = document.querySelector('[data-xano-list-container]') ||
                           document.querySelector('[data-xano-list]');
     const photoUploadForm = document.querySelector('[data-xano-form="upload_multiple_photos"]');
