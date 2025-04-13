@@ -3,7 +3,9 @@
   // ==========================================
   // == Script Xano Unifié (Formulaires + Données) ==
   // ==========================================
-  // Date: 2025-04-13 16h00
+  // Date: 2025-04-13 16h45
+
+let xanoClient; // Déclarez xanoClient ici
 
   function setupRoomTypeSelection() {
     // Cible le conteneur de ta Collection List (ajuste le sélecteur si besoin)
@@ -74,7 +76,8 @@
 // Modifie ton écouteur DOMContentLoaded pour appeler la nouvelle fonction
 document.addEventListener('DOMContentLoaded', function () {
   // --- Configuration ---
-  const xanoClient = new XanoClient({
+  // Assignez la variable déclarée plus haut
+  xanoClient = new XanoClient({ // Pas de 'const' ici
     apiGroupBaseUrl: 'https://xwxl-obyg-b3e3.p7.xano.io/api:qom0bt4V',
   });
 
@@ -97,7 +100,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // Appelée ici, en supposant que initXanoDataEndpoints a eu le temps de rendre la liste.
   // Si le rendu est très lent ou asynchrone, il faudrait peut-être l'appeler
   // en réponse à l'événement 'xano:data-loaded' émis par fetchXanoData.
-  setupCreatedRoomSelection();
+  setupCreatedRoomSelection(xanoClient);
   // -------------------------------------------------------
 
   console.log("Initialisation UNIFIÉE terminée.");
@@ -837,7 +840,7 @@ function bindDataToElement(element, data) {
 // ============================================================
 // == Fonctions pour Sélection Pièces (Types CMS & Créées) ==
 // ============================================================
-function setupCreatedRoomSelection() {
+function setupCreatedRoomSelection(client) {
   // Cible le conteneur où renderListData affiche les pièces créées
   // Utilise l'attribut que tu as mis sur le conteneur qui a data-xano-list / data-xano-list-container
   const listContainer = document.querySelector('[data-xano-list-container]') || document
@@ -852,7 +855,11 @@ function setupCreatedRoomSelection() {
     '[data-xano-field-name="property_photos_rooms_id"]') :
   null; // !! Vérifie que cet attribut correspond bien à l'input Xano pour l'ID de la pièce !!
 
-  // Vérifications
+// NOUVEAU: Cible le conteneur d'affichage des photos
+  const photoDisplayContainer = document.querySelector('#room-photos-display'); // <-- Votre ID de conteneur photo
+  const photoLoadingIndicator = photoDisplayContainer ? photoDisplayContainer.querySelector('[data-xano-loading]') : null; // <-- Chargement DANS le conteneur photo 
+  
+  // Vérifications initiales
   if (!listContainer) {
     console.warn("setupCreatedRoomSelection: Conteneur de liste des pièces créées non trouvé.");
     return;
@@ -861,17 +868,16 @@ function setupCreatedRoomSelection() {
     console.warn("setupCreatedRoomSelection: Formulaire d'upload photo non trouvé.");
     return;
   }
-  if (!roomDbIdInput) {
-    console.error(
-      "setupCreatedRoomSelection: Input caché [data-xano-field-name='property_photos_rooms_id'] non trouvé dans le formulaire d'upload !"
-      );
-    return;
+  // NOUVEAU: Vérifier le conteneur photo
+  if (!photoDisplayContainer) {
+    console.error("setupCreatedRoomSelection: Conteneur d'affichage des photos (#room-photos-display) non trouvé !");
+    return; // Important d'avoir cette zone
   }
 
   console.log(
     "setupCreatedRoomSelection: Initialisation écouteur de clics sur la liste des pièces créées.");
 
-  listContainer.addEventListener('click', function (event) {
+  listContainer.addEventListener('click', async function (event) {
     // Trouve l'élément cliqué (ou parent) qui a l'attribut data-action="select-created-room" ET data-room-id
     const selectedElement = event.target.closest(
       '[data-action="select-created-room"][data-room-id]');
@@ -893,6 +899,39 @@ function setupCreatedRoomSelection() {
 
       // Optionnel : Afficher le formulaire d'upload si caché, etc.
       photoUploadForm.style.display = ''; // Ou 'block'
+     // 4. NOUVEAU: Fetcher et afficher les photos pour cette room
+      if (client && photoDisplayContainer) { // Assurez-vous que le client et le conteneur existent
+         // Affiche le loading AVANT de lancer le fetch
+        if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'block';
+        // Cache une éventuelle ancienne erreur
+        const errorElement = photoDisplayContainer.querySelector('[data-xano-error]');
+        if (errorElement) errorElement.style.display = 'none';
+
+        const photoEndpoint = 'photos_by_room'; // <-- !! REMPLACEZ par le nom de votre endpoint Xano qui retourne les photos filtrées par ID de room
+        const params = {
+          property_photos_rooms_id: roomDbId // <-- !! VÉRIFIEZ que ce nom de paramètre est attendu par votre endpoint Xano
+        };
+
+        try {
+          // Utilise fetchXanoData pour récupérer et rendre les photos
+          // client = xanoClient passé en argument
+          // photoEndpoint = l'API à appeler
+          // 'GET' = méthode
+          // params = les filtres (l'ID de la room)
+          // photoDisplayContainer = l'élément qui a les attributs data-xano-list, data-xano-list-container etc.
+          // photoLoadingIndicator = l'indicateur de chargement à cacher après le fetch
+          await fetchXanoData(client, photoEndpoint, 'GET', params, photoDisplayContainer, photoLoadingIndicator);
+          console.log(`Photos pour la room ${roomDbId} chargées.`);
+        } catch (error) {
+           console.error(`Erreur lors du chargement des photos pour la room ${roomDbId}:`, error);
+           // fetchXanoData devrait gérer l'affichage de l'erreur dans photoDisplayContainer via [data-xano-error]
+        } finally {
+             // Assurez-vous que le loading est bien caché même si fetchXanoData a une erreur interne non gérée
+            if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'none';
+        }
+      } else {
+         console.warn("setupCreatedRoomSelection: Impossible de fetcher les photos - client Xano ou conteneur photo manquant.");
+      }
     }
   });
 }
