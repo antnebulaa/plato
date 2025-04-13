@@ -873,113 +873,93 @@ function bindDataToElement(element, data) {
 // ============================================================
 // === Version Corrigée de setupCreatedRoomSelection pour V2 ===
 function setupCreatedRoomSelection(client) {
-    // === VÉRIFICATION D'ENTRÉE ===
     console.log("--- Entrée dans setupCreatedRoomSelection ---");
     if (!client) {
-        console.error("ERREUR DANS setupCreatedRoomSelection: Le 'client' reçu est null ou undefined !");
-        return; // Ne pas continuer si client invalide
+        console.error("ERREUR DANS setupCreatedRoomSelection: Le 'client' reçu est null ou undefined !"); return;
     }
-    console.log("   Client reçu:", client); // Vérifier que l'objet est passé
-    // === FIN VÉRIFICATION D'ENTRÉE ===
-  
-    //const listContainer = document.querySelector('[data-xano-list-container]') ||
-    //                    document.querySelector('[data-xano-list]');
+    console.log("   Client reçu:", client);
 
-  // Nouveau sélecteur (spécifique à votre structure) :
-    const listContainer = document.querySelector('[data-xano-list-container="true"]');
-    // =======================
-
-  
     const photoUploadForm = document.querySelector('[data-xano-form="upload_multiple_photos"]');
-    const photoDisplayContainer = document.querySelector('#room-photos-display'); // Conteneur pour les photos
+    const photoDisplayContainer = document.querySelector('#room-photos-display');
 
-    // --- Vérifications CRITIQUES avant d'attacher l'écouteur ---
+    // === Vérification Spécifique listContainer ===
+    console.log("Tentative sélection listContainer avec [data-xano-list-container=\"true\"]");
+    const listContainer = document.querySelector('[data-xano-list-container="true"]');
 
-    // 1. Le conteneur des rooms cliquables doit exister
     if (!listContainer) {
-        console.error("ERREUR SETUP: Conteneur des rooms ([data-xano-list-container=\"true\"]) introuvable ! Vérifiez l'attribut.");
-        return;
+        console.error("ERREUR SETUP (Post-Query): Conteneur des rooms ([data-xano-list-container=\"true\"]) INTROUVABLE !");
+        return; // Arrêter si non trouvé
     }
+    // Double-check pour être sûr que ce n'est pas l'autre conteneur
+    if (listContainer.id === 'room-photos-display') {
+        console.error("ERREUR SETUP (Post-Query): Le sélecteur a trouvé #room-photos-display ! Problème d'attributs HTML.");
+        return; // Arrêter si c'est le mauvais
+    }
+    console.log("listContainer trouvé avec succès (confirmé):", listContainer);
+    // === Fin Vérification Spécifique ===
 
-    // 2. Le formulaire d'upload doit exister pour trouver l'input dedans
+    // --- Autres Vérifications ---
     if (!photoUploadForm) {
-        console.error("ERREUR SETUP: Formulaire d'upload ([data-xano-form=\"upload_multiple_photos\"]) introuvable. Impossible de mettre à jour l'ID de la room.");
-        return; // Bloquant pour la fonctionnalité initiale
+        console.error("ERREUR SETUP: photoUploadForm introuvable."); return;
     }
-
-    // 3. L'input DANS le formulaire d'upload doit exister (Remise de la vérification V1)
     const roomDbIdInput = photoUploadForm.querySelector('[data-xano-field-name="property_photos_rooms_id"]');
     if (!roomDbIdInput) {
-        console.error("ERREUR SETUP: Input caché ([data-xano-field-name=\"property_photos_rooms_id\"]) introuvable dans le formulaire d'upload! Vérifiez ce sélecteur.");
-        return; // Bloquant pour la fonctionnalité initiale
+        console.error("ERREUR SETUP: roomDbIdInput introuvable."); return;
     }
-
-    // 4. Le conteneur pour afficher les photos doit exister (Vérification V2)
     if (!photoDisplayContainer) {
-        console.error("ERREUR SETUP: Conteneur d'affichage des photos (#room-photos-display) introuvable ! Créez cet élément HTML pour afficher les photos.");
-        return; // Bloquant pour la nouvelle fonctionnalité
+        console.error("ERREUR SETUP: photoDisplayContainer introuvable."); return;
     }
-
-    // Sélection des éléments secondaires (après confirmation des parents)
     const photoLoadingIndicator = photoDisplayContainer.querySelector('[data-xano-loading]');
+    console.log("Toutes les vérifications setup OK.");
+    // --- Fin Autres Vérifications ---
 
-    // Si tout est OK, on attache l'écouteur
-    console.log("setupCreatedRoomSelection: Vérifications OK. Attachement écouteur sur:", listContainer); // Ce log devrait maintenant montrer le bon élément
 
-    listContainer.addEventListener('click', async function (event) {
-        console.log("Clic détecté dans listContainer."); // Log de base
-        const selectedElement = event.target.closest('[data-action="select-created-room"][data-room-id]');
-
-        if (selectedElement) {
-            const roomDbId = selectedElement.getAttribute('data-room-id'); // ex: 13
-            console.log(`Room sélectionnée: ID=${roomDbId}`);
-
-            // --- Mise à jour de l'input  ---
-            try {
-                 console.log("Tentative de mise à jour de l'input:", roomDbIdInput, "avec la valeur:", roomDbId);
-                 roomDbIdInput.value = roomDbId; // L'action clé
-                 console.log("Valeur de l'input après tentative:", roomDbIdInput.value); // Vérifier si ça a pris
-            } catch(e) {
-                 // Si une erreur se produit ici, elle DEVRAIT s'afficher
-                 console.error("!!! ERREUR lors de la mise à jour de l'input roomDbIdInput:", e);
-            }
-            // --- Fin de la partie ---
-
-            // Gère le feedback visuel
-            listContainer.querySelectorAll('[data-action="select-created-room"][data-room-id]')
-                .forEach(el => el.classList.remove('is-selected'));
-            selectedElement.classList.add('is-selected');
-            console.log("Feedback visuel appliqué.");
-
-            // Optionnel : Afficher le formulaire d'upload
-            // photoUploadForm.style.display = '';
-
-            // Fetcher et afficher les photos (Nouvelle partie)
-            console.log("Préparation du fetch des photos...");
-            if (client && photoDisplayContainer) { //  est déjà vérifié plus haut
-                if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'block';
-                const errorElement = photoDisplayContainer.querySelector('[data-xano-error]');
-                if (errorElement) errorElement.style.display = 'none';
-
-                const photoEndpoint = `property_photos/photos/${roomDbId}`; // À REMPLACER
-                const params = null; // À VÉRIFIER
-
+    // --- Tentative d'Attachement Écouteur ---
+    console.log("Tentative d'attachement de l'écouteur à listContainer...");
+    try {
+        listContainer.addEventListener('click', async function handleRoomClickFinal(event) {
+            // === Code intérieur de l'écouteur ===
+            console.log("--- CLIC DÉTECTÉ ---");
+            const selectedElement = event.target.closest('[data-action="select-created-room"][data-room-id]');
+            if (selectedElement) {
+                const roomDbId = selectedElement.getAttribute('data-room-id');
+                console.log(`Room ID: ${roomDbId}`);
                 try {
-                    await fetchXanoData(client, photoEndpoint, 'GET', params, photoDisplayContainer, photoLoadingIndicator);
-                    console.log(`Photos pour la room ${roomDbId} chargées.`);
-                } catch (error) {
-                    console.error(`Erreur lors du chargement des photos pour la room ${roomDbId}:`, error);
-                } finally {
-                    if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'none';
-                }
-            } else {
-                console.warn("Client Xano manquant, impossible de fetcher les photos.");
-            }
-        } else {
-            console.log("Clic détecté, mais l'élément cliqué ne correspond pas à [data-action='select-created-room'][data-room-id].");
-        }
-    });
-}
+                    roomDbIdInput.value = roomDbId;
+                    console.log(`Input mis à jour (valeur=${roomDbIdInput.value})`);
+                } catch (e) { console.error("Erreur maj input:", e); }
+
+                listContainer.querySelectorAll('[data-action="select-created-room"][data-room-id]').forEach(el => el.classList.remove('is-selected'));
+                selectedElement.classList.add('is-selected');
+                console.log("Feedback visuel appliqué.");
+
+                console.log("Préparation fetch photos...");
+                if (client && photoDisplayContainer) {
+                    if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'block';
+                    const errorElement = photoDisplayContainer.querySelector('[data-xano-error]');
+                    if (errorElement) errorElement.style.display = 'none';
+                    const photoEndpoint = `property_photos/photos/${roomDbId}`;
+                    const params = null;
+                    try {
+                        await fetchXanoData(client, photoEndpoint, 'GET', params, photoDisplayContainer, photoLoadingIndicator);
+                        console.log(`Workspace photos OK pour room ${roomDbId}.`);
+                    } catch (error) { console.error(`Erreur fetch photos pour room ${roomDbId}:`, error); }
+                    finally { if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'none'; }
+                } else { console.warn("Client Xano ou conteneur photo manquant pour fetch."); }
+            } else { console.log("Clic ignoré (pas sur un élément de room valide)."); }
+             // === Fin Code intérieur ===
+        });
+        // Si on arrive ici, l'appel à addEventListener n'a pas planté
+        console.log("Attachement écouteur RÉUSSI (addEventListener n'a pas levé d'erreur).");
+    } catch (error) {
+        // Si addEventListener lui-même lève une erreur
+        console.error("!!! ERREUR FATALE lors de l'APPEL à listContainer.addEventListener:", error);
+    }
+    // === Fin Tentative Attachement ===
+
+    console.log("Fin de l'exécution normale de setupCreatedRoomSelection."); // Nouveau log final
+} // Fin de la fonction
+
 // -----------------------------------------------------------------
 
 // ==========================================
