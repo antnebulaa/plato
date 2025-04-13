@@ -916,7 +916,7 @@ function setupCreatedRoomSelection(client) {
                 const errorElement = photoDisplayContainer.querySelector('[data-xano-error]');
                 if (errorElement) errorElement.style.display = 'none';
 
-                const photoEndpoint = 'photos_by_room'; // À REMPLACER
+                const photoEndpoint = 'property_photos/photos'; // À REMPLACER
                 const params = { property_photos_rooms_id: roomDbId }; // À VÉRIFIER
 
                 try {
