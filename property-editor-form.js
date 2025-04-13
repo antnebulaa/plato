@@ -96,7 +96,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // Appelée ici, en supposant que initXanoDataEndpoints a eu le temps de rendre la liste.
   // Si le rendu est très lent ou asynchrone, il faudrait peut-être l'appeler
   // en réponse à l'événement 'xano:data-loaded' émis par fetchXanoData.
-  setupCreatedRoomSelection();
+  setupCreatedRoomSelection(xanoClient);
   // -------------------------------------------------------
 
   console.log("Initialisation UNIFIÉE terminée.");
@@ -836,7 +836,7 @@ function bindDataToElement(element, data) {
 // ============================================================
 // == Fonctions pour Sélection Pièces (Types CMS & Créées) ==
 // ============================================================
-function setupCreatedRoomSelection() {
+function setupCreatedRoomSelection(client) {
   // Cible le conteneur où renderListData affiche les pièces créées
   // Utilise l'attribut que tu as mis sur le conteneur qui a data-xano-list / data-xano-list-container
   const listContainer = document.querySelector('[data-xano-list-container]') || document
@@ -892,6 +892,13 @@ function setupCreatedRoomSelection() {
 
       // Optionnel : Afficher le formulaire d'upload si caché, etc.
       photoUploadForm.style.display = ''; // Ou 'block'
+
+     // Appelle la fonction pour afficher les photos de cette pièce
+     // On passe l'ID de la pièce et l'instance de xanoClient
+     displayPhotosForRoom(roomDbId, xanoClient);
+     // ------------------------
+
+      
     }
   });
 }
