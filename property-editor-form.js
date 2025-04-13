@@ -962,7 +962,7 @@ async function displayPhotosForRoom(roomId, client) {
         // Appeler l'API GET avec le client Xano
        // Utilise l'instance globale DIRECTEMENT
         if (!client) throw new Error("Instance XanoClient non initialisé !");
-        const photos = await Client.get(endpoint); // La fonction client.get gère l'URL de base et l'auth
+        const photos = await client.get(endpoint); // La fonction client.get gère l'URL de base et l'auth
 
         // if(photoLoader) photoLoader.style.display = 'none'; // Cacher le loader
 
