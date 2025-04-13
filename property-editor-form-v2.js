@@ -1,8 +1,9 @@
 
+
   // ==========================================
   // == Script Xano Unifié (Formulaires + Données) ==
   // ==========================================
-  // Date: 2025-04-13 15H40
+  // Date: 2025-04-13 16h00
 
   function setupRoomTypeSelection() {
     // Cible le conteneur de ta Collection List (ajuste le sélecteur si besoin)
@@ -96,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // Appelée ici, en supposant que initXanoDataEndpoints a eu le temps de rendre la liste.
   // Si le rendu est très lent ou asynchrone, il faudrait peut-être l'appeler
   // en réponse à l'événement 'xano:data-loaded' émis par fetchXanoData.
-  setupCreatedRoomSelection(xanoClient);
+  setupCreatedRoomSelection();
   // -------------------------------------------------------
 
   console.log("Initialisation UNIFIÉE terminée.");
@@ -836,7 +837,7 @@ function bindDataToElement(element, data) {
 // ============================================================
 // == Fonctions pour Sélection Pièces (Types CMS & Créées) ==
 // ============================================================
-function setupCreatedRoomSelection(client) {
+function setupCreatedRoomSelection() {
   // Cible le conteneur où renderListData affiche les pièces créées
   // Utilise l'attribut que tu as mis sur le conteneur qui a data-xano-list / data-xano-list-container
   const listContainer = document.querySelector('[data-xano-list-container]') || document
@@ -892,93 +893,9 @@ function setupCreatedRoomSelection(client) {
 
       // Optionnel : Afficher le formulaire d'upload si caché, etc.
       photoUploadForm.style.display = ''; // Ou 'block'
-
-        // --- NOUVEL AJOUT ICI ---
-    // Appelle la fonction pour afficher les photos de cette pièce
-    // On passe l'ID de la pièce et l'instance de xanoClient
-    displayPhotosForRoom(roomDbId, client);
-    // ------------------------
     }
   });
 }
-
-// --- NOUVEAU : Fonction pour afficher les photos d'une pièce ---
-async function displayPhotosForRoom(roomId, client) {
-    console.log(`displayPhotosForRoom: Récupération des photos pour Room ID = ${roomId}`);
-
-    // Adapte les sélecteurs si tu as utilisé d'autres noms
-    const photoListContainer = document.querySelector('[data-element="photo-list-container"]');
-    const photoTemplate = document.querySelector('[data-element="photo-item-template"]');
-    // Optionnel: élément pour message d'erreur/vide spécifique aux photos
-    const photoEmptyState = document.querySelector('[data-element="photo-empty-state"]');
-
-    if (!photoListContainer || !photoTemplate) {
-        console.error("displayPhotosForRoom: Conteneur [data-element='photo-list-container'] ou template [data-element='photo-item-template'] non trouvé !");
-        return;
-    }
-
-    // Préparatifs UI
-    photoTemplate.style.display = 'none';
-    if (photoEmptyState) photoEmptyState.style.display = 'none';
-    photoListContainer.innerHTML = ''; // Vide les anciennes photos
-    // Afficher un loader ?
-    // const photoLoader = document.querySelector('[data-element="photo-loader"]');
-    // if(photoLoader) photoLoader.style.display = 'block';
-
-    // Construire l'URL de l'endpoint Xano
-    const endpoint = `room/${roomId}/photos`; // Utilise l'URL définie dans Xano
-
-    try {
-        // Appeler l'API GET avec le client Xano
-        const photos = await client.get(endpoint); // La fonction client.get gère l'URL de base et l'auth
-
-        // if(photoLoader) photoLoader.style.display = 'none'; // Cacher le loader
-
-        console.log(`displayPhotosForRoom: Photos reçues pour Room ID ${roomId}:`, photos);
-
-        // Vérifier si la réponse est bien un tableau (Xano retourne directement la liste normalement)
-        if (Array.isArray(photos) && photos.length > 0) {
-            photos.forEach(photo => {
-                const newItem = photoTemplate.cloneNode(true);
-                newItem.style.display = ''; // Afficher
-
-                // Utiliser bindDataToElement (qui existe déjà dans ton script)
-                // pour peupler les éléments à l'intérieur du clone.
-                // Important : Assure-toi que les clés ('image.url', 'photo_description')
-                // correspondent bien à la structure des objets 'photo' retournés par Xano.
-                const boundElements = newItem.querySelectorAll('[data-xano-bind]');
-                boundElements.forEach(boundElement => {
-                    bindDataToElement(boundElement, photo);
-                });
-                 // Si le clone lui-même a data-xano-bind (moins probable pour une photo)
-                 if (newItem.hasAttribute('data-xano-bind')){
-                     bindDataToElement(newItem, photo);
-                 }
-
-                 // Optionnel : Ajouter un data-attribut avec l'ID de la photo si besoin pour d'autres actions
-                 // newItem.setAttribute('data-photo-id', photo.id);
-
-                photoListContainer.appendChild(newItem);
-            });
-        } else {
-            console.log("displayPhotosForRoom: Aucune photo trouvée pour cette pièce.");
-            if (photoEmptyState) {
-                photoEmptyState.textContent = "Aucune photo dans cet album.";
-                photoEmptyState.style.display = '';
-            }
-        }
-
-    } catch (error) {
-        console.error(`displayPhotosForRoom: Erreur lors de la récupération/affichage des photos pour Room ID ${roomId}:`, error);
-        // if(photoLoader) photoLoader.style.display = 'none';
-        if (photoEmptyState) {
-            photoEmptyState.textContent = `Erreur: ${error.message}`;
-            photoEmptyState.style.display = '';
-        }
-    }
-}
-// --- FIN NOUVELLE FONCTION ---
-
 // -----------------------------------------------------------------
 
 // ==========================================
