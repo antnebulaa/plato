@@ -927,7 +927,7 @@ function setupCreatedRoomSelection() {
 
       
     }
-  });
+  );
 }
 
 // --- NOUVEAU : Fonction pour afficher les photos d'une pièce ---
