@@ -934,7 +934,7 @@ function setupCreatedRoomSelection(client) {
                 console.log("Feedback visuel appliqué.");
 
                 console.log("Préparation fetch photos...");
-                if (client && photoDisplayContainer) {
+                if (client) {
                     if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'block';
                     const errorElement = photoDisplayContainer.querySelector('[data-xano-error]');
                     if (errorElement) errorElement.style.display = 'none';
