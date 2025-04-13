@@ -934,12 +934,7 @@ function setupCreatedRoomSelection() {
 async function displayPhotosForRoom(roomId) {
     console.log(`displayPhotosForRoom: Récupération des photos pour Room ID = ${roomId}`);
 
-    // Vérification que client est bien défini
-    if (!client) {
-        console.error("displayPhotosForRoom: Le client Xano n'est pas défini!");
-        return;
-    }
-
+    
     // Adapte les sélecteurs si tu as utilisé d'autres noms
     const photoListContainer = document.querySelector('[data-element="photo-list-container"]');
     const photoTemplate = document.querySelector('[data-element="photo-item-template"]');
