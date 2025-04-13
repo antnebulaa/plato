@@ -916,12 +916,10 @@ function setupCreatedRoomSelection() {
       
      // Vérifie que xanoClientInstance existe avant de l'utiliser
      if (xanoClientInstance) {
-       console.log("DEBUG: xanoClientInstance exists. Calling displayPhotosForRoom..."); // <-- LOG 9
-          displayPhotosForRoom(roomDbId, xanoClientInstance); // <-- Passez xanoClientInstance ici
-       console.log("DEBUG: displayPhotosForRoom function finished."); // <-- LOG 10
-     } else {
-          console.error("DEBUG: xanoClientInstance is NOT available at click time!"); // <-- LOG ERREUR INSTANCE
-     }
+    displayPhotosForRoom(roomDbId, xanoClientInstance);
+} else {
+    console.error("xanoClientInstance n'est pas disponible!");
+}
 } else {
         console.log("DEBUG: Clicked element does not match selector or missing data-room-id."); // <-- LOG 11 (Si le clic n'est pas sur le bon élément)
     }
@@ -935,6 +933,12 @@ function setupCreatedRoomSelection() {
 // --- NOUVEAU : Fonction pour afficher les photos d'une pièce ---
 async function displayPhotosForRoom(roomId, client) {
     console.log(`displayPhotosForRoom: Récupération des photos pour Room ID = ${roomId}`);
+
+    // Vérification que client est bien défini
+    if (!client) {
+        console.error("displayPhotosForRoom: Le client Xano n'est pas défini!");
+        return;
+    }
 
     // Adapte les sélecteurs si tu as utilisé d'autres noms
     const photoListContainer = document.querySelector('[data-element="photo-list-container"]');
@@ -959,11 +963,9 @@ async function displayPhotosForRoom(roomId, client) {
     const endpoint = `room/${roomId}/photos`; // Utilise l'URL définie dans Xano
 
     try {
-        // Appeler l'API GET avec le client Xano
-       // Utilise l'instance globale DIRECTEMENT
-        if (!client) throw new Error("Instance XanoClient non initialisé !");
-        const photos = await client.get(endpoint); // La fonction client.get gère l'URL de base et l'auth
-
+       // Utiliser le paramètre client passé à la fonction
+        const photos = await client.get(endpoint); // Utiliser client, pas Client
+      
         // if(photoLoader) photoLoader.style.display = 'none'; // Cacher le loader
 
         console.log(`displayPhotosForRoom: Photos reçues pour Room ID ${roomId}:`, photos);
