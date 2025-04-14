@@ -10,7 +10,8 @@ let xanoClient; // Déclarez xanoClient ici
 
 // Variables pour la sélection multiple de photos
 let modeSelectionActif = false; // false = pas en mode sélection, true = en mode sélection
-
+let photosSelectionneesIds = [];
+let currentSelectedRoomId = null;
  
   function setupRoomTypeSelection() {
     // Cible le conteneur de ta Collection List (ajuste le sélecteur si besoin)
@@ -942,10 +943,16 @@ function setupCreatedRoomSelection(client) {
             if (selectedElement) {
                 const roomDbId = selectedElement.getAttribute('data-room-id');
                 console.log(`Room ID: ${roomDbId}`);
+             
+              // currentSelectedRoomId = roomDbId;
+               currentSelectedRoomId = roomDbId;
+              
                 try {
                     roomDbIdInput.value = roomDbId;
                     console.log(`Input mis à jour (valeur=${roomDbIdInput.value})`);
                 } catch (e) { console.error("Erreur maj input:", e); }
+
+              
 
                 listContainer.querySelectorAll('[data-action="select-created-room"][data-room-id]').forEach(el => el.classList.remove('is-selected'));
                 selectedElement.classList.add('is-selected');
