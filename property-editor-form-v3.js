@@ -655,6 +655,14 @@ function renderListData(dataArray, listContainerElement) {
         return; // Passer à l'item suivant
       }
 
+      if (item && item.path) {
+    // Assurez-vous que 'clone' est l'élément principal du template (ex: la div externe)
+    clone.setAttribute('data-photo-path', item.path);
+} else {
+    // Log si jamais un objet image n'a pas de propriété 'path'
+    console.warn("Impossible d'ajouter data-photo-path: 'path' manquant dans l'objet item", item);
+}
+
       // Rendre visible et marquer l'élément cloné
       clone.style.display = ''; // Enlever le display:none potentiel
       clone.removeAttribute('aria-hidden');
@@ -1014,8 +1022,48 @@ function setupPhotoSelectionMode() {
             // NOTE : Plus tard, ici, on désélectionnera les photos et on cachera le bouton Supprimer.
         }
     });
-
     console.log("SETUP: Écouteur ajouté au bouton mode sélection.");
+
+  // === AJOUT DANS setupPhotoSelectionMode ===
+
+const photoListContainer = document.getElementById('photo-list-container');
+if (!photoListContainer) { /* ... erreur ... */ return; }
+
+// Écouteur sur le CONTENEUR des photos (délégation d'événements)
+photoListContainer.addEventListener('click', function(event) {
+    if (!modeSelectionActif) { return; } // Mode sélection actif ?
+    const clickedPhotoElement = event.target.closest('[data-photo-path]'); // Photo cliquée ?
+    if (!clickedPhotoElement) { return; }
+    event.preventDefault();
+    const photoPath = clickedPhotoElement.getAttribute('data-photo-path'); // Récupère ID
+    if (!photoPath) return;
+    clickedPhotoElement.classList.toggle('is-photo-selected'); // Bascule style
+    // Met à jour le tableau photosSelectionneesIds (ajoute/retire photoPath)
+    const indexInSelection = photosSelectionneesIds.indexOf(photoPath);
+    if (indexInSelection > -1) { photosSelectionneesIds.splice(indexInSelection, 1); }
+    else { photosSelectionneesIds.push(photoPath); }
+    console.log("Photos sélectionnées (paths):", photosSelectionneesIds);
+    // Affiche/cache bouton supprimer
+    if (boutonSupprimerSelection){ // Vérifier si bouton existe
+         boutonSupprimerSelection.style.display = photosSelectionneesIds.length > 0 ? '' : 'none';
+    }
+});
+console.log("SETUP: Écouteur ajouté au conteneur de liste de photos.");
+
+// --- Écouteur sur le bouton "Supprimer la sélection" ---
+// 'boutonSupprimerSelection' est déjà défini au début de la fonction
+if (boutonSupprimerSelection) { // Vérifier si le bouton existe
+    boutonSupprimerSelection.addEventListener('click', function() {
+        if (photosSelectionneesIds.length === 0) { /* ... warning ... */ return; }
+        const confirmation = window.confirm(`Êtes-vous sûr de vouloir supprimer ${photosSelectionneesIds.length} photo(s) ? ...`);
+        if (!confirmation) { /* ... log ... */ return; }
+        console.log(`Suppression confirmée pour ${photosSelectionneesIds.length} photo(s). Paths:`, photosSelectionneesIds);
+        // TODO: Appeler Xano etc...
+    });
+    console.log("SETUP: Écouteur ajouté au bouton supprimer sélection.");
+}
+
+  
 } // Fin de setupPhotoSelectionMode
 
 
