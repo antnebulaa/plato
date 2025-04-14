@@ -6,6 +6,11 @@
   // Date: 2025-04-13 16h45
 
 let xanoClient; // Déclarez xanoClient ici
+
+
+// Variables pour la sélection multiple de photos
+let modeSelectionActif = false; // false = pas en mode sélection, true = en mode sélection
+
  
   function setupRoomTypeSelection() {
     // Cible le conteneur de ta Collection List (ajuste le sélecteur si besoin)
@@ -129,6 +134,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
   console.log("8. Appel à setupCreatedRoomSelection TERMINÉ (ne signifie pas qu'elle a réussi).");
     // --- Fin Vérification ---
+
+     setupPhotoSelectionMode();
+
 
     console.log("9. Initialisation UNIFIÉE terminée (fin du bloc try DOMContentLoaded).");
 
@@ -735,6 +743,8 @@ function renderListData(dataArray, listContainerElement) {
   }
 }
 
+
+
 function bindDataToElement(element, data) {
   const dataKey = element.getAttribute('data-xano-bind');
   if (!dataKey) return; // Pas de clé de binding
@@ -959,6 +969,55 @@ function setupCreatedRoomSelection(client) {
 
     console.log("Fin de l'exécution normale de setupCreatedRoomSelection."); // Nouveau log final
 } // Fin de la fonction
+
+
+// ==========================================
+// Fonction pour initialiser le bouton de changement de mode sélection    ==
+// ==========================================
+
+function setupPhotoSelectionMode() {
+    console.log("SETUP: Initialisation du bouton mode sélection photo.");
+
+    // Récupère le bouton par son ID (Vérifiez que l'ID correspond à celui dans Webflow)
+    const boutonModeSelection = document.getElementById('bouton-mode-selection');
+    // Récupère le conteneur des photos pour styler le mode sélection
+    const conteneurPhotos = document.getElementById('room-photos-display');
+
+    // Vérification que les éléments existent
+    if (!boutonModeSelection) {
+        console.error("SETUP ERROR: Bouton avec ID 'bouton-mode-selection' introuvable !");
+        return;
+    }
+    if (!conteneurPhotos) {
+        console.error("SETUP ERROR: Conteneur avec ID 'room-photos-display' introuvable !");
+        return; // Optionnel, mais utile pour la classe CSS
+    }
+
+    // Ajoute l'écouteur de clic sur le bouton
+    boutonModeSelection.addEventListener('click', function() {
+        // Inverse la valeur de la variable (true devient false, false devient true)
+        modeSelectionActif = !modeSelectionActif;
+        console.log("Mode sélection photos :", modeSelectionActif);
+
+        if (modeSelectionActif) {
+            // On entre en mode sélection
+            boutonModeSelection.textContent = "Annuler"; // Change le texte
+            if (conteneurPhotos) {
+                conteneurPhotos.classList.add('selection-active'); // Ajoute une classe pour CSS
+            }
+        } else {
+            // On sort du mode sélection
+            boutonModeSelection.textContent = "Sélectionner les photos"; // Texte d'origine
+            if (conteneurPhotos) {
+                conteneurPhotos.classList.remove('selection-active'); // Retire la classe
+            }
+            // NOTE : Plus tard, ici, on désélectionnera les photos et on cachera le bouton Supprimer.
+        }
+    });
+
+    console.log("SETUP: Écouteur ajouté au bouton mode sélection.");
+} // Fin de setupPhotoSelectionMode
+
 
 // -----------------------------------------------------------------
 
