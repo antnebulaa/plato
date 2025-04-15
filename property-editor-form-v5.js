@@ -1082,9 +1082,20 @@
   
       // Récupère le bouton par son ID (Vérifiez que l'ID correspond à celui dans Webflow)
       const boutonModeSelection = document.getElementById('bouton-mode-selection');
+    
       // Récupère le conteneur des photos pour styler le mode sélection
       const conteneurPhotos = document.getElementById('room-photos-display');
       const boutonSupprimerSelection = document.getElementById('bouton-supprimer-selection');
+if (boutonSupprimerSelection) {
+     if (photosSelectionneesIds.length > 0) {
+         boutonSupprimerSelection.classList.remove('is-hidden'); // <<< ENLEVER la classe pour AFFICHER
+     } else {
+         boutonSupprimerSelection.classList.add('is-hidden'); // <<< AJOUTER la classe pour CACHER
+     }
+     console.log("Visibilité bouton Supprimer mise à jour via classe. Caché:", photosSelectionneesIds.length === 0); // LOG 10 (modifié)
+} else {
+     console.error("Bouton Supprimer introuvable!");
+}
       
       // Vérification que les éléments existent
       if (!boutonModeSelection || !conteneurPhotos || !boutonSupprimerSelection) {
@@ -1111,9 +1122,31 @@
               if (conteneurPhotos) {
                   conteneurPhotos.classList.remove('selection-active'); // Retire la classe
               }
-              // NOTE : Plus tard, ici, on désélectionnera les photos et on cachera le bouton Supprimer.
-          }
-      });
+             // --- AJOUTS ICI pour nettoyer en sortant du mode ---
+
+            // 1. Cacher le bouton Supprimer (via la classe CSS)
+            //    (La variable boutonSupprimerSelection est définie au début de setupPhotoSelectionMode)
+            if (boutonSupprimerSelection) { // Sécurité : vérifier qu'on a bien trouvé le bouton au début
+                 boutonSupprimerSelection.classList.add('is-hidden');
+                 console.log("Bouton supprimer caché via classe (annulation mode sélection)");
+            }
+
+            // 2. Retirer la classe .is-photo-selected de toutes les photos
+            //    (La variable photoListContainer est définie dans setupPhotoSelectionMode)
+            if (photoListContainer) {
+                const photosActuellementSelectionnees = photoListContainer.querySelectorAll('.is-photo-selected');
+                photosActuellementSelectionnees.forEach(photoEl => {
+                    photoEl.classList.remove('is-photo-selected');
+                });
+                console.log(`Désélection visuelle de ${photosActuellementSelectionnees.length} photo(s)`);
+            }
+
+            // 3. Vider le tableau des IDs sélectionnés
+            photosSelectionneesIds = [];
+            console.log("Sortie du mode sélection, IDs vidés:", photosSelectionneesIds);
+
+            // --- FIN DES AJOUTS ---
+        }
       console.log("SETUP: Écouteur ajouté au bouton mode sélection.");
   
     // === AJOUT DANS setupPhotoSelectionMode ===
@@ -1233,8 +1266,10 @@
                    const conteneurPhotos = document.getElementById('room-photos-display'); // Assurez-vous que cet ID est correct
                   if(boutonModeSelection) boutonModeSelection.textContent = "Sélectionner les photos";
                   if(conteneurPhotos) conteneurPhotos.classList.remove('selection-active');
-                  boutonSupprimerSelection.style.display = 'none'; // Cacher le bouton supprimer
+                  // boutonSupprimerSelection.style.display = 'none'; // Cacher le bouton supprimer
                    // -----------------------------------------------------
+                // Cacher le bouton Supprimer en ajoutant la classe
+                boutonSupprimerSelection.classList.add('is-hidden');
   
               } else {
                   // Gérer une réponse de Xano qui n'indique pas le succès
@@ -1251,9 +1286,7 @@
               boutonSupprimerSelection.disabled = false;
               boutonSupprimerSelection.textContent = "Supprimer la sélection";
               // On cache le bouton si on est sorti du mode sélection (ce qui arrive en cas de succès)
-               if (!modeSelectionActif) {
-                   boutonSupprimerSelection.style.display = 'none';
-              }
+               
           }
       });
       console.log("SETUP: Écouteur ajouté au bouton supprimer sélection.");
