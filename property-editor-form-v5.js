@@ -1123,9 +1123,17 @@
          return; }
   
   // Écouteur sur le CONTENEUR des photos (délégation d'événements)
-  photoListContainer.addEventListener('click', function(event) {
-      if (!modeSelectionActif) { return; } // Mode sélection actif ?
+  conteneurPhotos.addEventListener('click', function(event) {
+      console.log("--- Clic détecté sur conteneurPhotos (#room-photos-display) ---"); // Log modifié
+      if (!modeSelectionActif) { 
+        // console.log("Mode sélection inactif, clic ignoré.");
+        return; 
+      } // Mode sélection actif ?
+      console.log("Mode sélection ACTIF. Cible du clic:", event.target);
+
       const clickedPhotoElement = event.target.closest('[data-photo-path]'); // Photo cliquée ?
+      console.log("Élément photo trouvé via closest:", clickedPhotoElement);
+    
       if (!clickedPhotoElement) { return; }
       event.preventDefault();
       const photoPath = clickedPhotoElement.getAttribute('data-photo-path'); // Récupère ID
