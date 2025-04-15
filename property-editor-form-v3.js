@@ -1065,7 +1065,111 @@ if (boutonSupprimerSelection) { // Vérifier si le bouton existe
         const confirmation = window.confirm(`Êtes-vous sûr de vouloir supprimer ${photosSelectionneesIds.length} photo(s) ? ...`);
         if (!confirmation) { /* ... log ... */ return; }
         console.log(`Suppression confirmée pour ${photosSelectionneesIds.length} photo(s). Paths:`, photosSelectionneesIds);
-        // TODO: Appeler Xano etc...
+
+
+      // --- Écouteur sur le bouton "Supprimer la sélection" ---
+if (boutonSupprimerSelection) {
+    boutonSupprimerSelection.addEventListener('click', async function() { // << Ajoutez async ici
+        // 1. Vérifier si des photos sont sélectionnées
+        if (photosSelectionneesIds.length === 0) {
+            console.warn("Clic sur Supprimer, mais aucune photo n'est sélectionnée.");
+            return;
+        }
+        // Vérifier si l'ID de la room est connu
+        if (currentSelectedRoomId === null) {
+             console.error("Impossible de supprimer : ID de la room courante inconnu.");
+             alert("Erreur : Impossible d'identifier la room actuelle.");
+             return;
+        }
+
+        // 2. Demander confirmation
+        const confirmation = window.confirm(`Êtes-vous sûr de vouloir supprimer ${photosSelectionneesIds.length} photo(s) ? Cette action est irréversible.`);
+        if (!confirmation) {
+            console.log("Suppression annulée par l'utilisateur.");
+            return;
+        }
+
+        // 3. Si confirmé, préparer et exécuter la suppression
+        console.log(`Suppression confirmée pour ${photosSelectionneesIds.length} photo(s) dans la room ${currentSelectedRoomId}. Paths:`, photosSelectionneesIds);
+
+        // Afficher un indicateur de chargement/suppression
+        boutonSupprimerSelection.disabled = true;
+        boutonSupprimerSelection.textContent = "Suppression...";
+
+        // Préparer les données à envoyer
+        const payload = {
+            room_id: parseInt(currentSelectedRoomId, 10), // Assurer que c'est un nombre
+            photo_paths: photosSelectionneesIds // Le tableau des chemins à supprimer
+        };
+
+        const deleteEndpoint = 'photos/batch_delete'; // <<< VÉRIFIEZ que c'est le bon chemin de votre endpoint Xano
+        const deleteMethod = 'POST'; // <<< Utilisez POST comme convenu
+
+        try {
+            // Appel API avec xanoClient (il est accessible ici)
+            const response = await xanoClient._request(deleteMethod, deleteEndpoint, payload, false); // false = pas FormData, envoie en JSON
+
+            console.log('Réponse suppression Xano:', response);
+
+            if (response && response.success) {
+                // --- SUPPRESSION RÉUSSIE ---
+                console.log('Photos supprimées avec succès via API !');
+                alert('Les photos sélectionnées ont été supprimées.'); // Feedback simple
+
+                // --- Rafraîchir la liste des photos ---
+                console.log(`Rafraîchissement des photos pour la room ${currentSelectedRoomId}...`);
+                const photoDisplayContainer = document.getElementById('room-photos-display'); // Assurez-vous que cet ID est correct
+                const photoLoadingIndicator = photoDisplayContainer ? photoDisplayContainer.querySelector('[data-xano-loading]') : null;
+                // Utilise l'endpoint de FETCH (pas celui de delete !)
+                const fetchEndpoint = `property_photos/photos/${currentSelectedRoomId}`;
+                const params = null;
+
+                if (photoDisplayContainer && xanoClient) { // Vérifier que xanoClient existe aussi
+                    if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'block';
+                    // Rappeler fetchXanoData pour recharger la liste de photos mise à jour
+                    // Note : La gestion d'erreur de ce fetch est dans fetchXanoData lui-même
+                     await fetchXanoData(xanoClient, fetchEndpoint, 'GET', params, photoDisplayContainer, photoLoadingIndicator);
+                }
+                 // ------------------------------------
+
+                // --- Réinitialiser l'état de sélection APRÈS le succès ---
+                 // (Normalement la réinitialisation du mode se fait via le bouton Annuler, mais on le force ici après succès)
+                photosSelectionneesIds = []; // Vider le tableau
+                // Retirer la classe visuelle des éléments (même s'ils vont être re-rendus)
+                const photoListContainer = document.getElementById('photo-list-container'); // Assurez-vous que cet ID est correct
+                if(photoListContainer){
+                     photoListContainer.querySelectorAll('.is-photo-selected').forEach(photoEl => {
+                         photoEl.classList.remove('is-photo-selected');
+                     });
+                }
+                // Quitter le mode sélection proprement
+                modeSelectionActif = false;
+                 const boutonModeSelection = document.getElementById('bouton-mode-selection'); // Assurez-vous que cet ID est correct
+                 const conteneurPhotos = document.getElementById('room-photos-display'); // Assurez-vous que cet ID est correct
+                if(boutonModeSelection) boutonModeSelection.textContent = "Sélectionner les photos";
+                if(conteneurPhotos) conteneurPhotos.classList.remove('selection-active');
+                boutonSupprimerSelection.style.display = 'none'; // Cacher le bouton supprimer
+                 // -----------------------------------------------------
+
+            } else {
+                // Gérer une réponse de Xano qui n'indique pas le succès
+                console.error("La suppression a échoué côté serveur (réponse non succès):", response);
+                alert("Erreur: La suppression des photos a échoué. Message : " + (response?.message || 'Réponse invalide du serveur.'));
+            }
+
+        } catch (error) {
+            // Gérer les erreurs réseau ou autres erreurs lors de l'appel
+            console.error("Erreur lors de l'appel API de suppression:", error);
+            alert("Erreur réseau ou technique lors de la suppression: " + error.message);
+        } finally {
+            // Réactiver le bouton et remettre le texte normal DANS TOUS LES CAS
+            boutonSupprimerSelection.disabled = false;
+            boutonSupprimerSelection.textContent = "Supprimer la sélection";
+            // On cache le bouton si on est sorti du mode sélection (ce qui arrive en cas de succès)
+             if (!modeSelectionActif) {
+                 boutonSupprimerSelection.style.display = 'none';
+            }
+        }
     });
     console.log("SETUP: Écouteur ajouté au bouton supprimer sélection.");
 }
