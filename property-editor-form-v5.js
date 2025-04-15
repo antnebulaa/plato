@@ -525,71 +525,66 @@
   }
   
   function renderData(data, element) {
-    // Si l'élément a un attribut data-xano-list, c'est une liste
-    if (element.hasAttribute('data-xano-list')) {
-      // Trouver les données de liste (plus robuste)
-      let listData = null;
-      const potentialDataSources = [
-        data,
-        data?.body,
-        data?.items,
-        data?.body?.items
-      ];
-  
-      for (const source of potentialDataSources) {
-        if (Array.isArray(source)) {
-          listData = source;
-          break;
+    // --- Vérification SPÉCIFIQUE pour la liste de PHOTOS ---
+    // On regarde si l'élément HTML où on doit afficher les données a l'ID 'room-photos-display'
+    // ET s'il est bien configuré pour afficher une liste (a l'attribut data-xano-list)
+    if (element.id === 'room-photos-display' && element.hasAttribute('data-xano-list')) {
+        console.log("renderData: Appel de renderPhotoItems pour #room-photos-display"); // Log pour vérifier
+
+        // Extraire la liste de données (Xano renvoie directement le tableau plat maintenant)
+        let listData = null;
+        if (Array.isArray(data)) {
+            listData = data;
+        } else {
+             console.warn("renderData: Données reçues pour photos ne sont pas un tableau:", data);
+             listData = []; // Sécurité: utiliser un tableau vide
         }
-        // Si ce n'est pas un tableau, mais un objet, chercher une clé qui contient un tableau
-        if (source && typeof source === 'object') {
-          for (const key in source) {
-            if (Array.isArray(source[key])) {
-              listData = source[key];
-              // On pourrait vouloir être plus spécifique si plusieurs tableaux existent
-              // console.warn(`Multiple arrays found in data source for list, using key: ${key}`);
-              break; // Prend le premier tableau trouvé
-            }
-          }
-        }
-        if (listData) break; // Sortir de la boucle externe si trouvé
-      }
-  
-      if (listData) {
-        renderListData(listData, element); // Utilise le helper
-      } else {
-        console.warn('Aucun tableau de données trouvé dans la réponse pour la liste:', data);
-        renderListData([], element); // Afficher la liste comme vide
-        // Optionnellement, afficher une erreur plus explicite
-        // element.textContent = "Erreur : Données de liste non valides ou non trouvées.";
-      }
-    } else {
-      // Sinon, c'est un élément unique (ou un conteneur pour des éléments uniques)
-      // Les données peuvent être dans data.body ou data directement
-      const sourceData = data?.body ? data.body : data;
-  
-      if (sourceData && typeof sourceData === 'object') {
-        // Lier les données aux enfants directs ou descendants avec data-xano-bind
-        const boundElements = element.querySelectorAll('[data-xano-bind]');
-        if (boundElements.length > 0) {
-          boundElements.forEach(boundElement => {
-            // Ne pas lier si l'élément est DANS un template de liste potentiel à l'intérieur de cet élément
-            if (!boundElement.closest('[data-xano-list] [data-xano-bind]')) {
-              bindDataToElement(boundElement, sourceData); // Utilise le helper
-            }
-          });
-        } else if (element.hasAttribute('data-xano-bind')) {
-          // Si l'élément lui-même a data-xano-bind (cas moins courant pour un conteneur)
-          bindDataToElement(element, sourceData);
-        }
-  
-      } else {
-        console.warn("Données pour l'élément unique non trouvées ou non objet:", sourceData);
-        // Que faire ici ? Afficher un message ? Laisser l'élément tel quel ?
-        // element.textContent = "Données non disponibles.";
-      }
+        // Appeler la fonction SPÉCIFIQUE aux photos
+        renderPhotoItems(listData, element); // <<< APPEL renderPhotoItems ICI
+
     }
-  }
+    // --- Logique pour TOUTES les AUTRES listes (ex: liste des rooms) ---
+    else if (element.hasAttribute('data-xano-list')) {
+        console.log("renderData: Appel de renderListData (générique) pour:", element); // Log pour vérifier
+
+        // Extraire la liste de données (logique originale, cherche dans data, data.body, etc.)
+        let listData = null;
+        const potentialDataSources = [ data, data?.body, data?.items, data?.body?.items ]; // Adapter si besoin
+        for (const source of potentialDataSources) {
+             if (Array.isArray(source)) { listData = source; break; }
+             if (source && typeof source === 'object') { for (const key in source) { if (Array.isArray(source[key])) { listData = source[key]; break; } } }
+             if (listData) break;
+        }
+        if (!listData) {
+            console.warn("renderData: Aucune donnée de liste trouvée pour", element, "dans", data);
+            listData = []; // Sécurité: utiliser un tableau vide
+        }
+        // Appeler la fonction GÉNÉRIQUE (celle pour les rooms, etc.)
+        renderListData(listData, element); // <<< APPEL renderListData ICI
+
+    }
+    // --- Logique pour les éléments uniques (non-listes) ---
+    else {
+        console.log("renderData: Affichage d'un élément unique pour:", element);
+        // Code original pour gérer les éléments uniques avec bindDataToElement
+        const sourceData = data?.body ? data.body : data;
+         if (sourceData && typeof sourceData === 'object') {
+             // Lier aux enfants directs ou à l'élément lui-même
+             const boundElements = element.querySelectorAll('[data-xano-bind]');
+             if (boundElements.length > 0) {
+                 boundElements.forEach(boundElement => {
+                     if (!boundElement.closest('[data-xano-list-item]')) { // Était '[data-xano-list] [data-xano-bind]', ajusté pour être plus sûr
+                         bindDataToElement(boundElement, sourceData);
+                     }
+                 });
+             } else if (element.hasAttribute('data-xano-bind')) {
+                 bindDataToElement(element, sourceData);
+             }
+         } else {
+             console.warn("renderData: Données pour élément unique non trouvées ou non objet:", sourceData);
+         }
+    }
+}
   
   function renderListData(dataArray, listContainerElement) {
     dataArray = Array.isArray(dataArray) ? dataArray : [];
