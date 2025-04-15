@@ -3,7 +3,7 @@
   // ==========================================
   // == Script Xano Unifié (Formulaires + Données) ==
   // ==========================================
-  // Date: 2025-04-15 12h53
+  // Date: 2025-04-15 15h30
 
   let xanoClient; // Déclarez xanoClient ici
 
@@ -997,16 +997,14 @@
       const boutonModeSelection = document.getElementById('bouton-mode-selection');
       // Récupère le conteneur des photos pour styler le mode sélection
       const conteneurPhotos = document.getElementById('room-photos-display');
-  
+      const boutonSupprimerSelection = document.getElementById('bouton-supprimer-selection');
+      
       // Vérification que les éléments existent
-      if (!boutonModeSelection) {
-          console.error("SETUP ERROR: Bouton avec ID 'bouton-mode-selection' introuvable !");
-          return;
+      if (!boutonModeSelection || !conteneurPhotos || !boutonSupprimerSelection) {
+        console.error("SETUP ERROR: Un ou plusieurs éléments HTML manquants (boutons ou conteneur photos). IDs: bouton-mode-selection, bouton-supprimer-selection, room-photos-display");
+        return;
       }
-      if (!conteneurPhotos) {
-          console.error("SETUP ERROR: Conteneur avec ID 'room-photos-display' introuvable !");
-          return; // Optionnel, mais utile pour la classe CSS
-      }
+
   
       // Ajoute l'écouteur de clic sur le bouton
       boutonModeSelection.addEventListener('click', function() {
@@ -1034,7 +1032,8 @@
     // === AJOUT DANS setupPhotoSelectionMode ===
   
   const photoListContainer = document.getElementById('photo-list-container');
-  if (!photoListContainer) { /* ... erreur ... */ return; }
+  if (!photoListContainer) { console.error("SETUP ERROR: Conteneur '#photo-list-container' introuvable ! Clics photos impossibles.");
+         return; }
   
   // Écouteur sur le CONTENEUR des photos (délégation d'événements)
   photoListContainer.addEventListener('click', function(event) {
