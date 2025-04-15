@@ -3,7 +3,7 @@
   // ==========================================
   // == Script Xano Unifié (Formulaires + Données) ==
   // ==========================================
-  // Date: 2025-04-15 12h53
+  // Date: 2025-04-15 15h30
 
   let xanoClient; // Déclarez xanoClient ici
 
@@ -593,90 +593,258 @@
   
   function renderListData(dataArray, listContainerElement) {
     dataArray = Array.isArray(dataArray) ? dataArray : [];
-
+  
     const templateSelector = listContainerElement.getAttribute('data-xano-list');
-    if (!templateSelector) { console.error("renderListData: Attribut data-xano-list manquant.", listContainerElement); return; }
+    if (!templateSelector) {
+      console.error("L'attribut data-xano-list doit contenir un sélecteur CSS pour le template.",
+        listContainerElement);
+      listContainerElement.textContent = "Erreur: Attribut data-xano-list manquant ou vide.";
+      return;
+    }
+  
     const templateElement = document.querySelector(templateSelector);
-    if (!templateElement) { console.error(`renderListData: Template "${templateSelector}" introuvable.`); return; }
-
-    const container = listContainerElement.querySelector('[data-xano-list-container]') || listContainerElement;
-
-    // Vider le conteneur (logique existante)
+    if (!templateElement) {
+      console.error(`Élément template "${templateSelector}" introuvable.`);
+      listContainerElement.textContent = `Erreur: Template "${templateSelector}" introuvable.`;
+      return;
+    }
+  
+    // Conteneur: soit un enfant spécifique, soit l'élément lui-même
+    const container = listContainerElement.querySelector('[data-xano-list-container]') ||
+      listContainerElement;
+  
+    // Vider le conteneur, en préservant le template s'il est à l'intérieur
+    // Et en préservant les éléments qui ne sont PAS des data-xano-list-item générés précédemment
     let currentChild = container.firstChild;
     while (currentChild) {
-        const nextChild = currentChild.nextSibling;
-        if (currentChild !== templateElement && currentChild.nodeType === Node.ELEMENT_NODE && currentChild.hasAttribute('data-xano-list-item')) {
-            container.removeChild(currentChild);
-        } // Garder le 'else if' pour la robustesse du vidage si besoin :
-        else if (container === listContainerElement && currentChild !== templateElement && currentChild.nodeType === Node.ELEMENT_NODE && !currentChild.hasAttribute('data-xano-list-item') /*ne pas supprimer éléments statiques*/) {
-             // Ne rien faire ici pour l'instant, pour éviter de supprimer des choses inattendues.
-             // Le premier if supprime les items générés précédemment.
-        }
-        currentChild = nextChild;
+      const nextChild = currentChild.nextSibling;
+      // Ne supprimer que les éléments générés précédemment OU si le conteneur est l'élément principal
+      // Et s'assurer de ne pas supprimer le template lui-même
+      if (currentChild !== templateElement && currentChild.nodeType === Node.ELEMENT_NODE &&
+        currentChild.hasAttribute('data-xano-list-item')) {
+        container.removeChild(currentChild);
+      } else if (container === listContainerElement && currentChild !== templateElement &&
+        currentChild.nodeType === Node.ELEMENT_NODE) {
+        // Si container = listContainerElement, on peut vouloir vider plus agressivement
+        // Sauf si l'utilisateur a mis d'autres éléments statiques qu'il veut garder ?
+        // Pour l'instant, on ne supprime que les items générés.
+        // Option : Vider tout sauf le template si container === listContainerElement
+        // container.removeChild(currentChild);
+      }
+      currentChild = nextChild;
     }
-
-    // Cacher le template (logique existante)
-    if (templateElement.tagName !== 'TEMPLATE') { templateElement.style.display = 'none'; templateElement.setAttribute('aria-hidden', 'true'); }
-
-    // --- Lire la configuration depuis le conteneur ---
-    const itemIdSource = listContainerElement.getAttribute('data-item-id-source'); // Ex: "id" ou "path"
-    const itemIdAttribute = listContainerElement.getAttribute('data-item-id-attribute'); // Ex: "data-room-id" ou "data-photo-path"
-    // --- Fin Lecture config ---
-
-    if (dataArray.length > 0) {
-        dataArray.forEach((item, index) => { // 'item' peut être une room ou une photo maintenant
-            const clone = templateElement.tagName === 'TEMPLATE' ? templateElement.content.cloneNode(true).firstElementChild : templateElement.cloneNode(true);
-            if (!clone) { console.error("renderListData: Échec clonage template pour item:", item); return; }
-
-            // Configuration de base du clone
-            clone.style.display = '';
-            clone.removeAttribute('aria-hidden');
-            clone.setAttribute('data-xano-list-item', '');
-            clone.setAttribute('data-xano-item-index', index.toString());
-
-            // --- [NOUVEAU] Ajouter l'attribut d'ID unique (si configuré) ---
-            if (itemIdSource && itemIdAttribute && item && item[itemIdSource] !== undefined && item[itemIdSource] !== null) {
-                clone.setAttribute(itemIdAttribute, item[itemIdSource]);
-                // console.log(`renderListData: Attribut ${itemIdAttribute}=${item[itemIdSource]} ajouté.`); // Optionnel: log de debug
-            } else if (itemIdSource && itemIdAttribute) {
-                 // Warning seulement si la config existait mais la donnée manquait dans l'item
-                console.warn(`renderListData: Impossible d'ajouter ${itemIdAttribute}. Clé source "${itemIdSource}" manquante/null dans:`, item);
-            }
-            // --- Fin Ajout ID unique ---
-
-            // Lier les sous-données (comme avant)
-            const boundElements = clone.querySelectorAll('[data-xano-bind]');
-            boundElements.forEach(boundElement => { bindDataToElement(boundElement, item); });
-            if (clone.hasAttribute('data-xano-bind')) { bindDataToElement(clone, item); }
-
-            // --- [NOUVEAU] Logique spécifique au type de template (si configuré) ---
-            const templateType = clone.getAttribute('data-template-type'); // Lire depuis le clone (qui vient du template)
-            if (templateType === 'room') {
-                // Logique spécifique aux rooms (ex: ajouter data-action si besoin)
-                const clickableElement = clone.querySelector('[data-action="select-created-room"]') || clone;
-                 if (!clickableElement.hasAttribute('data-action')) {
-                     clickableElement.setAttribute('data-action', 'select-created-room');
-                 }
-                 // Note: data-room-id est déjà ajouté par la logique générique itemIdAttribute si bien configuré.
-            } else if (templateType === 'photo') {
-                // Logique spécifique aux photos (aucune pour l'instant)
-            }
-            // --- Fin Logique Spécifique ---
-
-            // Gestion des liens génériques (comme avant, si applicable)
-            const linkElements = clone.querySelectorAll('[data-xano-link-to]');
-            linkElements.forEach(linkElement => { /* ... logique lien ... */ });
-            if (clone.hasAttribute('data-xano-link-to')) { /* ... logique lien ... */ }
-
-            container.appendChild(clone);
-        });
-    } else {
-        // Afficher message si vide (comme avant)
-        const emptyMessage = listContainerElement.getAttribute('data-xano-empty-message') || "Aucune donnée à afficher.";
-        if (!container.querySelector('.xano-empty-message')) { /* ... ajouter message ... */ }
-    }
-}
   
+    // S'assurer que le template est bien caché (s'il n'est pas déjà dans une balise <template>)
+    if (templateElement.tagName !== 'TEMPLATE') {
+      templateElement.style.display = 'none';
+      templateElement.setAttribute('aria-hidden', 'true'); // Pour l'accessibilité
+    }
+  
+    // Générer les éléments de la liste
+    if (dataArray.length > 0) {
+      dataArray.forEach((item, index) => { // item est une ROOM ici (ou autre élément générique)
+        // Cloner depuis le contenu de <template> ou l'élément lui-même
+        const clone = templateElement.tagName === 'TEMPLATE' ?
+          templateElement.content.cloneNode(true)
+          .firstElementChild // Prend le premier élément du fragment cloné
+          :
+          templateElement.cloneNode(true);
+  
+        if (!clone) {
+          console.error("Échec du clonage du template. Vérifiez la structure du template.",
+            templateElement);
+          return; // Passer à l'item suivant
+        }
+  
+       
+  
+        // Rendre visible et marquer l'élément cloné
+        clone.style.display = ''; // Enlever le display:none potentiel
+        clone.removeAttribute('aria-hidden');
+        clone.setAttribute('data-xano-list-item', ''); // Marqueur pour l'item généré
+        clone.setAttribute('data-xano-item-index', index
+      .toString()); // Index (utile pour debug ou style)
+  
+        // Lier les données aux sous-éléments [data-xano-bind]
+        const boundElements = clone.querySelectorAll('[data-xano-bind]');
+        boundElements.forEach(boundElement => {
+          bindDataToElement(boundElement, item); // Utilise le helper
+        });
+        // Si le clone lui-même a data-xano-bind (cas d'un template simple comme juste <li>)
+        if (clone.hasAttribute('data-xano-bind')) {
+          bindDataToElement(clone, item);
+        }
+  
+        // Gérer les liens dynamiques [data-xano-link-to] dans le clone
+        const linkElements = clone.querySelectorAll('[data-xano-link-to]');
+        linkElements.forEach(linkElement => {
+          const targetPage = linkElement.getAttribute('data-xano-link-to');
+          const idField = linkElement.getAttribute('data-xano-link-param-id') || 'id';
+          const idParamName = linkElement.getAttribute('data-xano-link-url-param') || 'id';
+  
+          let linkTarget = targetPage; // Lien par défaut si pas d'ID
+          const idValue = item[idField];
+  
+          if (idValue !== undefined && idValue !== null) {
+            linkTarget = `${targetPage}?${idParamName}=${encodeURIComponent(idValue)}`;
+          } else {
+            console.warn(`ID field "${idField}" non trouvé dans l'item pour le lien`, item);
+          }
+  
+          // Mettre à jour la cible du lien
+          if (linkElement.tagName === 'A') {
+            linkElement.href = linkTarget;
+          } else {
+            linkElement.setAttribute('data-xano-link-target', linkTarget);
+            linkElement.style.cursor = 'pointer';
+          }
+        });
+        // Si le clone lui-même a data-xano-link-to
+        if (clone.hasAttribute('data-xano-link-to')) {
+          const targetPage = clone.getAttribute('data-xano-link-to');
+          const idField = clone.getAttribute('data-xano-link-param-id') || 'id';
+          const idParamName = clone.getAttribute('data-xano-link-url-param') || 'id';
+          let linkTarget = targetPage;
+          const idValue = item[idField];
+          if (idValue !== undefined && idValue !== null) {
+            linkTarget = `${targetPage}?${idParamName}=${encodeURIComponent(idValue)}`;
+          }
+          if (clone.tagName === 'A') { clone.href = linkTarget; }
+          else { clone.setAttribute('data-xano-link-target', linkTarget);
+            clone.style.cursor = 'pointer'; }
+        }
+  
+        // Trouve l'élément cliquable DANS le clone (celui où tu as mis data-action dans Webflow)
+        const clickableElement = clone.querySelector('[data-action="select-created-room"]') ||
+          clone; // Prend l'élément avec data-action, ou le clone entier par défaut
+  
+        if (item.id !== undefined) { // Vérifie que l'objet 'item' de Xano a bien un champ 'id'
+          clickableElement.setAttribute('data-room-id', item.id);
+          // Assure-toi aussi que data-action est bien là (au cas où il n'est pas sur le clone lui-même)
+          if (!clickableElement.hasAttribute('data-action')) {
+            clickableElement.setAttribute('data-action', 'select-created-room');
+          }
+        } else {
+          console.warn("renderListData: ID manquant pour l'item:", item);
+          // Empêcher de cliquer si pas d'ID? clickableElement.style.pointerEvents = 'none';
+        }
+       // --- Fin Logique ROOMS ---
+        
+        // Ajouter le clone au conteneur
+        container.appendChild(clone);
+      });
+    } else {
+      // Afficher un message si aucune donnée (amélioration)
+      const emptyMessage = listContainerElement.getAttribute('data-xano-empty-message') ||
+        "Aucune donnée à afficher.";
+      // Vérifier s'il existe déjà un message vide pour ne pas le dupliquer
+      if (!container.querySelector('.xano-empty-message')) {
+        const messageElement = document.createElement('div'); // Ou 'p', 'li' selon le contexte
+        messageElement.className = 'xano-empty-message'; // Classe pour styliser
+        messageElement.textContent = emptyMessage;
+        container.appendChild(messageElement);
+      }
+    }
+  }
+  
+
+  function renderPhotoItems(dataArray, listContainerElement) {
+    dataArray = Array.isArray(dataArray) ? dataArray : [];
+  
+    const templateSelector = listContainerElement.getAttribute('data-xano-list');
+    if (!templateSelector) { console.error("renderPhotoItems: data-xano-list manquant.", listContainerElement); return; }
+    const templateElement = document.querySelector(templateSelector);
+    if (!templateElement) { console.error(`renderPhotoItems: Template "${templateSelector}" introuvable.`); return; }
+
+  
+    // Conteneur: soit un enfant spécifique, soit l'élément lui-même
+    const container = listContainerElement.querySelector('[data-xano-list-container]') ||
+      listContainerElement;
+  
+    // Vider le conteneur, en préservant le template s'il est à l'intérieur
+    // Et en préservant les éléments qui ne sont PAS des data-xano-list-item générés précédemment
+    let currentChild = container.firstChild;
+    while (currentChild) {
+      const nextChild = currentChild.nextSibling;
+      // Ne supprimer que les éléments générés précédemment OU si le conteneur est l'élément principal
+      // Et s'assurer de ne pas supprimer le template lui-même
+      if (currentChild !== templateElement && currentChild.nodeType === Node.ELEMENT_NODE &&
+        currentChild.hasAttribute('data-xano-list-item')) {
+        container.removeChild(currentChild);
+      } else if (container === listContainerElement && currentChild !== templateElement &&
+        currentChild.nodeType === Node.ELEMENT_NODE) {
+        // Si container = listContainerElement, on peut vouloir vider plus agressivement
+        // Sauf si l'utilisateur a mis d'autres éléments statiques qu'il veut garder ?
+        // Pour l'instant, on ne supprime que les items générés.
+        // Option : Vider tout sauf le template si container === listContainerElement
+        // container.removeChild(currentChild);
+      }
+      currentChild = nextChild;
+    }
+  
+    // S'assurer que le template est bien caché (s'il n'est pas déjà dans une balise <template>)
+    if (templateElement.tagName !== 'TEMPLATE') {
+      templateElement.style.display = 'none';
+      templateElement.setAttribute('aria-hidden', 'true'); // Pour l'accessibilité
+    }
+  
+    // Générer les éléments de la liste
+    if (dataArray.length > 0) {
+      dataArray.forEach((item, index) => { // item est un objet image {url:..., path:...}
+        const clone = templateElement.tagName === 'TEMPLATE' ?
+          templateElement.content.cloneNode(true).firstElementChild : templateElement.cloneNode(true);
+  
+        if (!clone) {
+          console.error("renderPhotoItems: Échec clonage pour item:", item);
+          return; // Passer à l'item suivant
+        }
+
+        // --- Ajout spécifique aux photos ---
+        if (item && item.path) {
+      // Assurez-vous que 'clone' est l'élément principal du template (ex: la div externe)
+      clone.setAttribute('data-photo-path', item.path);
+  } else {
+      // Log si jamais un objet image n'a pas de propriété 'path'
+      console.warn("Impossible d'ajouter data-photo-path: 'path' manquant dans l'objet item", item);
+  }
+  
+         // ... configuration de base du clone (display, aria-hidden, etc.) ...
+         // Rendre visible et marquer
+        clone.style.display = ''; // Enlever le display:none potentiel
+        clone.removeAttribute('aria-hidden');
+        clone.setAttribute('data-xano-list-item', ''); // Marqueur pour l'item généré
+        clone.setAttribute('data-xano-item-index', index
+      .toString()); // Index (utile pour debug ou style)
+  
+        // Lier les données aux sous-éléments [data-xano-bind]
+        const boundElements = clone.querySelectorAll('[data-xano-bind]');
+        boundElements.forEach(boundElement => {
+          bindDataToElement(boundElement, item); // Utilise le helper
+        });
+        // Si le clone lui-même a data-xano-bind (cas d'un template simple comme juste <li>)
+        if (clone.hasAttribute('data-xano-bind')) {
+          bindDataToElement(clone, item); // item est l'objet photo {url:..., path:...}
+        }
+  
+        // Ajouter le clone au conteneur
+        container.appendChild(clone);
+      });
+    } else {
+      // Afficher un message si aucune donnée (amélioration)
+      const emptyMessage = listContainerElement.getAttribute('data-xano-empty-message') ||
+        "Aucune donnée à afficher.";
+      // Vérifier s'il existe déjà un message vide pour ne pas le dupliquer
+      if (!container.querySelector('.xano-empty-message')) {
+        const messageElement = document.createElement('div'); // Ou 'p', 'li' selon le contexte
+        messageElement.className = 'xano-empty-message'; // Classe pour styliser
+        messageElement.textContent = emptyMessage;
+        container.appendChild(messageElement);
+      }
+    }
+  }
+
+
+
   
   function bindDataToElement(element, data) {
     const dataKey = element.getAttribute('data-xano-bind');
