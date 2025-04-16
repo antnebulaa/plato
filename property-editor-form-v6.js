@@ -648,8 +648,25 @@ console.log("SETUP: Listener de test attaché à document.body.");
     }
   
     // Conteneur: soit un enfant spécifique, soit l'élément lui-même
-    const container = listContainerElement.querySelector('[data-xano-list-container]') ||
-      listContainerElement;
+      // --- Logique CORRIGÉE pour trouver le conteneur où ajouter les items ---
+    let container = listContainerElement; // Par défaut, on ajoute à l'élément principal
+    const containerSelector = listContainerElement.getAttribute('data-xano-list-container');
+
+    if (containerSelector) {
+        // Si l'attribut existe et contient une valeur (ex: "#photo-list-container")
+        const specificContainer = listContainerElement.querySelector(containerSelector);
+        if (specificContainer) {
+            // Si on trouve l'élément correspondant au sélecteur, on l'utilise
+            container = specificContainer;
+        } else {
+            // Erreur si le sélecteur est spécifié mais l'élément non trouvé
+            console.warn(`Le conteneur spécifié par data-xano-list-container ("${containerSelector}") n'a pas été trouvé à l'intérieur de`, listContainerElement);
+            // On continue d'utiliser listContainerElement comme conteneur par défaut
+        }
+    }
+    // À partir d'ici, 'container' est le bon élément où faire appendChild
+    console.log("renderPhotoItems/renderListData: Ajout des éléments dans le conteneur:", container); // Log de vérification
+    // --- Fin Logique CORRIGÉE ---
   
     // Vider le conteneur, en préservant le template s'il est à l'intérieur
     // Et en préservant les éléments qui ne sont PAS des data-xano-list-item générés précédemment
@@ -795,9 +812,25 @@ console.log("SETUP: Listener de test attaché à document.body.");
     if (!templateElement) { console.error(`renderPhotoItems: Template "${templateSelector}" introuvable.`); return; }
 
   
-    // Conteneur: soit un enfant spécifique, soit l'élément lui-même
-    const container = listContainerElement.querySelector('[data-xano-list-container]') ||
-      listContainerElement;
+     // --- Logique CORRIGÉE pour trouver le conteneur où ajouter les items ---
+    let container = listContainerElement; // Par défaut, on ajoute à l'élément principal
+    const containerSelector = listContainerElement.getAttribute('data-xano-list-container');
+
+    if (containerSelector) {
+        // Si l'attribut existe et contient une valeur (ex: "#photo-list-container")
+        const specificContainer = listContainerElement.querySelector(containerSelector);
+        if (specificContainer) {
+            // Si on trouve l'élément correspondant au sélecteur, on l'utilise
+            container = specificContainer;
+        } else {
+            // Erreur si le sélecteur est spécifié mais l'élément non trouvé
+            console.warn(`Le conteneur spécifié par data-xano-list-container ("${containerSelector}") n'a pas été trouvé à l'intérieur de`, listContainerElement);
+            // On continue d'utiliser listContainerElement comme conteneur par défaut
+        }
+    }
+    // À partir d'ici, 'container' est le bon élément où faire appendChild
+    console.log("renderPhotoItems/renderListData: Ajout des éléments dans le conteneur:", container); // Log de vérification
+    // --- Fin Logique CORRIGÉE ---
   
     // Vider le conteneur, en préservant le template s'il est à l'intérieur
     // Et en préservant les éléments qui ne sont PAS des data-xano-list-item générés précédemment
