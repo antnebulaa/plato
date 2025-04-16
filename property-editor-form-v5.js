@@ -3,7 +3,7 @@
   // ==========================================
   // == Script Xano Unifié (Formulaires + Données) ==
   // ==========================================
-  // Date: 2025-04-16 12h39
+  // Date: 2025-04-16 15h43
 
   let xanoClient; // Déclarez xanoClient ici
 
@@ -1073,169 +1073,227 @@
   } // Fin de la fonction
   
   
-// ===========================================================
-// == FONCTION POUR GERER LA SELECTION/SUPPRESSION DE PHOTOS ==
-// ===========================================================
-function setupPhotoSelectionMode() {
-    console.log("SETUP: Initialisation complète du mode sélection photo.");
+  // ==========================================
+  // Fonction pour initialiser le bouton de changement de mode sélection    ==
+  // ==========================================
+  
+  function setupPhotoSelectionMode() {
+      console.log("SETUP: Initialisation du bouton mode sélection photo.");
+  
+      // Récupère le bouton par son ID (Vérifiez que l'ID correspond à celui dans Webflow)
+      const boutonModeSelection = document.getElementById('bouton-mode-selection');
+    
+      // Récupère le conteneur des photos pour styler le mode sélection
+      const conteneurPhotos = document.getElementById('room-photos-display');
+      const boutonSupprimerSelection = document.getElementById('bouton-supprimer-selection');
+if (boutonSupprimerSelection) {
+     if (photosSelectionneesIds.length > 0) {
+         boutonSupprimerSelection.classList.remove('is-hidden'); // <<< ENLEVER la classe pour AFFICHER
+     } else {
+         boutonSupprimerSelection.classList.add('is-hidden'); // <<< AJOUTER la classe pour CACHER
+     }
+     console.log("Visibilité bouton Supprimer mise à jour via classe. Caché:", photosSelectionneesIds.length === 0); // LOG 10 (modifié)
+} else {
+     console.error("Bouton Supprimer introuvable!");
+}
+      
+      // Vérification que les éléments existent
+      if (!boutonModeSelection || !conteneurPhotos || !boutonSupprimerSelection) {
+        console.error("SETUP ERROR: Un ou plusieurs éléments HTML manquants (boutons ou conteneur photos). IDs: bouton-mode-selection, bouton-supprimer-selection, room-photos-display");
+        return;
+      }
 
-    // --- Récupération des éléments HTML essentiels ---
-    const boutonModeSelection = document.getElementById('bouton-mode-selection');
-    const boutonSupprimerSelection = document.getElementById('bouton-supprimer-selection');
-    const conteneurPhotos = document.getElementById('room-photos-display'); // Conteneur principal
-    const photoListContainer = document.getElementById('photo-list-container'); // Conteneur où les photos sont ajoutées
+  
+      // Ajoute l'écouteur de clic sur le bouton
+      boutonModeSelection.addEventListener('click', function() {
+          // Inverse la valeur de la variable (true devient false, false devient true)
+          modeSelectionActif = !modeSelectionActif;
+          console.log("Mode sélection photos :", modeSelectionActif);
+  
+          if (modeSelectionActif) {
+              // On entre en mode sélection
+              boutonModeSelection.textContent = "Annuler"; // Change le texte
+              if (conteneurPhotos) {
+                  conteneurPhotos.classList.add('selection-active'); // Ajoute une classe pour CSS
+              }
+          } else {
+              // On sort du mode sélection
+              boutonModeSelection.textContent = "Sélectionner les photos"; // Texte d'origine
+              if (conteneurPhotos) {
+                  conteneurPhotos.classList.remove('selection-active'); // Retire la classe
+              }
+             // --- AJOUTS ICI pour nettoyer en sortant du mode ---
 
-    // --- Vérification initiale des éléments ---
-    if (!boutonModeSelection || !boutonSupprimerSelection || !conteneurPhotos || !photoListContainer) {
-        console.error("SETUP ERROR: Un ou plusieurs éléments HTML manquants (boutons, conteneurs photo). Vérifiez les IDs: 'bouton-mode-selection', 'bouton-supprimer-selection', 'room-photos-display', 'photo-list-container'.");
-        return; // Arrêter si un élément manque
-    }
-    // Note: Le bouton supprimer doit avoir la classe 'is-hidden' par défaut dans Webflow
+            // 1. Cacher le bouton Supprimer (via la classe CSS)
+            //    (La variable boutonSupprimerSelection est définie au début de setupPhotoSelectionMode)
+            if (boutonSupprimerSelection) { // Sécurité : vérifier qu'on a bien trouvé le bouton au début
+                 boutonSupprimerSelection.classList.add('is-hidden');
+                 console.log("Bouton supprimer caché via classe (annulation mode sélection)");
+            }
 
-    // --- 1. Écouteur pour le bouton "Sélectionner / Annuler" ---
-    boutonModeSelection.addEventListener('click', function() {
-        modeSelectionActif = !modeSelectionActif; // Inverse le mode
-        console.log("Mode sélection photos basculé :", modeSelectionActif);
+            // 2. Retirer la classe .is-photo-selected de toutes les photos
+            //    (La variable photoListContainer est définie dans setupPhotoSelectionMode)
+            if (photoListContainer) {
+                const photosActuellementSelectionnees = photoListContainer.querySelectorAll('.is-photo-selected');
+                photosActuellementSelectionnees.forEach(photoEl => {
+                    photoEl.classList.remove('is-photo-selected');
+                });
+                console.log(`Désélection visuelle de ${photosActuellementSelectionnees.length} photo(s)`);
+            }
 
-        if (modeSelectionActif) {
-            boutonModeSelection.textContent = "Annuler";
-            conteneurPhotos.classList.add('selection-active');
-        } else {
-            // Sortie du mode sélection : Nettoyage complet
-            boutonModeSelection.textContent = "Sélectionner les photos";
-            conteneurPhotos.classList.remove('selection-active');
-            boutonSupprimerSelection.classList.add('is-hidden'); // Cacher bouton supprimer
-
-            // Retirer la classe .is-photo-selected de toutes les photos
-            const photosSelectionneesVisuellement = photoListContainer.querySelectorAll('.is-photo-selected');
-            photosSelectionneesVisuellement.forEach(photoEl => {
-                photoEl.classList.remove('is-photo-selected');
-            });
-
-            // Vider le tableau des IDs sélectionnés
+            // 3. Vider le tableau des IDs sélectionnés
             photosSelectionneesIds = [];
-            console.log("Sortie mode sélection, IDs vidés, bouton supprimer caché.");
+            console.log("Sortie du mode sélection, IDs vidés:", photosSelectionneesIds);
+
+            // --- FIN DES AJOUTS ---
         }
-    });
-    console.log("SETUP: Écouteur ajouté au bouton mode sélection.");
+      console.log("SETUP: Écouteur ajouté au bouton mode sélection.");
+  
+    // === AJOUT DANS setupPhotoSelectionMode ===
+  
+  const photoListContainer = document.getElementById('photo-list-container');
+  if (!photoListContainer) { console.error("SETUP ERROR: Conteneur '#photo-list-container' introuvable ! Clics photos impossibles.");
+         return; }
+  
+  // Écouteur sur le CONTENEUR des photos (délégation d'événements)
+  conteneurPhotos.addEventListener('click', function(event) {
+      console.log("--- Clic détecté sur conteneurPhotos (#room-photos-display) ---"); // Log modifié
+      if (!modeSelectionActif) { 
+        // console.log("Mode sélection inactif, clic ignoré.");
+        return; 
+      } // Mode sélection actif ?
+      console.log("Mode sélection ACTIF. Cible du clic:", event.target);
 
-    // --- 2. Écouteur pour le clic sur les PHOTOS (délégation) ---
-    photoListContainer.addEventListener('click', function(event) {
-        // Ne rien faire si on n'est pas en mode sélection
-        if (!modeSelectionActif) {
-            return;
-        }
-
-        // Trouver l'élément photo parent qui porte l'identifiant
-        const clickedPhotoElement = event.target.closest('[data-photo-path]');
-        if (!clickedPhotoElement) {
-            return; // Clic à côté d'une photo, ou attribut manquant
-        }
-
-        // event.preventDefault(); // Utile si les éléments étaient des liens
-
-        const photoPath = clickedPhotoElement.getAttribute('data-photo-path');
-        if (!photoPath) {
-            console.warn("Clic sur photo mais attribut data-photo-path vide/manquant.", clickedPhotoElement);
-            return;
-        }
-
-        // Basculer la classe visuelle
-        clickedPhotoElement.classList.toggle('is-photo-selected');
-        const isSelectedNow = clickedPhotoElement.classList.contains('is-photo-selected');
-
-        // Mettre à jour le tableau des IDs (chemins)
-        const indexInSelection = photosSelectionneesIds.indexOf(photoPath);
-        if (isSelectedNow) { // On vient de sélectionner
-            if (indexInSelection === -1) { photosSelectionneesIds.push(photoPath); }
-        } else { // On vient de désélectionner
-            if (indexInSelection > -1) { photosSelectionneesIds.splice(indexInSelection, 1); }
-        }
-        console.log("Photos sélectionnées (paths):", photosSelectionneesIds);
-
-        // Afficher/Cacher le bouton Supprimer basé sur la sélection
-        if (photosSelectionneesIds.length > 0) {
-            boutonSupprimerSelection.classList.remove('is-hidden'); // Afficher
-        } else {
-            boutonSupprimerSelection.classList.add('is-hidden'); // Cacher
-        }
-        console.log("Visibilité bouton Supprimer (via classe) mise à jour. Caché:", photosSelectionneesIds.length === 0);
-    });
-    console.log("SETUP: Écouteur ajouté au conteneur de liste de photos (#photo-list-container).");
-
-    // --- 3. Écouteur pour le bouton "Supprimer la sélection" ---
-    if (boutonSupprimerSelection) { // Vérifier si le bouton existe avant d'ajouter l'écouteur
-        boutonSupprimerSelection.addEventListener('click', async function() {
-            // Vérifier sélection et room ID
-            if (photosSelectionneesIds.length === 0 || currentSelectedRoomId === null) {
-                console.warn("Clic sur Supprimer ignoré: aucune photo sélectionnée ou room ID inconnu.");
-                alert("Veuillez sélectionner des photos à supprimer et vous assurer qu'une pièce est active.");
-                return;
-            }
-
-            // Confirmation
-            const confirmation = window.confirm(`Êtes-vous sûr de vouloir supprimer ${photosSelectionneesIds.length} photo(s) ? Cette action est irréversible.`);
-            if (!confirmation) { return; }
-
-            console.log(`Suppression confirmée pour ${photosSelectionneesIds.length} photo(s) dans room ${currentSelectedRoomId}. Paths:`, photosSelectionneesIds);
-
-            // UI de chargement
-            boutonSupprimerSelection.disabled = true;
-            boutonSupprimerSelection.textContent = "Suppression...";
-
-            // Payload et config API
-            const payload = {
-                room_id: parseInt(currentSelectedRoomId, 10),
-                photo_paths: photosSelectionneesIds
-            };
-            const deleteEndpoint = 'photos/batch_delete'; // Vérifiez ce chemin !
-            const deleteMethod = 'POST'; // Utiliser POST
-
-            try {
-                const response = await xanoClient._request(deleteMethod, deleteEndpoint, payload, false);
-                console.log('Réponse suppression Xano:', response);
-
-                if (response && response.success) {
-                    // --- SUCCÈS ---
-                    console.log('Photos supprimées avec succès via API !');
-                    alert('Les photos sélectionnées ont été supprimées.');
-
-                    // Rafraîchir la liste (essentiel)
-                    console.log(`Rafraîchissement photos room ${currentSelectedRoomId}...`);
-                    const fetchEndpoint = `property_photos/photos/${currentSelectedRoomId}`;
-                    const photoLoadingIndicator = conteneurPhotos.querySelector('[data-xano-loading]'); // conteneurPhotos est défini au début
-                    if (conteneurPhotos && xanoClient) {
-                        if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'block';
-                         await fetchXanoData(xanoClient, fetchEndpoint, 'GET', null, conteneurPhotos, photoLoadingIndicator);
-                    }
-
-                    // Réinitialiser complètement l'état de sélection après succès
-                    photosSelectionneesIds = [];
-                    modeSelectionActif = false;
-                    if (boutonModeSelection) boutonModeSelection.textContent = "Sélectionner les photos";
-                    if (conteneurPhotos) conteneurPhotos.classList.remove('selection-active');
-                    boutonSupprimerSelection.classList.add('is-hidden'); // Cacher via classe
-
-                } else {
-                    // Erreur applicative retournée par Xano
-                    console.error("La suppression a échoué côté serveur:", response);
-                    alert("Erreur: La suppression a échoué. Message : " + (response?.message || 'Réponse invalide.'));
-                }
-            } catch (error) {
-                // Erreur réseau / technique
-                console.error("Erreur appel API suppression:", error);
-                alert("Erreur réseau/technique lors de la suppression: " + error.message);
-            } finally {
-                // Réactiver bouton et texte DANS TOUS LES CAS (sauf succès où il est caché)
-                boutonSupprimerSelection.disabled = false;
-                boutonSupprimerSelection.textContent = "Supprimer la sélection";
-                // La visibilité est gérée par les autres parties ou le bloc succès
-            }
-        });
-        console.log("SETUP: Écouteur ajouté au bouton supprimer sélection.");
-    }
-
-} // Fin de setupPhotoSelectionMode
+      const clickedPhotoElement = event.target.closest('[data-photo-path]'); // Photo cliquée ?
+      console.log("Élément photo trouvé via closest:", clickedPhotoElement);
+    
+      if (!clickedPhotoElement) { return; }
+      event.preventDefault();
+      const photoPath = clickedPhotoElement.getAttribute('data-photo-path'); // Récupère ID
+      if (!photoPath) return;
+      clickedPhotoElement.classList.toggle('is-photo-selected'); // Bascule style
+      // Met à jour le tableau photosSelectionneesIds (ajoute/retire photoPath)
+      const indexInSelection = photosSelectionneesIds.indexOf(photoPath);
+      if (indexInSelection > -1) { photosSelectionneesIds.splice(indexInSelection, 1); }
+      else { photosSelectionneesIds.push(photoPath); }
+      console.log("Photos sélectionnées (paths):", photosSelectionneesIds);
+      // Affiche/cache bouton supprimer
+      if (boutonSupprimerSelection){ // Vérifier si bouton existe
+           boutonSupprimerSelection.style.display = photosSelectionneesIds.length > 0 ? '' : 'none';
+      }
+  });
+  console.log("SETUP: Écouteur ajouté au conteneur de liste de photos.");
+  
+ 
+        // --- Écouteur sur le bouton "Supprimer la sélection" ---
+  if (boutonSupprimerSelection) {
+      boutonSupprimerSelection.addEventListener('click', async function() { // << Ajoutez async ici
+          // 1. Vérifier si des photos sont sélectionnées
+          if (photosSelectionneesIds.length === 0) {
+              console.warn("Clic sur Supprimer, mais aucune photo n'est sélectionnée.");
+              return;
+          }
+          // Vérifier si l'ID de la room est connu
+          if (currentSelectedRoomId === null) {
+               console.error("Impossible de supprimer : ID de la room courante inconnu.");
+               alert("Erreur : Impossible d'identifier la room actuelle.");
+               return;
+          }
+  
+          // 2. Demander confirmation
+          const confirmation = window.confirm(`Êtes-vous sûr de vouloir supprimer ${photosSelectionneesIds.length} photo(s) ? Cette action est irréversible.`);
+          if (!confirmation) {
+              console.log("Suppression annulée par l'utilisateur.");
+              return;
+          }
+  
+          // 3. Si confirmé, préparer et exécuter la suppression
+          console.log(`Suppression confirmée pour ${photosSelectionneesIds.length} photo(s) dans la room ${currentSelectedRoomId}. Paths:`, photosSelectionneesIds);
+  
+          // Afficher un indicateur de chargement/suppression
+          boutonSupprimerSelection.disabled = true;
+          boutonSupprimerSelection.textContent = "Suppression...";
+  
+          // Préparer les données à envoyer
+          const payload = {
+              room_id: parseInt(currentSelectedRoomId, 10), // Assurer que c'est un nombre
+              photo_paths: photosSelectionneesIds // Le tableau des chemins à supprimer
+          };
+  
+          const deleteEndpoint = 'photos/batch_delete'; // <<< VÉRIFIEZ que c'est le bon chemin de votre endpoint Xano
+          const deleteMethod = 'POST'; // <<< Utilisez POST comme convenu
+  
+          try {
+              // Appel API avec xanoClient (il est accessible ici)
+              const response = await xanoClient._request(deleteMethod, deleteEndpoint, payload, false); // false = pas FormData, envoie en JSON
+  
+              console.log('Réponse suppression Xano:', response);
+  
+              if (response && response.success) {
+                  // --- SUPPRESSION RÉUSSIE ---
+                  console.log('Photos supprimées avec succès via API !');
+                  alert('Les photos sélectionnées ont été supprimées.'); // Feedback simple
+  
+                  // --- Rafraîchir la liste des photos ---
+                  console.log(`Rafraîchissement des photos pour la room ${currentSelectedRoomId}...`);
+                  const photoDisplayContainer = document.getElementById('room-photos-display'); // Assurez-vous que cet ID est correct
+                  const photoLoadingIndicator = photoDisplayContainer ? photoDisplayContainer.querySelector('[data-xano-loading]') : null;
+                  // Utilise l'endpoint de FETCH (pas celui de delete !)
+                  const fetchEndpoint = `property_photos/photos/${currentSelectedRoomId}`;
+                  const params = null;
+  
+                  if (photoDisplayContainer && xanoClient) { // Vérifier que xanoClient existe aussi
+                      if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'block';
+                      // Rappeler fetchXanoData pour recharger la liste de photos mise à jour
+                      // Note : La gestion d'erreur de ce fetch est dans fetchXanoData lui-même
+                       await fetchXanoData(xanoClient, fetchEndpoint, 'GET', params, photoDisplayContainer, photoLoadingIndicator);
+                  }
+                   // ------------------------------------
+  
+                  // --- Réinitialiser l'état de sélection APRÈS le succès ---
+                   // (Normalement la réinitialisation du mode se fait via le bouton Annuler, mais on le force ici après succès)
+                  photosSelectionneesIds = []; // Vider le tableau
+                  // Retirer la classe visuelle des éléments (même s'ils vont être re-rendus)
+                  const photoListContainer = document.getElementById('photo-list-container'); // Assurez-vous que cet ID est correct
+                  if(photoListContainer){
+                       photoListContainer.querySelectorAll('.is-photo-selected').forEach(photoEl => {
+                           photoEl.classList.remove('is-photo-selected');
+                       });
+                  }
+                  // Quitter le mode sélection proprement
+                  modeSelectionActif = false;
+                   const boutonModeSelection = document.getElementById('bouton-mode-selection'); // Assurez-vous que cet ID est correct
+                   const conteneurPhotos = document.getElementById('room-photos-display'); // Assurez-vous que cet ID est correct
+                  if(boutonModeSelection) boutonModeSelection.textContent = "Sélectionner les photos";
+                  if(conteneurPhotos) conteneurPhotos.classList.remove('selection-active');
+                  // boutonSupprimerSelection.style.display = 'none'; // Cacher le bouton supprimer
+                   // -----------------------------------------------------
+                // Cacher le bouton Supprimer en ajoutant la classe
+                boutonSupprimerSelection.classList.add('is-hidden');
+  
+              } else {
+                  // Gérer une réponse de Xano qui n'indique pas le succès
+                  console.error("La suppression a échoué côté serveur (réponse non succès):", response);
+                  alert("Erreur: La suppression des photos a échoué. Message : " + (response?.message || 'Réponse invalide du serveur.'));
+              }
+  
+          } catch (error) {
+              // Gérer les erreurs réseau ou autres erreurs lors de l'appel
+              console.error("Erreur lors de l'appel API de suppression:", error);
+              alert("Erreur réseau ou technique lors de la suppression: " + error.message);
+          } finally {
+              // Réactiver le bouton et remettre le texte normal DANS TOUS LES CAS
+              boutonSupprimerSelection.disabled = false;
+              boutonSupprimerSelection.textContent = "Supprimer la sélection";
+              // On cache le bouton si on est sorti du mode sélection (ce qui arrive en cas de succès)
+               
+          }
+      });
+      console.log("SETUP: Écouteur ajouté au bouton supprimer sélection.");
+  }
+   // --- FIN du listener boutonSupprimerSelection ---
+    
+  } // Fin de setupPhotoSelectionMode
   
   
   // -----------------------------------------------------------------
