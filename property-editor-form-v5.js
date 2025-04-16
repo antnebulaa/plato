@@ -1090,7 +1090,7 @@ function setupPhotoSelectionMode() {
         console.error("SETUP ERROR: Un ou plusieurs éléments HTML manquants (boutons, conteneurs photo). Vérifiez les IDs: 'bouton-mode-selection', 'bouton-supprimer-selection', 'room-photos-display', 'photo-list-container'.");
         return; // Arrêter si un élément manque
     }
-    // Note: Le bouton supprimer doit avoir la classe 'is-hidden' par défaut dans Webflow
+    // Note: Le bouton supprimer doit avoir la classe 'button-is-hidden' par défaut dans Webflow
 
     // --- 1. Écouteur pour le bouton "Sélectionner / Annuler" ---
     boutonModeSelection.addEventListener('click', function() {
@@ -1102,17 +1102,29 @@ function setupPhotoSelectionMode() {
             conteneurPhotos.classList.add('selection-active');
         } else {
             // Sortie du mode sélection : Nettoyage complet
-            boutonModeSelection.textContent = "Sélectionner les photos";
-            conteneurPhotos.classList.remove('selection-active');
-            boutonSupprimerSelection.classList.add('buttonb-is-hidden'); // Cacher bouton supprimer
+            boutonModeSelection.textContent = "Sélectionner les photos"; // Texte d'origine
+            if (conteneurPhotos) { // Utiliser la variable définie au début de la fonction
+                conteneurPhotos.classList.remove('selection-active'); // Retire la classe
+            }
 
-            // Retirer la classe .is-photo-selected de toutes les photos
-            const photosSelectionneesVisuellement = photoListContainer.querySelectorAll('.is-photo-selected');
-            photosSelectionneesVisuellement.forEach(photoEl => {
-                photoEl.classList.remove('is-photo-selected');
-            });
+            // 1. Cacher le bouton Supprimer (via les classes CSS)
+            if (boutonSupprimerSelection) { // Utiliser la variable définie au début
+                 boutonSupprimerSelection.classList.add('button-is-hidden');    // <<< Votre ligne actuelle (OK)
+                 boutonSupprimerSelection.classList.remove('button-is-visible'); // <<< AJOUTER CETTE LIGNE
+                 console.log("Bouton supprimer caché via classe (annulation mode sélection)");
+            }
 
-            // Vider le tableau des IDs sélectionnés
+            // 2. Retirer la classe .is-photo-selected de toutes les photos
+            if (photoListContainer) { // Utiliser la variable définie plus bas (ou la définir au début aussi)
+                 const photosActuellementSelectionnees = photoListContainer.querySelectorAll('.is-photo-selected');
+                 photosActuellementSelectionnees.forEach(photoEl => {
+                     photoEl.classList.remove('is-photo-selected');
+                 });
+                 console.log(`Désélection visuelle de ${photosActuellementSelectionnees.length} photo(s)`);
+            }
+
+
+            // 3. Vider le tableau des IDs sélectionnés
             photosSelectionneesIds = [];
             console.log("Sortie mode sélection, IDs vidés, bouton supprimer caché.");
         }
@@ -1156,8 +1168,10 @@ function setupPhotoSelectionMode() {
         // Afficher/Cacher le bouton Supprimer basé sur la sélection
         if (photosSelectionneesIds.length > 0) {
             boutonSupprimerSelection.classList.remove('button-is-hidden'); // Afficher
+            boutonSupprimerSelection.classList.add('button-is-visible'); // <<< FORCER VISIBLE
         } else {
             boutonSupprimerSelection.classList.add('button-is-hidden'); // Cacher
+            boutonSupprimerSelection.classList.remove('button-is-visible'); // <<< ENLEVER VISIBLE
         }
         console.log("Visibilité bouton Supprimer (via classe) mise à jour. Caché:", photosSelectionneesIds.length === 0);
     });
@@ -1215,6 +1229,7 @@ function setupPhotoSelectionMode() {
                     if (boutonModeSelection) boutonModeSelection.textContent = "Sélectionner les photos";
                     if (conteneurPhotos) conteneurPhotos.classList.remove('selection-active');
                     boutonSupprimerSelection.classList.add('button-is-hidden'); // Cacher via classe
+                    boutonSupprimerSelection.classList.remove('button-is-visible'); // <<< Nettoyer
 
                 } else {
                     // Erreur applicative retournée par Xano
