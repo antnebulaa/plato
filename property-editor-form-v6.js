@@ -1132,49 +1132,18 @@ function setupPhotoSelectionMode() {
     console.log("SETUP: Écouteur ajouté au bouton mode sélection.");
 
     // --- 2. Écouteur pour le clic sur les PHOTOS (délégation) ---
+// --- Test Simplifié de l'Écouteur Photo ---
+if (photoListContainer) { // Assurez-vous que photoListContainer existe
     photoListContainer.addEventListener('click', function(event) {
-        // Ne rien faire si on n'est pas en mode sélection
-        if (!modeSelectionActif) {
-            return;
-        }
-
-        // Trouver l'élément photo parent qui porte l'identifiant
-        const clickedPhotoElement = event.target.closest('[data-photo-path]');
-        if (!clickedPhotoElement) {
-            return; // Clic à côté d'une photo, ou attribut manquant
-        }
-
-        // event.preventDefault(); // Utile si les éléments étaient des liens
-
-        const photoPath = clickedPhotoElement.getAttribute('data-photo-path');
-        if (!photoPath) {
-            console.warn("Clic sur photo mais attribut data-photo-path vide/manquant.", clickedPhotoElement);
-            return;
-        }
-
-        // Basculer la classe visuelle
-        clickedPhotoElement.classList.toggle('is-photo-selected');
-        const isSelectedNow = clickedPhotoElement.classList.contains('is-photo-selected');
-
-        // Mettre à jour le tableau des IDs (chemins)
-        const indexInSelection = photosSelectionneesIds.indexOf(photoPath);
-        if (isSelectedNow) { // On vient de sélectionner
-            if (indexInSelection === -1) { photosSelectionneesIds.push(photoPath); }
-        } else { // On vient de désélectionner
-            if (indexInSelection > -1) { photosSelectionneesIds.splice(indexInSelection, 1); }
-        }
-        console.log("Photos sélectionnées (paths):", photosSelectionneesIds);
-
-        // Afficher/Cacher le bouton Supprimer basé sur la sélection
-        if (photosSelectionneesIds.length > 0) {
-            boutonSupprimerSelection.classList.remove('button-is-hidden'); // Afficher
-            boutonSupprimerSelection.classList.add('button-is-visible'); // <<< FORCER VISIBLE
-        } else {
-            boutonSupprimerSelection.classList.add('button-is-hidden'); // Cacher
-            boutonSupprimerSelection.classList.remove('button-is-visible'); // <<< ENLEVER VISIBLE
-        }
-        console.log("Visibilité bouton Supprimer (via classe) mise à jour. Caché:", photosSelectionneesIds.length === 0);
+        // Juste une alerte et un log pour voir si ça se déclenche
+        alert('CLIC DÉTECTÉ DANS photoListContainer! Element cliqué: ' + event.target.tagName);
+        console.log('CLIC DÉTECTÉ DANS photoListContainer! Target:', event.target);
     });
+    console.log("SETUP: Écouteur de TEST attaché à #photo-list-container."); // Log de confirmation d'attachement
+} else {
+    console.error("SETUP ERROR (Test): Impossible d'attacher l'écouteur de test car #photo-list-container est introuvable.");
+}
+// --- Fin Test Simplifié ---
     console.log("SETUP: Écouteur ajouté au conteneur de liste de photos (#photo-list-container).");
 
     // --- 3. Écouteur pour le bouton "Supprimer la sélection" ---
