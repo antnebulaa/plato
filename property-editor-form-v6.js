@@ -136,34 +136,8 @@
     console.log("8. Appel à setupCreatedRoomSelection TERMINÉ (ne signifie pas qu'elle a réussi).");
       // --- Fin Vérification ---
   
-       // setupPhotoSelectionMode();
-       console.log("Tentative d'attachement du listener de TEST SIMPLE sur #photo-list-container");
-try {
-    // On attend une seconde pour être sûr que le rendu est fini (juste pour ce test)
-    setTimeout(function() {
-        console.log("Exécution différée du listener de test simple.");
-        const directPhotoListContainer = document.getElementById('photo-list-container');
-        if (directPhotoListContainer) {
-            directPhotoListContainer.addEventListener('click', function(event) {
-                console.log("--- LISTENER TEST SIMPLE: Clic détecté dans #photo-list-container! ---");
-                console.log("Cible du Test Simple:", event.target);
-                const closestPhoto = event.target.closest('[data-photo-path]');
-                console.log("Closest [data-photo-path] pour Test Simple:", closestPhoto);
-                if (closestPhoto) {
-                     console.log("Path trouvé par Test Simple:", closestPhoto.getAttribute('data-photo-path'));
-                }
-            });
-            console.log("Listener de TEST SIMPLE attaché avec succès.");
-        } else {
-            console.error("Listener de TEST SIMPLE: #photo-list-container INTROUVABLE.");
-        }
-    }, 1000); // Attend 1 seconde (1000ms)
-
-} catch (error) {
-    console.error("Listener de TEST SIMPLE: Erreur pendant l'attachement.", error);
-}
-
-  
+        setupPhotoSelectionMode();
+     
   
       console.log("9. Initialisation UNIFIÉE terminée (fin du bloc try DOMContentLoaded).");
   
@@ -694,7 +668,8 @@ try {
             templateElement);
           return; // Passer à l'item suivant
         }
-  
+  //  ENSUITE: ENLEVER L'ID DU CLONE
+    clone.removeAttribute('id'); // <<< AJOUTER CETTE LIGNE ICI
        
   
         // Rendre visible et marquer l'élément cloné
@@ -854,6 +829,8 @@ try {
           return; // Passer à l'item suivant
         }
 
+        clone.removeAttribute('id');
+        
         // --- Ajout spécifique aux photos ---
         if (item && item.path) {
       // Assurez-vous que 'clone' est l'élément principal du template (ex: la div externe)
