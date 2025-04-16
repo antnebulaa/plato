@@ -171,23 +171,7 @@ try {
         console.error("ERREUR GLOBALE DANS DOMContentLoaded:", initError);
         // Une erreur ici pourrait empêcher setupCreatedRoomSelection d'être appelée
     }
-    // Listener de test sur BODY (à ajouter une fois)
-document.body.addEventListener('click', function(event) {
-    console.log("--- BODY CLICK DETECTED ---");
-    console.log("Cible réelle (event.target):", event.target);
-    // On vérifie si l'origine du clic est bien nos photos
-    if (event.target.closest('#photo-list-container')) {
-         console.log("... (Body Listener) Cible du clic DANS #photo-list-container");
-    } else {
-         console.log("... (Body Listener) Cible du clic HORS #photo-list-container");
-    }
-    if (event.target.closest('[data-photo-path]')) {
-         console.log("... (Body Listener) Cible du clic DANS/SUR [data-photo-path]");
-    } else {
-         console.log("... (Body Listener) Cible du clic HORS [data-photo-path]");
-    }
-}, true); // true = écouter pendant la phase de capture (attrape l'événement plus tôt)
-console.log("SETUP: Listener de test attaché à document.body.");
+   
   });
   
   // ==========================================
@@ -1152,7 +1136,7 @@ console.log("SETUP: Listener de test attaché à document.body.");
 // ===========================================================
 // == FONCTION POUR GERER LA SELECTION/SUPPRESSION DE PHOTOS ==
 // ===========================================================
-/* function setupPhotoSelectionMode() {
+ function setupPhotoSelectionMode() {
     console.log("SETUP: Initialisation complète du mode sélection photo.");
 
     // --- Récupération des éléments HTML essentiels ---
@@ -1208,19 +1192,65 @@ console.log("SETUP: Listener de test attaché à document.body.");
     console.log("SETUP: Écouteur ajouté au bouton mode sélection.");
 
     // --- 2. Écouteur pour le clic sur les PHOTOS (délégation) ---
-// --- Test Simplifié de l'Écouteur Photo ---
-if (photoListContainer) { // Assurez-vous que photoListContainer existe
-    photoListContainer.addEventListener('click', function(event) {
-        // Juste une alerte et un log pour voir si ça se déclenche
-        alert('CLIC DÉTECTÉ DANS photoListContainer! Element cliqué: ' + event.target.tagName);
-        console.log('CLIC DÉTECTÉ DANS photoListContainer! Target:', event.target);
-    });
-    console.log("SETUP: Écouteur de TEST attaché à #photo-list-container."); // Log de confirmation d'attachement
-} else {
-    console.error("SETUP ERROR (Test): Impossible d'attacher l'écouteur de test car #photo-list-container est introuvable.");
-}
-// --- Fin Test Simplifié ---
-    console.log("SETUP: Écouteur ajouté au conteneur de liste de photos (#photo-list-container).");
+// Récupérer le conteneur où les photos sont réellement ajoutées
+    const photoListContainer = document.getElementById('photo-list-container');
+
+    if (!photoListContainer) {
+        console.error("SETUP ERROR: Conteneur '#photo-list-container' introuvable ! Clics photos impossibles.");
+        // On pourrait arrêter ici, mais laissons les autres listeners s'attacher si besoin
+    } else {
+        // L'écouteur réel et complet :
+        photoListContainer.addEventListener('click', function(event) {
+            // Ne rien faire si on n'est pas en mode sélection
+            if (!modeSelectionActif) {
+                return;
+            }
+
+            // Trouver l'élément photo parent qui porte l'identifiant ('data-photo-path' est ajouté par renderPhotoItems)
+            const clickedPhotoElement = event.target.closest('[data-photo-path]');
+            if (!clickedPhotoElement) {
+                return; // Clic à côté d'une photo, ou attribut manquant sur le parent
+            }
+
+            // event.preventDefault(); // Si jamais l'élément était un lien
+
+            const photoPath = clickedPhotoElement.getAttribute('data-photo-path');
+            if (!photoPath) {
+                console.warn("Clic sur photo mais attribut data-photo-path vide/manquant.", clickedPhotoElement);
+                return;
+            }
+
+            // Basculer la classe visuelle
+            clickedPhotoElement.classList.toggle('is-photo-selected');
+            const isSelectedNow = clickedPhotoElement.classList.contains('is-photo-selected');
+
+            // Mettre à jour le tableau des IDs (chemins)
+            const indexInSelection = photosSelectionneesIds.indexOf(photoPath);
+            if (isSelectedNow) { // On vient de sélectionner
+                 if (indexInSelection === -1) { photosSelectionneesIds.push(photoPath); }
+            } else { // On vient de désélectionner
+                if (indexInSelection > -1) { photosSelectionneesIds.splice(indexInSelection, 1); }
+            }
+            console.log("Photos sélectionnées (paths):", photosSelectionneesIds); // Gardons ce log utile
+
+            // Afficher/Cacher le bouton Supprimer basé sur la sélection (avec les 2 classes)
+            // boutonSupprimerSelection est défini au début de setupPhotoSelectionMode
+            if (boutonSupprimerSelection) {
+                 if (photosSelectionneesIds.length > 0) {
+                     boutonSupprimerSelection.classList.remove('button-is-hidden');
+                     boutonSupprimerSelection.classList.add('button-is-visible');
+                 } else {
+                     boutonSupprimerSelection.classList.add('button-is-hidden');
+                     boutonSupprimerSelection.classList.remove('button-is-visible');
+                 }
+                 console.log("Visibilité bouton Suppr (via classe). Caché:", photosSelectionneesIds.length === 0); // Gardons ce log
+            } else {
+                 console.error("Bouton Supprimer ('bouton-supprimer-selection') introuvable dans le handler clic photo!");
+            }
+        });
+        console.log("SETUP: Écouteur (complet) ajouté au conteneur de liste de photos (#photo-list-container).");
+    } // Fin du else (!photoListContainer)
+    
 
     // --- 3. Écouteur pour le bouton "Supprimer la sélection" ---
     if (boutonSupprimerSelection) { // Vérifier si le bouton existe avant d'ajouter l'écouteur
@@ -1295,7 +1325,7 @@ if (photoListContainer) { // Assurez-vous que photoListContainer existe
         console.log("SETUP: Écouteur ajouté au bouton supprimer sélection.");
     }
 
-} */// Fin de setupPhotoSelectionMode
+} // Fin de setupPhotoSelectionMode
   
   
   // -----------------------------------------------------------------
