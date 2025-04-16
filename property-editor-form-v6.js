@@ -607,24 +607,41 @@
   
     // Conteneur: soit un enfant spécifique, soit l'élément lui-même
       // --- Logique CORRIGÉE pour trouver le conteneur où ajouter les items ---
-    let container = listContainerElement; // Par défaut, on ajoute à l'élément principal
-    const containerSelector = listContainerElement.getAttribute('data-xano-list-container');
+   // --- Logique CORRIGÉE et ROBUSTE pour trouver le conteneur où ajouter les items ---
+    let container = listContainerElement; // Par défaut, on ajoute à l'élément principal qui a data-xano-list
+    const containerSelectorValue = listContainerElement.getAttribute('data-xano-list-container');
 
-    if (containerSelector) {
-        // Si l'attribut existe et contient une valeur (ex: "#photo-list-container")
-        const specificContainer = listContainerElement.querySelector(containerSelector);
-        if (specificContainer) {
-            // Si on trouve l'élément correspondant au sélecteur, on l'utilise
-            container = specificContainer;
-        } else {
-            // Erreur si le sélecteur est spécifié mais l'élément non trouvé
-            console.warn(`Le conteneur spécifié par data-xano-list-container ("${containerSelector}") n'a pas été trouvé à l'intérieur de`, listContainerElement);
-            // On continue d'utiliser listContainerElement comme conteneur par défaut
+    if (containerSelectorValue) {
+        // Cas 1: La valeur est un sélecteur CSS valide (commence par #, ., [ etc.)
+        if (['#', '.', '['].some(prefix => containerSelectorValue.startsWith(prefix))) {
+            const specificContainer = listContainerElement.querySelector(containerSelectorValue);
+            if (specificContainer) {
+                container = specificContainer; // Utilise le conteneur trouvé par sélecteur
+            } else {
+                console.warn(`Le conteneur spécifié par data-xano-list-container ("${containerSelectorValue}") n'a pas été trouvé à l'intérieur de`, listContainerElement);
+                // Fallback: on utilise listContainerElement
+            }
         }
+        // Cas 2: La valeur est simplement "true" (ou similaire) - on cherche un enfant avec l'attribut
+        else if (containerSelectorValue.toLowerCase() === 'true') {
+             // Cherche un enfant direct (ou descendant) qui a l'attribut, peu importe sa valeur
+             const childContainer = listContainerElement.querySelector('[data-xano-list-container]');
+             if (childContainer && childContainer !== listContainerElement) { // S'assure qu'on trouve bien un ENFANT
+                 container = childContainer; // Utilise cet enfant comme conteneur
+             } else {
+                 console.warn(`Attribut data-xano-list-container="true" trouvé sur ${listContainerElement.tagName} mais aucun enfant avec cet attribut n'a été trouvé pour servir de conteneur.`);
+                 // Fallback: on utilise listContainerElement
+             }
+        }
+         // Autres cas (valeur de l'attribut non gérée) - on utilise listContainerElement par défaut
     }
-    // À partir d'ici, 'container' est le bon élément où faire appendChild
-    console.log("renderPhotoItems/renderListData: Ajout des éléments dans le conteneur:", container); // Log de vérification
+    // Si l'attribut data-xano-list-container n'existe pas du tout, container reste listContainerElement
+
+    // Log final pour vérifier où les éléments seront ajoutés
+    const functionName = (element && element.id === 'room-photos-display') ? 'renderPhotoItems' : 'renderListData';
+    console.log(`${functionName}: Ajout des éléments dans le conteneur:`, container);
     // --- Fin Logique CORRIGÉE ---
+   
   
     // Vider le conteneur, en préservant le template s'il est à l'intérieur
     // Et en préservant les éléments qui ne sont PAS des data-xano-list-item générés précédemment
@@ -772,24 +789,41 @@
 
   
      // --- Logique CORRIGÉE pour trouver le conteneur où ajouter les items ---
-    let container = listContainerElement; // Par défaut, on ajoute à l'élément principal
-    const containerSelector = listContainerElement.getAttribute('data-xano-list-container');
+   // --- Logique CORRIGÉE et ROBUSTE pour trouver le conteneur où ajouter les items ---
+    let container = listContainerElement; // Par défaut, on ajoute à l'élément principal qui a data-xano-list
+    const containerSelectorValue = listContainerElement.getAttribute('data-xano-list-container');
 
-    if (containerSelector) {
-        // Si l'attribut existe et contient une valeur (ex: "#photo-list-container")
-        const specificContainer = listContainerElement.querySelector(containerSelector);
-        if (specificContainer) {
-            // Si on trouve l'élément correspondant au sélecteur, on l'utilise
-            container = specificContainer;
-        } else {
-            // Erreur si le sélecteur est spécifié mais l'élément non trouvé
-            console.warn(`Le conteneur spécifié par data-xano-list-container ("${containerSelector}") n'a pas été trouvé à l'intérieur de`, listContainerElement);
-            // On continue d'utiliser listContainerElement comme conteneur par défaut
+    if (containerSelectorValue) {
+        // Cas 1: La valeur est un sélecteur CSS valide (commence par #, ., [ etc.)
+        if (['#', '.', '['].some(prefix => containerSelectorValue.startsWith(prefix))) {
+            const specificContainer = listContainerElement.querySelector(containerSelectorValue);
+            if (specificContainer) {
+                container = specificContainer; // Utilise le conteneur trouvé par sélecteur
+            } else {
+                console.warn(`Le conteneur spécifié par data-xano-list-container ("${containerSelectorValue}") n'a pas été trouvé à l'intérieur de`, listContainerElement);
+                // Fallback: on utilise listContainerElement
+            }
         }
+        // Cas 2: La valeur est simplement "true" (ou similaire) - on cherche un enfant avec l'attribut
+        else if (containerSelectorValue.toLowerCase() === 'true') {
+             // Cherche un enfant direct (ou descendant) qui a l'attribut, peu importe sa valeur
+             const childContainer = listContainerElement.querySelector('[data-xano-list-container]');
+             if (childContainer && childContainer !== listContainerElement) { // S'assure qu'on trouve bien un ENFANT
+                 container = childContainer; // Utilise cet enfant comme conteneur
+             } else {
+                 console.warn(`Attribut data-xano-list-container="true" trouvé sur ${listContainerElement.tagName} mais aucun enfant avec cet attribut n'a été trouvé pour servir de conteneur.`);
+                 // Fallback: on utilise listContainerElement
+             }
+        }
+         // Autres cas (valeur de l'attribut non gérée) - on utilise listContainerElement par défaut
     }
-    // À partir d'ici, 'container' est le bon élément où faire appendChild
-    console.log("renderPhotoItems/renderListData: Ajout des éléments dans le conteneur:", container); // Log de vérification
+    // Si l'attribut data-xano-list-container n'existe pas du tout, container reste listContainerElement
+
+    // Log final pour vérifier où les éléments seront ajoutés
+    const functionName = (element && element.id === 'room-photos-display') ? 'renderPhotoItems' : 'renderListData';
+    console.log(`${functionName}: Ajout des éléments dans le conteneur:`, container);
     // --- Fin Logique CORRIGÉE ---
+   
   
     // Vider le conteneur, en préservant le template s'il est à l'intérieur
     // Et en préservant les éléments qui ne sont PAS des data-xano-list-item générés précédemment
