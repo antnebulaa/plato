@@ -1193,8 +1193,7 @@ try {
 
     // --- 2. Écouteur pour le clic sur les PHOTOS (délégation) ---
 // Récupérer le conteneur où les photos sont réellement ajoutées
-    const photoListContainer = document.getElementById('photo-list-container');
-
+    
     if (!photoListContainer) {
         console.error("SETUP ERROR: Conteneur '#photo-list-container' introuvable ! Clics photos impossibles.");
         // On pourrait arrêter ici, mais laissons les autres listeners s'attacher si besoin
