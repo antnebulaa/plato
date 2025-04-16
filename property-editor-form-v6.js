@@ -171,6 +171,23 @@ try {
         console.error("ERREUR GLOBALE DANS DOMContentLoaded:", initError);
         // Une erreur ici pourrait empêcher setupCreatedRoomSelection d'être appelée
     }
+    // Listener de test sur BODY (à ajouter une fois)
+document.body.addEventListener('click', function(event) {
+    console.log("--- BODY CLICK DETECTED ---");
+    console.log("Cible réelle (event.target):", event.target);
+    // On vérifie si l'origine du clic est bien nos photos
+    if (event.target.closest('#photo-list-container')) {
+         console.log("... (Body Listener) Cible du clic DANS #photo-list-container");
+    } else {
+         console.log("... (Body Listener) Cible du clic HORS #photo-list-container");
+    }
+    if (event.target.closest('[data-photo-path]')) {
+         console.log("... (Body Listener) Cible du clic DANS/SUR [data-photo-path]");
+    } else {
+         console.log("... (Body Listener) Cible du clic HORS [data-photo-path]");
+    }
+}, true); // true = écouter pendant la phase de capture (attrape l'événement plus tôt)
+console.log("SETUP: Listener de test attaché à document.body.");
   });
   
   // ==========================================
