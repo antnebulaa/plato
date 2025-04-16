@@ -638,7 +638,7 @@
     // Si l'attribut data-xano-list-container n'existe pas du tout, container reste listContainerElement
 
     // Log final pour vérifier où les éléments seront ajoutés
-    const functionName = (element && element.id === 'room-photos-display') ? 'renderPhotoItems' : 'renderListData';
+    const functionName = (listContainerElement && listContainerElement.id === 'room-photos-display') ? 'renderPhotoItems' : 'renderListData';
     console.log(`${functionName}: Ajout des éléments dans le conteneur:`, container);
     // --- Fin Logique CORRIGÉE ---// 
   
@@ -819,7 +819,7 @@
     // Si l'attribut data-xano-list-container n'existe pas du tout, container reste listContainerElement
 
     // Log final pour vérifier où les éléments seront ajoutés
-    const functionName = (element && element.id === 'room-photos-display') ? 'renderPhotoItems' : 'renderListData';
+    const functionName = (listContainerElement && listContainerElement.id === 'room-photos-display') ? 'renderPhotoItems' : 'renderListData';
     console.log(`${functionName}: Ajout des éléments dans le conteneur:`, container);
     // --- Fin Logique CORRIGÉE ---
    
