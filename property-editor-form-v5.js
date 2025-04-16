@@ -1104,7 +1104,7 @@ function setupPhotoSelectionMode() {
             // Sortie du mode sélection : Nettoyage complet
             boutonModeSelection.textContent = "Sélectionner les photos";
             conteneurPhotos.classList.remove('selection-active');
-            boutonSupprimerSelection.classList.add('is-hidden'); // Cacher bouton supprimer
+            boutonSupprimerSelection.classList.add('buttonb-is-hidden'); // Cacher bouton supprimer
 
             // Retirer la classe .is-photo-selected de toutes les photos
             const photosSelectionneesVisuellement = photoListContainer.querySelectorAll('.is-photo-selected');
@@ -1155,9 +1155,9 @@ function setupPhotoSelectionMode() {
 
         // Afficher/Cacher le bouton Supprimer basé sur la sélection
         if (photosSelectionneesIds.length > 0) {
-            boutonSupprimerSelection.classList.remove('is-hidden'); // Afficher
+            boutonSupprimerSelection.classList.remove('button-is-hidden'); // Afficher
         } else {
-            boutonSupprimerSelection.classList.add('is-hidden'); // Cacher
+            boutonSupprimerSelection.classList.add('button-is-hidden'); // Cacher
         }
         console.log("Visibilité bouton Supprimer (via classe) mise à jour. Caché:", photosSelectionneesIds.length === 0);
     });
@@ -1214,7 +1214,7 @@ function setupPhotoSelectionMode() {
                     modeSelectionActif = false;
                     if (boutonModeSelection) boutonModeSelection.textContent = "Sélectionner les photos";
                     if (conteneurPhotos) conteneurPhotos.classList.remove('selection-active');
-                    boutonSupprimerSelection.classList.add('is-hidden'); // Cacher via classe
+                    boutonSupprimerSelection.classList.add('button-is-hidden'); // Cacher via classe
 
                 } else {
                     // Erreur applicative retournée par Xano
