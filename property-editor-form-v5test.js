@@ -796,11 +796,15 @@
 
         // --- Ajout spécifique aux photos ---
         if (item && item.path) {
+         // Supprimer l'attribut data-photo-path existant (sécurité)
+      clone.removeAttribute('data-photo-path');
       // Assurez-vous que 'clone' est l'élément principal du template (ex: la div externe)
       clone.setAttribute('data-photo-path', item.path);
   } else {
       // Log si jamais un objet image n'a pas de propriété 'path'
-      console.warn("Impossible d'ajouter data-photo-path: 'path' manquant dans l'objet item", item);
+       console.warn("Path manquant pour la photo:", item);
+    // Éviter de cloner si path manquant (optionnel)
+    return;
   }
   
          // ... configuration de base du clone (display, aria-hidden, etc.) ...
