@@ -1122,11 +1122,13 @@
 
         } else {
             // Mode sélection désactivé - AJOUT DES LIGNES DE RÉINITIALISATION
-            photosSelectionneesIds = []; // Réinitialise le tableau des sélections
-            const photosSelectionnees = photoListContainer.querySelectorAll('.is-photo-selected');
-            photosSelectionnees.forEach(photo => {
-                photo.classList.remove('is-photo-selected');
-            });
+           photosSelectionneesIds = [];
+const photosSelectionnees = photoListContainer.querySelectorAll('.is-photo-selected');
+console.log('Photos à désélectionner:', photosSelectionnees); // <-- Variable CORRECTE
+photosSelectionnees.forEach(photo => {
+    photo.classList.remove('is-photo-selected');
+    console.log('Classe retirée sur:', photo); // <-- photo existe ici
+});
             
             boutonModeSelection.textContent = "Sélectionner les photos";
             conteneurPhotos.classList.remove('selection-active');
