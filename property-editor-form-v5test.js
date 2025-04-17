@@ -1123,39 +1123,48 @@
             boutonModeSelection.textContent = "Sélectionner les photos";
             conteneurPhotos.classList.remove('selection-active'); // Retire classe du conteneur général
 
-            // >>> AJOUT: Logique de désélection <<<
+            // >>> NOUVELLE APPROCHE pour la désélection <<<
             console.log("Annulation sélection : Désélection de toutes les photos.");
-            // 1. Vider le tableau des sélections
+
+            // 1. Utiliser le tableau photosSelectionneesIds AVANT de le vider
+            console.log(`   -> Tentative de désélection basée sur le tableau photosSelectionneesIds (taille actuelle: ${photosSelectionneesIds.length})`);
+            const pathsToDeselect = [...photosSelectionneesIds]; // Copie du tableau au cas où
+
+            pathsToDeselect.forEach((photoPath, index) => {
+                // Construire le sélecteur d'attribut spécifique pour CETTE photo
+                // Attention à l'échappement des caractères spéciaux dans le chemin si nécessaire
+                const escapedPhotoPath = photoPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"'); // Échappe \ et "
+                const elementSelector = `#photo-list-container [data-xano-list-item][data-photo-path="${escapedPhotoPath}"]`;
+                // console.log(`      -> [${index}] Recherche de l'élément avec sélecteur: ${elementSelector}`);
+
+                try {
+                    const photoElement = document.querySelector(elementSelector);
+
+                    if (photoElement) {
+                        // Élément trouvé, on retire la classe
+                         if (photoElement.classList.contains('is-photo-selected')) {
+                              console.log(`      -> [${index}] Élément trouvé pour path ${photoPath}. Retrait de '.is-photo-selected'.`);
+                              photoElement.classList.remove('is-photo-selected');
+                         } else {
+                              console.log(`      -> [${index}] Élément trouvé pour path ${photoPath}, mais n'avait PAS '.is-photo-selected' (étrange?).`);
+                         }
+                    } else {
+                        // Élément non trouvé, problème potentiel (ou élément déjà retiré du DOM?)
+                        console.warn(`      -> [${index}] Élément INTROUVABLE pour path ${photoPath} avec le sélecteur.`);
+                    }
+                } catch (e) {
+                     console.error(`      -> [${index}] Erreur lors de la recherche ou du retrait de classe pour le sélecteur ${elementSelector}:`, e);
+                }
+            });
+
+            // 2. Vider le tableau APRÈS avoir traité tous les chemins
             photosSelectionneesIds = [];
-            console.log("   -> Tableau photosSelectionneesIds vidé.");
-
-            // 2. Retirer la classe visuelle des photos DANS le photoListContainer
-            //    Utilisation d'un querySelectorAll plus spécifique depuis document pour être sûr
-            const query = '#photo-list-container [data-xano-list-item].is-photo-selected';
-            console.log(`   -> Recherche des photos avec le sélecteur : "${query}"`);
-            const selectedPhotos = document.querySelectorAll(query); // <<< MODIFICATION ICI: Recherche depuis document
-            console.log(`   -> Trouvé ${selectedPhotos.length} photo(s) avec .is-photo-selected.`); // On espère voir > 0 ici !
-
-            if (selectedPhotos.length > 0) {
-                selectedPhotos.forEach((photoEl, index) => {
-                    // Log avant de retirer la classe pour être sûr
-                    const path = photoEl.getAttribute('data-photo-path') || 'Pas de path trouvé';
-                    console.log(`      -> [${index}] Tentative de retrait de '.is-photo-selected' de l'élément avec path: ${path}`);
-                    photoEl.classList.remove('is-photo-selected');
-                    // Optionnel: Vérifier dans l'inspecteur d'éléments si la classe part bien
-                });
-            } else {
-                 // Si même cette query ne trouve rien, il y a un mystère plus profond
-                 console.warn("   -> ÉCHEC : Impossible de trouver les éléments avec .is-photo-selected via querySelectorAll, même depuis document.");
-                 // On pourrait tenter une recherche encore plus large comme fallback, mais c'est étrange
-                 // const fallbackSelected = document.querySelectorAll('.is-photo-selected');
-                 // console.log(`   -> Fallback : document.querySelectorAll('.is-photo-selected') trouve ${fallbackSelected.length} éléments.`);
-            }
+            console.log("   -> Tableau photosSelectionneesIds vidé (après boucle).");
 
             // 3. Cacher le bouton Supprimer (via la fonction helper)
             updateDeleteButtonVisibility();
             console.log("   -> Visibilité bouton Supprimer mise à jour (doit être caché).");
-            // >>> FIN AJOUT <<<
+            // >>> FIN NOUVELLE APPROCHE <<<
         }
     });
     console.log("SETUP: Écouteur ajouté au bouton mode sélection.");
