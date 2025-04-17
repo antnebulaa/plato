@@ -494,6 +494,16 @@
       if (loadingIndicator) loadingIndicator.style.display = 'none';
   
       renderData(responseData, targetElement); // Utilise le helper
+
+      // === AJOUTER ICI ===
+        if (targetElement.id === 'room-photos-display') {
+            const successEvent = new CustomEvent('xano:photos-loaded', {
+                detail: { photos: responseData }
+            });
+            document.dispatchEvent(successEvent);
+        }
+        // === FIN AJOUT ===
+
   
       // Déclencher l'événement de succès après le rendu
       const successEvent = new CustomEvent('xano:data-loaded', {
@@ -1079,9 +1089,12 @@
   
   function setupPhotoSelectionMode() {
     console.log("SETUP: Initialisation du bouton mode sélection photo.");
+    // === AJOUTER ICI ===
+    document.addEventListener('xano:photos-loaded', deselectionneToutesPhotos);
+    // === FIN AJOUT ===
     const boutonModeSelection = document.getElementById('bouton-mode-selection');
     const conteneurPhotos = document.getElementById('room-photos-display'); // <<< Cible originale pour l'écouteur photo
-    const photoListContainer = document.getElementById('photo-list-container'); // <<< Nécessaire pour trouver les photos à désélectionner
+    const photoListContainer = document.querySelector('[data-xano-list-container="true"]'); // <<< Nécessaire pour trouver les photos à désélectionner
     const boutonSupprimerSelection = document.getElementById('bouton-supprimer-selection');
 
     // Vérification que les éléments existent
@@ -1107,49 +1120,12 @@
     }
    
      // --- NOUVELLE FONCTION: Fonction auxiliaire pour désélectionner toutes les photos ---
-    function deselectionneToutesPhotos() {
-        console.log("DÉSÉLECTION - Début désélection de toutes les photos...");
-        
-        // Vider d'abord le tableau
-        const nombreAvantVidage = photosSelectionneesIds.length;
-        photosSelectionneesIds = [];
-        console.log(`DÉSÉLECTION - Tableau vidé (contenait ${nombreAvantVidage} éléments)`);
-        
-        // APPROCHE 1: Cibler tous les éléments avec data-photo-path dans le container
-        // Cette approche est la plus cohérente avec la méthode de sélection
-        const allPhotoElements = photoListContainer.querySelectorAll('[data-photo-path]');
-        console.log(`DÉSÉLECTION - Trouvé ${allPhotoElements.length} éléments avec [data-photo-path]`);
-        
-        allPhotoElements.forEach((photoEl) => {
-            if (photoEl.classList.contains('is-photo-selected')) {
-                photoEl.classList.remove('is-photo-selected');
-                console.log(`DÉSÉLECTION - Classe retirée de l'élément avec path: ${photoEl.getAttribute('data-photo-path')}`);
-            }
-        });
-        
-        // APPROCHE 2: Rechercher directement tous les éléments avec la classe
-        const selectedPhotos = photoListContainer.querySelectorAll('.is-photo-selected');
-        console.log(`DÉSÉLECTION - Trouvé ${selectedPhotos.length} éléments avec .is-photo-selected directement`);
-        
-        selectedPhotos.forEach((photoEl) => {
-            photoEl.classList.remove('is-photo-selected');
-            console.log("DÉSÉLECTION - Classe retirée d'un élément déjà sélectionné");
-        });
-        
-        // APPROCHE 3: Cibler également les images à l'intérieur des conteneurs
-        const selectedImages = photoListContainer.querySelectorAll('.photo-item-image');
-        console.log(`DÉSÉLECTION - Vérifié également ${selectedImages.length} images`);
-        
-        selectedImages.forEach((imgEl) => {
-            const parentEl = imgEl.closest('[data-photo-path]');
-            if (parentEl && parentEl.classList.contains('is-photo-selected')) {
-                parentEl.classList.remove('is-photo-selected');
-                console.log("DÉSÉLECTION - Classe retirée du parent d'une image");
-            }
-        });
-        
-        console.log("DÉSÉLECTION - Fin de la désélection");
-    }
+   function deselectionneToutesPhotos() {
+    photosSelectionneesIds = [];
+    const selectedPhotos = document.querySelectorAll('.is-photo-selected');
+    selectedPhotos.forEach(photoEl => photoEl.classList.remove('is-photo-selected'));
+}
+
 
     // --- Écouteur sur le bouton Gérer/Annuler (#bouton-mode-selection) ---
     boutonModeSelection.addEventListener('click', function() {
@@ -1206,7 +1182,8 @@
 
         // Bascule la classe visuelle de sélection sur l'élément trouvé (le clone de photo-item-template)
         // C'EST ICI QUE LA SÉLECTION VISUELLE SE FAIT
-        clickedPhotoElement.classList.toggle('is-photo-selected');
+        const isSelected = clickedPhotoElement.toggleAttribute('data-photo-selected');
+clickedPhotoElement.setAttribute('data-photo-selected', isSelected);
         const isNowSelected = clickedPhotoElement.classList.contains('is-photo-selected');
         console.log(`Photo [path: ${photoPath}] est maintenant sélectionnée: ${isNowSelected}`);
 
@@ -1328,6 +1305,10 @@
 
      // Initialiser la visibilité du bouton Supprimer au chargement (il doit être caché)
       updateDeleteButtonVisibility();
+
+   return () => {
+        document.removeEventListener('xano:photos-loaded', deselectionneToutesPhotos);
+    };
 
 } // Fin de setupPhotoSelectionMode
   
