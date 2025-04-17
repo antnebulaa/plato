@@ -1094,7 +1094,7 @@
     // === FIN AJOUT ===
     const boutonModeSelection = document.getElementById('bouton-mode-selection');
     const conteneurPhotos = document.getElementById('room-photos-display'); // <<< Cible originale pour l'écouteur photo
-    const photoListContainer = document.querySelector('[data-xano-list-container="true"]'); // <<< Nécessaire pour trouver les photos à désélectionner
+    const photoListContainer = document.getElementById('photo-list-container'); // <<< Nécessaire pour trouver les photos à désélectionner
     const boutonSupprimerSelection = document.getElementById('bouton-supprimer-selection');
 
     // Vérification que les éléments existent
