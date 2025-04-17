@@ -1094,7 +1094,8 @@
     // === FIN AJOUT ===
     const boutonModeSelection = document.getElementById('bouton-mode-selection');
     const conteneurPhotos = document.getElementById('room-photos-display'); // <<< Cible originale pour l'écouteur photo
-    const photoListContainer = document.getElementById('photo-list-container'); // <<< Nécessaire pour trouver les photos à désélectionner
+   const photoListContainer = document.querySelector('[data-xano-list-container="true"]');
+    // <<< Nécessaire pour trouver les photos à désélectionner
     const boutonSupprimerSelection = document.getElementById('bouton-supprimer-selection');
 
     // Vérification que les éléments existent
@@ -1122,9 +1123,13 @@
      // --- NOUVELLE FONCTION: Fonction auxiliaire pour désélectionner toutes les photos ---
    function deselectionneToutesPhotos() {
     photosSelectionneesIds = [];
-    const selectedPhotos = document.querySelectorAll('.is-photo-selected');
-    selectedPhotos.forEach(photoEl => photoEl.classList.remove('is-photo-selected'));
+    const selectedPhotos = photoListContainer.querySelectorAll('[data-photo-path].is-photo-selected');
+    selectedPhotos.forEach(photoEl => {
+        photoEl.classList.remove('is-photo-selected');
+        photoEl.removeAttribute('data-photo-selected'); // Cohérence avec le CSS
+    });
 }
+
 
 
     // --- Écouteur sur le bouton Gérer/Annuler (#bouton-mode-selection) ---
@@ -1154,22 +1159,12 @@
 
     // --- Écouteur sur le CONTENEUR des photos (#room-photos-display) ---
     // On garde la cible originale 'conteneurPhotos' comme dans votre script
-    conteneurPhotos.addEventListener('click', function(event) {
-        // console.log("--- Clic détecté sur conteneurPhotos (#room-photos-display) ---");
-        if (!modeSelectionActif) {
-            // console.log("Mode sélection inactif, clic photo ignoré.");
-            return; // Mode sélection actif ?
-        }
-        // console.log("Mode sélection ACTIF. Cible du clic:", event.target);
-
-        // Trouve l'élément parent le plus proche qui a data-photo-path
-        const clickedPhotoElement = event.target.closest('[data-photo-path]');
-        // console.log("Élément photo trouvé via closest:", clickedPhotoElement);
-
-        if (!clickedPhotoElement) {
-           // console.log("Clic en dehors d'une photo ou élément sans data-photo-path.");
-            return; // Sortir si le clic n'est pas sur une photo identifiable (l'élément cloné)
-        }
+    photoListContainer.addEventListener('click', function(event) {
+       event.stopPropagation(); // Bloquer la propagation
+    if (!modeSelectionActif) return;
+     
+         const clickedPhotoElement = event.target.closest('[data-photo-path]');
+    if (!clickedPhotoElement) return;
 
         // On ne veut pas forcément empêcher la propagation si besoin, mais on gère la sélection
         // event.preventDefault(); // À décommenter seulement si la photo est dans un lien et qu'on ne veut pas naviguer
