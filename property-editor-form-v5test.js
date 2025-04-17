@@ -1080,8 +1080,8 @@
   function setupPhotoSelectionMode() {
     console.log("SETUP: Initialisation du bouton mode sélection photo.");
     const boutonModeSelection = document.getElementById('bouton-mode-selection');
-    const conteneurPhotos = document.getElementById('room-photos-display'); // Conteneur principal des photos
-    const photoListContainer = document.getElementById('photo-list-container'); // Conteneur où les items photos sont ajoutés
+    const conteneurPhotos = document.getElementById('room-photos-display'); // <<< Cible originale pour l'écouteur photo
+    const photoListContainer = document.getElementById('photo-list-container'); // <<< Nécessaire pour trouver les photos à désélectionner
     const boutonSupprimerSelection = document.getElementById('bouton-supprimer-selection');
 
     // Vérification que les éléments existent
@@ -1090,24 +1090,23 @@
         return;
     }
 
-    // --- Fonction pour mettre à jour la visibilité du bouton Supprimer ---
+    // --- Fonction HELPER pour gérer la visibilité du bouton Supprimer via les CLASSES ---
     function updateDeleteButtonVisibility() {
-        if (!boutonSupprimerSelection) return; // Sécurité
+        if (!boutonSupprimerSelection) return;
 
-        if (photosSelectionneesIds.length > 0 && modeSelectionActif) {
-            // Afficher le bouton
+        // Le bouton doit être visible SEULEMENT si on est en mode sélection ET qu'au moins une photo est sélectionnée.
+        if (modeSelectionActif && photosSelectionneesIds.length > 0) {
             boutonSupprimerSelection.classList.remove('button-is-hidden');
             boutonSupprimerSelection.classList.add('button-is-visible');
-             console.log("Bouton supprimer rendu VISIBLE");
+            // console.log("Bouton supprimer rendu VISIBLE");
         } else {
-            // Cacher le bouton
             boutonSupprimerSelection.classList.remove('button-is-visible');
             boutonSupprimerSelection.classList.add('button-is-hidden');
-            console.log("Bouton supprimer rendu CACHÉ");
+            // console.log("Bouton supprimer rendu CACHÉ");
         }
     }
 
-    // --- Écouteur sur le bouton Gérer/Annuler ---
+    // --- Écouteur sur le bouton Gérer/Annuler (#bouton-mode-selection) ---
     boutonModeSelection.addEventListener('click', function() {
         modeSelectionActif = !modeSelectionActif;
         console.log("Mode sélection photos :", modeSelectionActif);
@@ -1115,154 +1114,150 @@
         if (modeSelectionActif) {
             // On entre en mode sélection
             boutonModeSelection.textContent = "Annuler";
-            conteneurPhotos.classList.add('selection-active');
-            // On ne montre pas forcément le bouton supprimer ici,
-            // il sera affiché dès qu'une photo est sélectionnée.
-             updateDeleteButtonVisibility(); // Met à jour au cas où (devrait le cacher si 0 sélection)
+            conteneurPhotos.classList.add('selection-active'); // Classe sur le conteneur général
+            // La visibilité du bouton dépendra de la sélection (gérée par updateDeleteButtonVisibility)
+            updateDeleteButtonVisibility(); // Mettre à jour (devrait le cacher si 0 sélection)
 
         } else {
             // On sort du mode sélection (Clic sur "Annuler")
             boutonModeSelection.textContent = "Sélectionner les photos";
-            conteneurPhotos.classList.remove('selection-active');
+            conteneurPhotos.classList.remove('selection-active'); // Retire classe du conteneur général
 
-            // >>> AJOUT : Logique de désélection <<<
+            // >>> AJOUT: Logique de désélection <<<
             console.log("Annulation sélection : Désélection de toutes les photos.");
             // 1. Vider le tableau des sélections
             photosSelectionneesIds = [];
+            console.log("   -> Tableau photosSelectionneesIds vidé.");
 
-            // 2. Retirer la classe visuelle des photos dans le conteneur
+            // 2. Retirer la classe visuelle des photos DANS le photoListContainer
             if (photoListContainer) {
-                 photoListContainer.querySelectorAll('.is-photo-selected').forEach(photoEl => {
+                 const selectedPhotos = photoListContainer.querySelectorAll('.is-photo-selected');
+                 console.log(`   -> Trouvé ${selectedPhotos.length} photo(s) avec .is-photo-selected.`);
+                 selectedPhotos.forEach(photoEl => {
                      photoEl.classList.remove('is-photo-selected');
+                     // console.log("      -> Classe retirée de :", photoEl);
                  });
             } else {
                  console.warn("Impossible de désélectionner visuellement : #photo-list-container non trouvé.");
             }
 
-            // 3. Cacher le bouton Supprimer
-            updateDeleteButtonVisibility(); // Doit maintenant le cacher car photosSelectionneesIds est vide
+            // 3. Cacher le bouton Supprimer (via la fonction helper)
+            updateDeleteButtonVisibility();
+            console.log("   -> Visibilité bouton Supprimer mise à jour (doit être caché).");
+            // >>> FIN AJOUT <<<
         }
     });
     console.log("SETUP: Écouteur ajouté au bouton mode sélection.");
 
 
-    // --- Écouteur sur le CONTENEUR des photos (délégation d'événements) ---
-    // Remplacé 'conteneurPhotos' par 'photoListContainer' pour être plus précis sur la zone cliquable des photos
-    photoListContainer.addEventListener('click', function(event) {
-        // console.log("--- Clic détecté sur #photo-list-container ---"); // Log si besoin
+    // --- Écouteur sur le CONTENEUR des photos (#room-photos-display) ---
+    // On garde la cible originale 'conteneurPhotos' comme dans votre script
+    conteneurPhotos.addEventListener('click', function(event) {
+        // console.log("--- Clic détecté sur conteneurPhotos (#room-photos-display) ---");
         if (!modeSelectionActif) {
             // console.log("Mode sélection inactif, clic photo ignoré.");
-            return; // Ne rien faire si on n'est pas en mode sélection
+            return; // Mode sélection actif ?
         }
-       // console.log("Mode sélection ACTIF. Cible du clic:", event.target);
+        // console.log("Mode sélection ACTIF. Cible du clic:", event.target);
 
-        // Cibler l'élément parent qui contient l'attribut data-photo-path
+        // Trouve l'élément parent le plus proche qui a data-photo-path
         const clickedPhotoElement = event.target.closest('[data-photo-path]');
-       // console.log("Élément photo trouvé via closest:", clickedPhotoElement);
+        // console.log("Élément photo trouvé via closest:", clickedPhotoElement);
 
         if (!clickedPhotoElement) {
            // console.log("Clic en dehors d'une photo ou élément sans data-photo-path.");
-            return; // Sortir si le clic n'est pas sur une photo identifiable
+            return; // Sortir si le clic n'est pas sur une photo identifiable (l'élément cloné)
         }
 
-        event.preventDefault(); // Empêcher comportement par défaut (utile si photo est dans un <a>)
+        // On ne veut pas forcément empêcher la propagation si besoin, mais on gère la sélection
+        // event.preventDefault(); // À décommenter seulement si la photo est dans un lien et qu'on ne veut pas naviguer
 
         const photoPath = clickedPhotoElement.getAttribute('data-photo-path');
-        if (!photoPath) return; // Sécurité
+        if (!photoPath) {
+             console.warn("Élément cliqué a [data-photo-path] mais l'attribut est vide.", clickedPhotoElement);
+             return; // Sécurité
+        }
 
-        // Bascule la classe visuelle de sélection
+        // Bascule la classe visuelle de sélection sur l'élément trouvé (le clone de photo-item-template)
+        // C'EST ICI QUE LA SÉLECTION VISUELLE SE FAIT
         clickedPhotoElement.classList.toggle('is-photo-selected');
+        const isNowSelected = clickedPhotoElement.classList.contains('is-photo-selected');
+        console.log(`Photo [path: ${photoPath}] est maintenant sélectionnée: ${isNowSelected}`);
 
         // Met à jour le tableau photosSelectionneesIds (ajoute/retire photoPath)
         const indexInSelection = photosSelectionneesIds.indexOf(photoPath);
         if (indexInSelection > -1) {
-            // La photo était sélectionnée, on la retire
-            photosSelectionneesIds.splice(indexInSelection, 1);
-            console.log(`Photo retirée: ${photoPath}`);
+             // Était sélectionné, on le retire du tableau (car toggle l'a désélectionné visuellement)
+             if (!isNowSelected) { // Double vérification
+                  photosSelectionneesIds.splice(indexInSelection, 1);
+                  console.log(`   -> Photo retirée du tableau: ${photoPath}`);
+             } else {
+                   console.warn("Incohérence: Photo retirée visuellement mais encore dans le tableau?");
+             }
         } else {
-            // La photo n'était pas sélectionnée, on l'ajoute
-            photosSelectionneesIds.push(photoPath);
-            console.log(`Photo ajoutée: ${photoPath}`);
+             // N'était pas sélectionné, on l'ajoute au tableau (car toggle l'a sélectionné visuellement)
+              if (isNowSelected) { // Double vérification
+                  photosSelectionneesIds.push(photoPath);
+                  console.log(`   -> Photo ajoutée au tableau: ${photoPath}`);
+              } else {
+                    console.warn("Incohérence: Photo ajoutée visuellement mais pas ajoutée au tableau?");
+              }
         }
         console.log("Photos sélectionnées (paths):", photosSelectionneesIds);
 
-        // >>> MODIFIÉ : Utilisation de la fonction pour gérer la visibilité <<<
+        // >>> MODIFIÉ : Utilisation de la fonction helper pour gérer la visibilité du bouton Supprimer <<<
         updateDeleteButtonVisibility();
 
     });
-    console.log("SETUP: Écouteur ajouté au conteneur de liste de photos (#photo-list-container).");
-
+    console.log("SETUP: Écouteur ajouté au conteneur de photos (#room-photos-display).");
 
     // --- Écouteur sur le bouton "Supprimer la sélection" ---
+    // La logique interne de cet écouteur (confirmation, appel API, rafraîchissement, réinitialisation)
+    // de la version précédente semblait correcte et est conservée ici.
     if (boutonSupprimerSelection) {
-        boutonSupprimerSelection.addEventListener('click', async function() { // << async est déjà là, c'est bon
-            // 1. Vérifier si des photos sont sélectionnées
+        boutonSupprimerSelection.addEventListener('click', async function() {
+            // ... (Même code que dans ma réponse précédente pour la logique de suppression) ...
+            // [Copiez ici toute la partie 'addEventListener' pour 'boutonSupprimerSelection' de ma réponse précédente]
+            // --- Début copie ---
             if (photosSelectionneesIds.length === 0) {
                 console.warn("Clic sur Supprimer, mais aucune photo n'est sélectionnée.");
                 return;
             }
-            // Vérifier si l'ID de la room est connu
             if (currentSelectedRoomId === null) {
                  console.error("Impossible de supprimer : ID de la room courante inconnu.");
                  alert("Erreur : Impossible d'identifier la room actuelle.");
                  return;
             }
-
-            // 2. Demander confirmation
             const confirmation = window.confirm(`Êtes-vous sûr de vouloir supprimer ${photosSelectionneesIds.length} photo(s) ? Cette action est irréversible.`);
             if (!confirmation) {
                 console.log("Suppression annulée par l'utilisateur.");
                 return;
             }
-
-            // 3. Si confirmé, préparer et exécuter la suppression
             console.log(`Suppression confirmée pour ${photosSelectionneesIds.length} photo(s) dans la room ${currentSelectedRoomId}. Paths:`, photosSelectionneesIds);
-            // Afficher un indicateur de chargement/suppression
             boutonSupprimerSelection.disabled = true;
             boutonSupprimerSelection.textContent = "Suppression...";
-
-            // Préparer les données à envoyer
             const payload = {
-                room_id: parseInt(currentSelectedRoomId, 10), // Assurer que c'est un nombre
-                photo_paths: photosSelectionneesIds // Le tableau des chemins à supprimer
+                room_id: parseInt(currentSelectedRoomId, 10),
+                photo_paths: photosSelectionneesIds
             };
-            const deleteEndpoint = 'photos/batch_delete'; // <<< VÉRIFIEZ que c'est le bon chemin
-            const deleteMethod = 'POST'; // <<< Utilisez POST comme convenu
-
+            const deleteEndpoint = 'photos/batch_delete';
+            const deleteMethod = 'POST';
             try {
-                // Appel API avec xanoClient
-                const response = await xanoClient._request(deleteMethod, deleteEndpoint, payload, false); // false = JSON
+                const response = await xanoClient._request(deleteMethod, deleteEndpoint, payload, false);
                 console.log('Réponse suppression Xano:', response);
 
-                // --- ANALYSE DE LA RÉPONSE ---
-                // Adaptez cette condition si Xano ne renvoie pas 'response.success === true'
-                // Par exemple, si une suppression réussie renvoie juste les ID supprimés ou un message spécifique.
-                // On suppose ici que la réponse contient une clé 'success' ou similaire.
-                // Si la réponse est juste 'null' ou un tableau vide en cas de succès, ajustez.
+                // Adaptez cette logique de succès si nécessaire
                 let success = false;
-                if (response && response.success === true) { // Exemple: si Xano renvoie { success: true, ... }
-                     success = true;
-                } else if (response === null && photosSelectionneesIds.length > 0) { // Exemple: si Xano renvoie 204 ou null en cas de succès
-                     // Attention, il faut être sûr que 'null' signifie succès ici.
-                     // success = true; // Décommentez si c'est le cas
-                     console.warn("Réponse de suppression Xano est null. Interprétation comme succès?");
-                     // Pour la sécurité, ne traitons pas 'null' comme succès sans confirmation
-                } else if (response && Array.isArray(response) && response.length > 0) { // Exemple: si Xano renvoie la liste des éléments supprimés
-                    // success = true; // Décommentez si c'est le cas
-                }
-                 // Adaptez/ajoutez d'autres conditions si nécessaire
+                if (response && response.success === true) { success = true; }
+                // Ajoutez d'autres conditions de succès si Xano répond différemment (ex: null, tableau...)
 
                 if (success) {
-                    // --- SUPPRESSION RÉUSSIE ---
                     console.log('Photos supprimées avec succès via API !');
-                    alert('Les photos sélectionnées ont été supprimées.'); // Feedback simple
-
-                    // --- Rafraîchir la liste des photos ---
+                    alert('Les photos sélectionnées ont été supprimées.');
                     console.log(`Rafraîchissement des photos pour la room ${currentSelectedRoomId}...`);
                     const photoLoadingIndicator = photoDisplayContainer ? photoDisplayContainer.querySelector('[data-xano-loading]') : null;
                     const fetchEndpoint = `property_photos/photos/${currentSelectedRoomId}`;
                     const params = null;
-
                     if (photoDisplayContainer && xanoClient) {
                         if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'block';
                          try {
@@ -1274,43 +1269,32 @@
                          } finally {
                                if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'none';
                          }
-                    } else {
-                         console.warn("Impossible de rafraîchir : photoDisplayContainer ou xanoClient manquant.");
-                    }
-                    // ------------------------------------
+                    } else { console.warn("Impossible de rafraîchir : photoDisplayContainer ou xanoClient manquant."); }
 
-                    // --- Réinitialiser l'état de sélection APRÈS le succès et le rafraîchissement ---
-                    photosSelectionneesIds = []; // Vider le tableau
-                    // On sort du mode sélection
-                    modeSelectionActif = false;
+                    // Réinitialiser l'état après succès
+                    photosSelectionneesIds = [];
+                    modeSelectionActif = false; // Important de sortir du mode
                     if(boutonModeSelection) boutonModeSelection.textContent = "Sélectionner les photos";
                     if(conteneurPhotos) conteneurPhotos.classList.remove('selection-active');
                     updateDeleteButtonVisibility(); // Pour cacher le bouton supprimer
 
                 } else {
-                    // Gérer une réponse de Xano qui n'indique PAS le succès
                     console.error("La suppression a échoué côté serveur (réponse non interprétée comme succès):", response);
-                    // Essayez de donner un message plus utile si possible
                     let errorMessage = "La suppression des photos a échoué.";
-                    if (response && response.message) {
-                         errorMessage += ` Message du serveur : ${response.message}`;
-                    } else {
-                         errorMessage += " Réponse inattendue du serveur.";
-                    }
+                    if (response && response.message) { errorMessage += ` Message du serveur : ${response.message}`; }
+                    else { errorMessage += " Réponse inattendue du serveur."; }
                     alert(errorMessage);
                 }
-
             } catch (error) {
-                // Gérer les erreurs réseau ou autres erreurs lors de l'appel
                 console.error("Erreur lors de l'appel API de suppression:", error);
                 alert("Erreur réseau ou technique lors de la tentative de suppression: " + error.message);
             } finally {
-                // Réactiver le bouton et remettre le texte normal DANS TOUS LES CAS (erreur ou succès partiel)
                 boutonSupprimerSelection.disabled = false;
                 boutonSupprimerSelection.textContent = "Supprimer la sélection";
-                // Mettre à jour la visibilité au cas où l'état aurait changé (normalement caché après succès)
+                // Mettre à jour la visibilité finale (si succès, modeSelectionActif est false -> bouton caché)
                 updateDeleteButtonVisibility();
             }
+            // --- Fin copie ---
         });
         console.log("SETUP: Écouteur ajouté au bouton supprimer sélection.");
     }
