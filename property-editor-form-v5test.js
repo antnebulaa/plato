@@ -3,7 +3,7 @@
   // ==========================================
   // == Script Xano Unifié (Formulaires + Données) ==
   // ==========================================
-  // Date: 2025-04-15 11h30
+  // Date: 2025-04-15 15h30
 
   let xanoClient; // Déclarez xanoClient ici
 
@@ -298,7 +298,7 @@
                 "Utilisation de data-xano-form-id-param avec POST. L'ID sera ajouté à l'URL. Assurez-vous que c'est le comportement attendu."
                 )
               finalEndpoint = `${endpoint}/${idValue}`;
-            } 
+            }
           }
   
           // Collecter les données du formulaire, y compris les fichiers
@@ -796,15 +796,11 @@
 
         // --- Ajout spécifique aux photos ---
         if (item && item.path) {
-         // Supprimer l'attribut data-photo-path existant (sécurité)
-      clone.removeAttribute('data-photo-path');
       // Assurez-vous que 'clone' est l'élément principal du template (ex: la div externe)
       clone.setAttribute('data-photo-path', item.path);
   } else {
       // Log si jamais un objet image n'a pas de propriété 'path'
-       console.warn("Path manquant pour la photo:", item);
-    // Éviter de cloner si path manquant (optionnel)
-    return;
+      console.warn("Impossible d'ajouter data-photo-path: 'path' manquant dans l'objet item", item);
   }
   
          // ... configuration de base du clone (display, aria-hidden, etc.) ...
@@ -1109,6 +1105,51 @@
             // console.log("Bouton supprimer rendu CACHÉ");
         }
     }
+   
+     // --- NOUVELLE FONCTION: Fonction auxiliaire pour désélectionner toutes les photos ---
+    function deselectionneToutesPhotos() {
+        console.log("DÉSÉLECTION - Début désélection de toutes les photos...");
+        
+        // Vider d'abord le tableau
+        const nombreAvantVidage = photosSelectionneesIds.length;
+        photosSelectionneesIds = [];
+        console.log(`DÉSÉLECTION - Tableau vidé (contenait ${nombreAvantVidage} éléments)`);
+        
+        // APPROCHE 1: Cibler tous les éléments avec data-photo-path dans le container
+        // Cette approche est la plus cohérente avec la méthode de sélection
+        const allPhotoElements = photoListContainer.querySelectorAll('[data-photo-path]');
+        console.log(`DÉSÉLECTION - Trouvé ${allPhotoElements.length} éléments avec [data-photo-path]`);
+        
+        allPhotoElements.forEach((photoEl) => {
+            if (photoEl.classList.contains('is-photo-selected')) {
+                photoEl.classList.remove('is-photo-selected');
+                console.log(`DÉSÉLECTION - Classe retirée de l'élément avec path: ${photoEl.getAttribute('data-photo-path')}`);
+            }
+        });
+        
+        // APPROCHE 2: Rechercher directement tous les éléments avec la classe
+        const selectedPhotos = photoListContainer.querySelectorAll('.is-photo-selected');
+        console.log(`DÉSÉLECTION - Trouvé ${selectedPhotos.length} éléments avec .is-photo-selected directement`);
+        
+        selectedPhotos.forEach((photoEl) => {
+            photoEl.classList.remove('is-photo-selected');
+            console.log("DÉSÉLECTION - Classe retirée d'un élément déjà sélectionné");
+        });
+        
+        // APPROCHE 3: Cibler également les images à l'intérieur des conteneurs
+        const selectedImages = photoListContainer.querySelectorAll('.photo-item-image');
+        console.log(`DÉSÉLECTION - Vérifié également ${selectedImages.length} images`);
+        
+        selectedImages.forEach((imgEl) => {
+            const parentEl = imgEl.closest('[data-photo-path]');
+            if (parentEl && parentEl.classList.contains('is-photo-selected')) {
+                parentEl.classList.remove('is-photo-selected');
+                console.log("DÉSÉLECTION - Classe retirée du parent d'une image");
+            }
+        });
+        
+        console.log("DÉSÉLECTION - Fin de la désélection");
+    }
 
     // --- Écouteur sur le bouton Gérer/Annuler (#bouton-mode-selection) ---
     boutonModeSelection.addEventListener('click', function() {
@@ -1116,23 +1157,20 @@
         console.log("Mode sélection photos :", modeSelectionActif);
 
         if (modeSelectionActif) {
-          // Mode sélection activé
+            // On entre en mode sélection
             boutonModeSelection.textContent = "Annuler";
             conteneurPhotos.classList.add('selection-active');
-
+            updateDeleteButtonVisibility();
         } else {
-            // Mode sélection désactivé - AJOUT DES LIGNES DE RÉINITIALISATION
-           photosSelectionneesIds = [];
-const photosSelectionnees = photoListContainer.querySelectorAll('.is-photo-selected');
-console.log('Photos à désélectionner:', photosSelectionnees); // <-- Variable CORRECTE
-photosSelectionnees.forEach(photo => {
-    photo.classList.remove('is-photo-selected');
-    console.log('Classe retirée sur:', photo); // <-- photo existe ici
-});
-            
+            // On sort du mode sélection (Clic sur "Annuler")
             boutonModeSelection.textContent = "Sélectionner les photos";
             conteneurPhotos.classList.remove('selection-active');
-            updateDeleteButtonVisibility(); // Met à jour l'état du bouton Supprimer
+            
+            // Utiliser la nouvelle fonction de désélection
+            deselectionneToutesPhotos();
+            
+            // Mise à jour du bouton Supprimer
+            updateDeleteButtonVisibility();
         }
     });
     console.log("SETUP: Écouteur ajouté au bouton mode sélection.");
