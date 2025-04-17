@@ -1121,64 +1121,72 @@
         } else {
             // On sort du mode sélection (Clic sur "Annuler")
             boutonModeSelection.textContent = "Sélectionner les photos";
-            conteneurPhotos.classList.remove('selection-active'); // Retire classe du conteneur général
+            conteneurPhotos.classList.remove('selection-active');
 
-            // >>> NOUVELLE APPROCHE pour la désélection <<<
             console.log("Annulation sélection : Désélection de toutes les photos.");
-            console.log(`   -> Tentative de désélection basée sur le tableau photosSelectionneesIds (taille actuelle: ${photosSelectionneesIds.length})`);
-            const pathsToDeselect = [...photosSelectionneesIds]; // Copie du tableau au cas où
 
-            pathsToDeselect.forEach((photoPath, index) => {
-                // Log du chemin exact recherché depuis le tableau
-                console.log(`      -> [${index}] Processing path from array: "${photoPath}"`);
+            // >>> AJOUT D'UN SETTIMEOUT POUR TESTER L'HYPOTHÈSE DE TIMING <<<
+            // Copier les chemins à traiter car le tableau original sera vidé
+            const pathsToDeselect = [...photosSelectionneesIds];
+            console.log(`   -> Tableau copié (pathsToDeselect), taille: ${pathsToDeselect.length}. Planification de la désélection différée.`);
 
-                const escapedPhotoPath = photoPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"'); // Échappe \ et "
-                const elementSelector = `#photo-list-container [data-xano-list-item][data-photo-path="${escapedPhotoPath}"]`;
-                // console.log(`      -> [${index}] Recherche de l'élément avec sélecteur: ${elementSelector}`);
-
-                try {
-                    const photoElement = document.querySelector(elementSelector);
-
-                    if (photoElement) {
-                         if (photoElement.classList.contains('is-photo-selected')) {
-                              console.log(`      -> [${index}] Élément TROUVÉ. Retrait de '.is-photo-selected'.`);
-                              photoElement.classList.remove('is-photo-selected');
-                         } else {
-                              console.log(`      -> [${index}] Élément TROUVÉ, mais n'avait PAS '.is-photo-selected'.`);
-                         }
-                    } else {
-                        // Élément non trouvé, log du chemin recherché et log des chemins présents
-                        console.warn(`      -> [${index}] Élément INTROUVABLE pour path "${photoPath}" avec le sélecteur.`);
-
-                        // <<< AJOUT: Log all paths currently in the DOM for comparison >>>
-                        // Logguer seulement lors du premier échec pour éviter trop de bruit
-                        if (index === 0) {
-                             console.log(`         -> Vérification: Listing des data-photo-path présents dans #photo-list-container :`);
-                             const allPhotoElementsInDOM = document.querySelectorAll('#photo-list-container [data-xano-list-item][data-photo-path]');
-                             if (allPhotoElementsInDOM.length > 0) {
-                                 allPhotoElementsInDOM.forEach((el, elIndex) => {
-                                     // Log de la valeur EXACTE de l'attribut dans le DOM
-                                     console.log(`         -> DOM Element ${elIndex}: data-photo-path="${el.getAttribute('data-photo-path')}"`);
-                                 });
-                             } else {
-                                 console.log(`         -> Aucun élément avec [data-photo-path] trouvé dans #photo-list-container.`);
-                             }
-                        }
-                        // <<< FIN AJOUT >>>
-                    }
-                } catch (e) {
-                     console.error(`      -> [${index}] Erreur lors de la recherche ou du retrait de classe pour le sélecteur ${elementSelector}:`, e);
-                }
-            });
-
-            // 2. Vider le tableau APRÈS avoir traité tous les chemins
+            // Vider le tableau original immédiatement pour que l'état soit cohérent
             photosSelectionneesIds = [];
-            console.log("   -> Tableau photosSelectionneesIds vidé (après boucle).");
+            console.log("   -> Tableau photosSelectionneesIds vidé (immédiatement).");
 
-            // 3. Cacher le bouton Supprimer (via la fonction helper)
+            // Mettre à jour le bouton supprimer immédiatement (il doit être caché)
             updateDeleteButtonVisibility();
-            console.log("   -> Visibilité bouton Supprimer mise à jour (doit être caché).");
-            // >>> FIN NOUVELLE APPROCHE <<<
+            console.log("   -> Visibilité bouton Supprimer mise à jour (immédiate).");
+
+            // Planifier l'exécution de la recherche et du retrait de classe
+            setTimeout(() => {
+                console.log("--- Exécution différée (setTimeout 0ms) ---");
+                console.log(`   -> Tentative de désélection basée sur le tableau pathsToDeselect (taille: ${pathsToDeselect.length})`);
+
+                pathsToDeselect.forEach((photoPath, index) => {
+                    console.log(`      -> [${index}] Processing path from copied array: "${photoPath}"`);
+
+                    const escapedPhotoPath = photoPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    const elementSelector = `#photo-list-container [data-xano-list-item][data-photo-path="${escapedPhotoPath}"]`;
+
+                    try {
+                        const photoElement = document.querySelector(elementSelector);
+
+                        if (photoElement) {
+                            // Si l'élément est trouvé DANS le setTimeout
+                            if (photoElement.classList.contains('is-photo-selected')) {
+                                console.log(`      -> [${index}] Élément TROUVÉ (différé). Retrait de '.is-photo-selected'.`);
+                                photoElement.classList.remove('is-photo-selected');
+                            } else {
+                                console.log(`      -> [${index}] Élément TROUVÉ (différé), mais n'avait PAS '.is-photo-selected'.`);
+                            }
+                        } else {
+                            // Si même en différé il n'est pas trouvé, le problème est ailleurs (il est vraiment retiré)
+                            console.warn(`      -> [${index}] Élément INTROUVABLE (différé) pour path "${photoPath}" avec le sélecteur.`);
+                             // Logguer les paths présents dans le DOM à ce moment différé
+                             if (index === 0) { // Log only once
+                                 console.log(`         -> Re-vérification DOM (différé): Listing des data-photo-path présents dans #photo-list-container :`);
+                                 const allPhotoElementsInDOM = document.querySelectorAll('#photo-list-container [data-xano-list-item][data-photo-path]');
+                                 if (allPhotoElementsInDOM.length > 0) {
+                                     allPhotoElementsInDOM.forEach((el, elIndex) => {
+                                         console.log(`         -> DOM Element ${elIndex}: data-photo-path="${el.getAttribute('data-photo-path')}"`);
+                                     });
+                                 } else {
+                                     // Si toujours aucun élément trouvé ici, c'est qu'ils sont bien retirés du DOM par autre chose.
+                                     console.log(`         -> Aucun élément avec [data-photo-path] trouvé (différé). Les éléments ont probablement été retirés du DOM.`);
+                                 }
+                            }
+                        }
+                    } catch (e) {
+                        console.error(`      -> [${index}] Erreur lors de la recherche (différé) ou du retrait de classe pour le sélecteur ${elementSelector}:`, e);
+                    }
+                });
+
+                console.log("--- Fin de l'exécution différée ---");
+
+            }, 0); // Délai de 0 ms
+
+            // >>> FIN AJOUT SETTIMEOUT <<<
         }
     });
     console.log("SETUP: Écouteur ajouté au bouton mode sélection.");
