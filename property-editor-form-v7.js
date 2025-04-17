@@ -1,4 +1,4 @@
- 
+
 
   // ==========================================
   // == Script Xano Unifié (Formulaires + Données) ==
@@ -1240,7 +1240,7 @@
                 room_id: parseInt(currentSelectedRoomId, 10),
                 photo_paths: photosSelectionneesIds
             };
-            const deleteEndpoint = 'property_photos/photos/batch_delete';
+            const deleteEndpoint = 'photos/batch_delete';
             const deleteMethod = 'POST';
             try {
                 const response = await xanoClient._request(deleteMethod, deleteEndpoint, payload, false);
