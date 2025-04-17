@@ -1125,14 +1125,13 @@
 
             // >>> NOUVELLE APPROCHE pour la désélection <<<
             console.log("Annulation sélection : Désélection de toutes les photos.");
-
-            // 1. Utiliser le tableau photosSelectionneesIds AVANT de le vider
             console.log(`   -> Tentative de désélection basée sur le tableau photosSelectionneesIds (taille actuelle: ${photosSelectionneesIds.length})`);
             const pathsToDeselect = [...photosSelectionneesIds]; // Copie du tableau au cas où
 
             pathsToDeselect.forEach((photoPath, index) => {
-                // Construire le sélecteur d'attribut spécifique pour CETTE photo
-                // Attention à l'échappement des caractères spéciaux dans le chemin si nécessaire
+                // Log du chemin exact recherché depuis le tableau
+                console.log(`      -> [${index}] Processing path from array: "${photoPath}"`);
+
                 const escapedPhotoPath = photoPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"'); // Échappe \ et "
                 const elementSelector = `#photo-list-container [data-xano-list-item][data-photo-path="${escapedPhotoPath}"]`;
                 // console.log(`      -> [${index}] Recherche de l'élément avec sélecteur: ${elementSelector}`);
@@ -1141,16 +1140,31 @@
                     const photoElement = document.querySelector(elementSelector);
 
                     if (photoElement) {
-                        // Élément trouvé, on retire la classe
                          if (photoElement.classList.contains('is-photo-selected')) {
-                              console.log(`      -> [${index}] Élément trouvé pour path ${photoPath}. Retrait de '.is-photo-selected'.`);
+                              console.log(`      -> [${index}] Élément TROUVÉ. Retrait de '.is-photo-selected'.`);
                               photoElement.classList.remove('is-photo-selected');
                          } else {
-                              console.log(`      -> [${index}] Élément trouvé pour path ${photoPath}, mais n'avait PAS '.is-photo-selected' (étrange?).`);
+                              console.log(`      -> [${index}] Élément TROUVÉ, mais n'avait PAS '.is-photo-selected'.`);
                          }
                     } else {
-                        // Élément non trouvé, problème potentiel (ou élément déjà retiré du DOM?)
-                        console.warn(`      -> [${index}] Élément INTROUVABLE pour path ${photoPath} avec le sélecteur.`);
+                        // Élément non trouvé, log du chemin recherché et log des chemins présents
+                        console.warn(`      -> [${index}] Élément INTROUVABLE pour path "${photoPath}" avec le sélecteur.`);
+
+                        // <<< AJOUT: Log all paths currently in the DOM for comparison >>>
+                        // Logguer seulement lors du premier échec pour éviter trop de bruit
+                        if (index === 0) {
+                             console.log(`         -> Vérification: Listing des data-photo-path présents dans #photo-list-container :`);
+                             const allPhotoElementsInDOM = document.querySelectorAll('#photo-list-container [data-xano-list-item][data-photo-path]');
+                             if (allPhotoElementsInDOM.length > 0) {
+                                 allPhotoElementsInDOM.forEach((el, elIndex) => {
+                                     // Log de la valeur EXACTE de l'attribut dans le DOM
+                                     console.log(`         -> DOM Element ${elIndex}: data-photo-path="${el.getAttribute('data-photo-path')}"`);
+                                 });
+                             } else {
+                                 console.log(`         -> Aucun élément avec [data-photo-path] trouvé dans #photo-list-container.`);
+                             }
+                        }
+                        // <<< FIN AJOUT >>>
                     }
                 } catch (e) {
                      console.error(`      -> [${index}] Erreur lors de la recherche ou du retrait de classe pour le sélecteur ${elementSelector}:`, e);
