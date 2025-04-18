@@ -1247,10 +1247,17 @@
                 const response = await xanoClient._request(deleteMethod, deleteEndpoint, payload, false);
                 console.log('Réponse suppression Xano:', response);
 
-                // Adaptez cette logique de succès si nécessaire
-                let success = false;
-                if (response && response.success === true) { success = true; }
-                // Ajoutez d'autres conditions de succès si Xano répond différemment (ex: null, tableau...)
+               // --- NOUVELLE VÉRIFICATION DE SUCCÈS ---
+    let success = true; // Présumer le succès si _request n'a pas levé d'erreur
+    // Si Xano renvoie spécifiquement un objet indiquant un échec (à adapter selon votre API)
+    if (response && typeof response === 'object' && response.success === false) {
+         success = false;
+         console.warn("Succès API interprété comme FAUX basé sur response.success:", response);
+    }
+    // Vous pouvez ajouter d'autres vérifications si Xano a une structure d'erreur spécifique
+    // Par exemple: if (response && response.error) { success = false; }
+
+    // --- FIN NOUVELLE VÉRIFICATION ---
 
                 if (success) {
                     console.log('Photos supprimées avec succès via API !');
