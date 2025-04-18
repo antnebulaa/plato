@@ -1324,7 +1324,7 @@ function setupPhotoSelectionMode() {
             // Mettre à jour le texte de confirmation
             // Optionnel : récupérer le nom de la pièce si vous l'avez stocké quelque part
             // let roomName = "cette pièce"; // Récupérer le nom si possible
-            textElement.textContent = `Voulez-vous vraiment supprimer ${count} photo${count > 1 ? 's' : ''} ? Cette action est irréversible.`;
+            textElement.textContent = `Voulez-vous supprimer ${count} photo${count > 1 ? 's' : ''} ? Cette action est irréversible.`;
 
             // Ouvrir la modale
             openDeleteModal();
