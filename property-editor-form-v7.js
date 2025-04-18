@@ -1215,8 +1215,7 @@
     // La logique interne de cet écouteur (confirmation, appel API, rafraîchissement, réinitialisation)
     // de la version précédente semblait correcte et est conservée ici.
     if (boutonSupprimerSelection) {
-        boutonSupprimerSelection.addEventListener('click', async function(event) {
-           event.preventDefault();
+        boutonSupprimerSelection.addEventListener('click', async function() {
             // ... (Même code que dans ma réponse précédente pour la logique de suppression) ...
             // [Copiez ici toute la partie 'addEventListener' pour 'boutonSupprimerSelection' de ma réponse précédente]
             // --- Début copie ---
@@ -1245,59 +1244,47 @@
             const deleteMethod = 'POST';
             try {
                 const response = await xanoClient._request(deleteMethod, deleteEndpoint, payload, false);
-              // === DEBUT DU NOUVEAU BLOC ===
+                console.log('Réponse suppression Xano:', response);
 
-                // Log pour voir la réponse exacte avant de la tester
-                // console.log('REPONSE BRUTE DE XANO:', response); // Déjà présent juste avant
+                // Adaptez cette logique de succès si nécessaire
+                let success = false;
+                if (response && response.success === true) { success = true; }
+                // Ajoutez d'autres conditions de succès si Xano répond différemment (ex: null, tableau...)
 
-                // Log spécifique pour la clé 'success'
-                console.log("Vérification du succès -> Type de response.success:", typeof response?.success, "| Valeur:", response?.success);
-
-                // Condition if/else directe et plus sûre
-                if (response?.success) { // Vérifie si response existe ET si response.success est "truthy" (vrai)
-                    // --- SUCCÈS ---
-                    console.log('Condition de succès VRAIE ! Execution du bloc succès...'); // Log pour confirmer
+                if (success) {
                     console.log('Photos supprimées avec succès via API !');
                     alert('Les photos sélectionnées ont été supprimées.');
-
-                    // Rafraîchir la liste (essentiel)
-                    console.log(`Rafraîchissement photos room ${currentSelectedRoomId}...`);
+                    console.log(`Rafraîchissement des photos pour la room ${currentSelectedRoomId}...`);
+                    const photoLoadingIndicator = photoDisplayContainer ? photoDisplayContainer.querySelector('[data-xano-loading]') : null;
                     const fetchEndpoint = `property_photos/photos/${currentSelectedRoomId}`;
-                    const photoLoadingIndicator = conteneurPhotos.querySelector('[data-xano-loading]');
-                    if (conteneurPhotos && xanoClient) {
+                    const params = null;
+                    if (photoDisplayContainer && xanoClient) {
                         if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'block';
-                        try {
-                              await fetchXanoData(xanoClient, fetchEndpoint, 'GET', null, conteneurPhotos, photoLoadingIndicator);
+                         try {
+                              await fetchXanoData(xanoClient, fetchEndpoint, 'GET', params, photoDisplayContainer, photoLoadingIndicator);
                               console.log("Rafraîchissement terminé.");
                          } catch (fetchError) {
-                              console.error("Erreur lors du rafraîchissement après suppression:", fetchError);
-                              alert("Photos supprimées, mais l'affichage n'a pas pu être mis à jour. Veuillez rafraîchir la page.");
+                              console.error("Erreur lors du rafraîchissement des photos après suppression:", fetchError);
+                              alert("Les photos ont été supprimées, mais l'affichage n'a pas pu être mis à jour automatiquement. Veuillez rafraîchir la page ou re-sélectionner la pièce.");
                          } finally {
                                if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'none';
                          }
-                    } else { console.warn("Impossible de rafraîchir : conteneur ou client manquant."); }
+                    } else { console.warn("Impossible de rafraîchir : photoDisplayContainer ou xanoClient manquant."); }
 
                     // Réinitialiser l'état après succès
                     photosSelectionneesIds = [];
-                    modeSelectionActif = false;
+                    modeSelectionActif = false; // Important de sortir du mode
                     if(boutonModeSelection) boutonModeSelection.textContent = "Sélectionner les photos";
                     if(conteneurPhotos) conteneurPhotos.classList.remove('selection-active');
-                    // Cacher le bouton Supprimer via classes
-                    if(boutonSupprimerSelection){
-                        boutonSupprimerSelection.classList.add('button-is-hidden');
-                        boutonSupprimerSelection.classList.remove('button-is-visible');
-                    }
+                    updateDeleteButtonVisibility(); // Pour cacher le bouton supprimer
 
                 } else {
-                    // --- ECHEC ---
-                     console.log('Condition de succès FAUSSE ! Execution du bloc échec...'); // Log pour confirmer
                     console.error("La suppression a échoué côté serveur (réponse non interprétée comme succès):", response);
                     let errorMessage = "La suppression des photos a échoué.";
                     if (response && response.message) { errorMessage += ` Message du serveur : ${response.message}`; }
                     else { errorMessage += " Réponse inattendue du serveur."; }
                     alert(errorMessage);
                 }
-                // === FIN DU NOUVEAU BLOC ===
             } catch (error) {
                 console.error("Erreur lors de l'appel API de suppression:", error);
                 alert("Erreur réseau ou technique lors de la tentative de suppression: " + error.message);
