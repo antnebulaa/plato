@@ -1330,6 +1330,7 @@ function setupPhotoSelectionMode() {
             openDeleteModal();
 
         }); // --- FIN écouteur boutonSupprimerSelection ---
+      
         console.log("SETUP: Écouteur MODIFIÉ ajouté au bouton supprimer sélection.");
     }
 
@@ -1357,12 +1358,38 @@ function setupPhotoSelectionMode() {
 
     // --- NOUVELLES Fonctions Helper pour Ouvrir/Fermer la modale ---
     function openDeleteModal() {
+        console.log("Attempting to open modal..."); // DEBUG
         const modalElement = document.querySelector('[fs-modal-element="delete-confirm"]');
-        // Vérifier que l'API Finsweet est chargée et disponible
+        console.log("Modal Element trouvé:", modalElement); // DEBUG
+
+       // Debugging the Finsweet API object status
+     console.log("window.fsAttributes object:", window.fsAttributes); // DEBUG <--- TRÈS IMPORTANT
+     if (window.fsAttributes) {
+         console.log("window.fsAttributes.modal object:", window.fsAttributes.modal); // DEBUG <--- TRÈS IMPORTANT
+         if (window.fsAttributes.modal) {
+             console.log("Type of window.fsAttributes.modal.open:", typeof window.fsAttributes.modal.open); // DEBUG <--- TRÈS IMPORTANT
+         }
+     } else if (window.fsAttributes === undefined) { // Vérifier explicitement undefined
+         console.log("window.fsAttributes is undefined."); // DEBUG
+     } else {
+         console.log("window.fsAttributes exists, but is not an object or is null?", window.fsAttributes); // DEBUG
+     }
+
+        
+      
+      // Vérifier que l'API Finsweet est chargée et disponible
         if (modalElement && window.fsAttributes && window.fsAttributes.modal && typeof window.fsAttributes.modal.open === 'function') {
-            window.fsAttributes.modal.open(modalElement);
-        } else {
+           console.log("API ready, calling modal.open()..."); // DEBUG
+          try {
+          window.fsAttributes.modal.open(modalElement);
+          console.log("modal.open() called successfully."); // DEBUG
+        } catch (e) {
+              console.error("Error occurred DURING window.fsAttributes.modal.open():", e); // DEBUG
+        }
+      }  else {
             console.error("Impossible d'ouvrir la modale : élément [fs-modal-element='delete-confirm'] ou API Finsweet (window.fsAttributes.modal.open) non trouvés/prêts.");
+             // Peut-être informer l'utilisateur que quelque chose ne va pas
+         alert("Erreur: Impossible d'initialiser la fenêtre de confirmation. Vérifiez la console du navigateur (F12).");
         }
     }
 
