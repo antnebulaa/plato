@@ -1216,6 +1216,7 @@
     // de la version précédente semblait correcte et est conservée ici.
     if (boutonSupprimerSelection) {
         boutonSupprimerSelection.addEventListener('click', async function() {
+           event.preventDefault();
             // ... (Même code que dans ma réponse précédente pour la logique de suppression) ...
             // [Copiez ici toute la partie 'addEventListener' pour 'boutonSupprimerSelection' de ma réponse précédente]
             // --- Début copie ---
