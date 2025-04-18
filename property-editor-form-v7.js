@@ -1356,52 +1356,77 @@ function setupPhotoSelectionMode() {
          }
     }
 
-    // --- NOUVELLES Fonctions Helper pour Ouvrir/Fermer la modale ---
-    function openDeleteModal() {
-        console.log("Attempting to open modal..."); // DEBUG
-        const modalElement = document.querySelector('[fs-modal-element="delete-confirm"]');
-        console.log("Modal Element trouvé:", modalElement); // DEBUG
+   // --- NOUVELLES Fonctions Helper pour Ouvrir/Fermer la modale (MODIFIÉES pour être async) ---
 
-       // Debugging the Finsweet API object status
-     console.log("window.fsAttributes object:", window.fsAttributes); // DEBUG <--- TRÈS IMPORTANT
-     if (window.fsAttributes) {
-         console.log("window.fsAttributes.modal object:", window.fsAttributes.modal); // DEBUG <--- TRÈS IMPORTANT
-         if (window.fsAttributes.modal) {
-             console.log("Type of window.fsAttributes.modal.open:", typeof window.fsAttributes.modal.open); // DEBUG <--- TRÈS IMPORTANT
+ async function openDeleteModal() { // <<< Ajout de async
+     console.log("Attempting to open modal (async)...");
+     const modalElement = document.querySelector('[fs-modal-element="delete-confirm"]');
+     console.log("Modal Element trouvé:", modalElement);
+
+     try {
+         // Vérifier les prérequis
+         if (!modalElement) {
+             throw new Error("Élément modal [fs-modal-element='delete-confirm'] introuvable.");
          }
-     } else if (window.fsAttributes === undefined) { // Vérifier explicitement undefined
-         console.log("window.fsAttributes is undefined."); // DEBUG
-     } else {
-         console.log("window.fsAttributes exists, but is not an object or is null?", window.fsAttributes); // DEBUG
+         if (!(window.fsAttributes && window.fsAttributes.modal)) {
+              // Ce cas ne devrait plus arriver d'après vos logs, mais sécurité
+              throw new Error("API Finsweet (window.fsAttributes.modal) non trouvée.");
+         }
+
+         // <<< ATTENDRE la fin du chargement/initialisation du module modal >>>
+         console.log("Attente de la promesse window.fsAttributes.modal.loading...");
+         await window.fsAttributes.modal.loading; // Attend que la promesse se résolve
+         console.log("Promesse de chargement Finsweet modal résolue.");
+
+         // Vérifier MAINTENANT si la fonction 'open' est disponible
+         if (typeof window.fsAttributes.modal.open === 'function') {
+             console.log("API prête, appel de modal.open()...");
+             window.fsAttributes.modal.open(modalElement);
+             console.log("modal.open() appelé avec succès.");
+         } else {
+              // Si même après await, la fonction n'est pas là (étrange)
+              console.error("Type de window.fsAttributes.modal.open après await:", typeof window.fsAttributes.modal.open);
+              throw new Error("API Finsweet (modal.open) n'est pas une fonction même après attente.");
+         }
+
+     } catch (error) {
+         console.error("Erreur lors de l'ouverture de la modale:", error);
+         alert(`Erreur: Impossible d'ouvrir la fenêtre de confirmation. Détails dans la console (F12). ${error.message}`);
      }
+ }
 
-        
-      
-      // Vérifier que l'API Finsweet est chargée et disponible
-        if (modalElement && window.fsAttributes && window.fsAttributes.modal && typeof window.fsAttributes.modal.open === 'function') {
-           console.log("API ready, calling modal.open()..."); // DEBUG
-          try {
-          window.fsAttributes.modal.open(modalElement);
-          console.log("modal.open() called successfully."); // DEBUG
-        } catch (e) {
-              console.error("Error occurred DURING window.fsAttributes.modal.open():", e); // DEBUG
-        }
-      }  else {
-            console.error("Impossible d'ouvrir la modale : élément [fs-modal-element='delete-confirm'] ou API Finsweet (window.fsAttributes.modal.open) non trouvés/prêts.");
-             // Peut-être informer l'utilisateur que quelque chose ne va pas
-         alert("Erreur: Impossible d'initialiser la fenêtre de confirmation. Vérifiez la console du navigateur (F12).");
-        }
-    }
+ async function closeDeleteModal() { // <<< Ajout de async
+     console.log("Attempting to close modal (async)...");
+     const modalElement = document.querySelector('[fs-modal-element="delete-confirm"]');
 
-    function closeDeleteModal() {
-        const modalElement = document.querySelector('[fs-modal-element="delete-confirm"]');
-         // Vérifier que l'API Finsweet est chargée et disponible
-        if (modalElement && window.fsAttributes && window.fsAttributes.modal && typeof window.fsAttributes.modal.close === 'function') {
-            window.fsAttributes.modal.close(modalElement);
-        } else {
-             console.error("Impossible de fermer la modale : élément [fs-modal-element='delete-confirm'] ou API Finsweet (window.fsAttributes.modal.close) non trouvés/prêts.");
-        }
-    }
+     try {
+          if (!modalElement) {
+             throw new Error("Élément modal [fs-modal-element='delete-confirm'] introuvable.");
+         }
+         if (!(window.fsAttributes && window.fsAttributes.modal)) {
+              throw new Error("API Finsweet (window.fsAttributes.modal) non trouvée.");
+         }
+
+         // <<< ATTENDRE la fin du chargement/initialisation >>>
+         console.log("Attente de la promesse window.fsAttributes.modal.loading (pour fermeture)...");
+         await window.fsAttributes.modal.loading;
+         console.log("Promesse de chargement Finsweet modal résolue (pour fermeture).");
+
+         // Vérifier si la fonction 'close' est disponible
+         if (typeof window.fsAttributes.modal.close === 'function') {
+             console.log("API prête, appel de modal.close()...");
+             window.fsAttributes.modal.close(modalElement);
+             console.log("modal.close() appelé avec succès.");
+         } else {
+              console.error("Type de window.fsAttributes.modal.close après await:", typeof window.fsAttributes.modal.close);
+              throw new Error("API Finsweet (modal.close) n'est pas une fonction même après attente.");
+         }
+
+     } catch (error) {
+         console.error("Erreur lors de la fermeture de la modale:", error);
+         // Pas besoin d'alerte pour une erreur de fermeture normalement
+     }
+ }
 
     // Appel initial pour cacher le bouton Supprimer si rien n'est sélectionné
     updateDeleteButtonVisibility();
