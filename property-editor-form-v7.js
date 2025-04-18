@@ -1357,8 +1357,7 @@ function setupPhotoSelectionMode() {
     }
 
    // --- NOUVELLES Fonctions Helper pour Ouvrir/Fermer la modale (MODIFIÉES pour être async) ---
-
-// --- Fonctions Helper pour Ouvrir/Fermer la modale (MODIFIÉES pour simulation clic) ---
+ // --- Fonctions Helper pour Ouvrir/Fermer la modale (REVENIR à la version simulation clic) ---
 
  function openDeleteModal() {
      console.log("Attempting to open modal via hidden trigger...");
@@ -1376,22 +1375,22 @@ function setupPhotoSelectionMode() {
  }
 
  function closeDeleteModal() {
-     // On essaie toujours de fermer via l'API si possible, mais sans attendre la promesse
-     // car elle ne semble pas garantir la présence de .close
-     console.log("Attempting to close modal via API (best effort)...");
-     const modalElement = document.querySelector('[fs-modal-element="delete-confirm"]');
-     try {
-         // Vérification simple avant d'appeler
-         if (modalElement && window.fsAttributes && window.fsAttributes.modal && typeof window.fsAttributes.modal.close === 'function') {
-             window.fsAttributes.modal.close(modalElement);
-             console.log("Fermeture via API tentée.");
-         } else {
-              console.warn("Impossible de fermer via API : fonction non trouvée au moment de l'appel.");
-              // Fallback : On pourrait essayer de simuler un clic sur un bouton fs-modal-close si nécessaire,
-              // mais souvent la fermeture dans le 'finally' n'est critique qu'en cas d'erreur avant fermeture naturelle.
-         }
-     } catch(error) {
-         console.error("Erreur lors de la tentative de fermeture via API:", error);
+     // Pour fermer, on va compter sur les boutons avec fs-modal-close OU
+     // trouver un bouton de fermeture caché et simuler un clic si nécessaire.
+     // Tenter via l'API n'est probablement pas fiable avec cette version.
+     console.log("Attempting to close modal by finding a close button...");
+     // Cherche un bouton visible ou caché qui a l'attribut fs-modal-close pour cette modale
+     const closeButton = document.querySelector('[fs-modal-close="delete-confirm"]'); // Adaptez la valeur si besoin
+
+     if (closeButton) {
+          console.log("Close button found, simulating click...");
+          // closeButton.click(); // Décommentez si nécessaire, mais attention aux effets de bord.
+          // Souvent, il vaut mieux laisser la fermeture se faire naturellement via l'interaction utilisateur
+          // ou la logique dans 'finally' qui pourrait déclencher un bouton close.
+          // Pour l'instant, on logue juste qu'on pourrait le faire.
+          console.warn("Fermeture programmatique via .click() sur bouton close désactivée pour l'instant.");
+     } else {
+         console.warn("Aucun bouton de fermeture [fs-modal-close='delete-confirm'] trouvé pour fermeture programmatique.");
      }
  }
 
