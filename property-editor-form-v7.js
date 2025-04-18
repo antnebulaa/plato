@@ -1263,30 +1263,40 @@
                     console.log('Photos supprimées avec succès via API !');
                     alert('Les photos sélectionnées ont été supprimées.');
                     console.log(`Rafraîchissement des photos pour la room ${currentSelectedRoomId}...`);
-                    const photoLoadingIndicator = photoDisplayContainer ? photoDisplayContainer.querySelector('[data-xano-loading]') : null;
-                    const fetchEndpoint = `property_photos/photos/${currentSelectedRoomId}`;
-                    const params = null;
-                    if (photoDisplayContainer && xanoClient) {
-                        if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'block';
-                         try {
-                              await fetchXanoData(xanoClient, fetchEndpoint, 'GET', params, photoDisplayContainer, photoLoadingIndicator);
-                              console.log("Rafraîchissement terminé.");
-                         } catch (fetchError) {
-                              console.error("Erreur lors du rafraîchissement des photos après suppression:", fetchError);
-                              alert("Les photos ont été supprimées, mais l'affichage n'a pas pu être mis à jour automatiquement. Veuillez rafraîchir la page ou re-sélectionner la pièce.");
-                         } finally {
-                               if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'none';
-                         }
-                    } else { console.warn("Impossible de rafraîchir : photoDisplayContainer ou xanoClient manquant."); }
+                  
+                     // === UTILISER la variable 'conteneurPhotos' (définie dans setupPhotoSelectionMode) ===
+     const photoLoadingIndicator = conteneurPhotos ? conteneurPhotos.querySelector('[data-xano-loading]') : null;
+     const fetchEndpoint = `property_photos/photos/${currentSelectedRoomId}`;
+     const params = null;
+                  
+                    // === UTILISER 'conteneurPhotos' ===
+     if (conteneurPhotos && xanoClient) {
+         if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'block';
+         try {
+              // === UTILISER 'conteneurPhotos' comme argument pour l'élément cible ===
+              await fetchXanoData(xanoClient, fetchEndpoint, 'GET', params, conteneurPhotos, photoLoadingIndicator);
+              console.log("Rafraîchissement terminé.");
+         } catch (fetchError) {
+              console.error("Erreur lors du rafraîchissement des photos après suppression:", fetchError);
+              alert("Les photos ont été supprimées, mais l'affichage n'a pas pu être mis à jour automatiquement...");
+         } finally {
+               if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'none';
+         }
+     } else {
+          // === UTILISER 'conteneurPhotos' ===
+          console.warn("Impossible de rafraîchir : conteneurPhotos ou xanoClient manquant.");
+          alert("Les photos ont été supprimées, mais le rafraîchissement automatique a échoué car un élément requis est manquant.");
+     }
 
-                    // Réinitialiser l'état après succès
-                    photosSelectionneesIds = [];
-                    modeSelectionActif = false; // Important de sortir du mode
-                    if(boutonModeSelection) boutonModeSelection.textContent = "Sélectionner les photos";
-                    if(conteneurPhotos) conteneurPhotos.classList.remove('selection-active');
-                    updateDeleteButtonVisibility(); // Pour cacher le bouton supprimer
+     // Réinitialiser l'état...
+     photosSelectionneesIds = [];
+     modeSelectionActif = false;
+     if(boutonModeSelection) boutonModeSelection.textContent = "Sélectionner les photos";
+     // === UTILISER 'conteneurPhotos' ===
+     if(conteneurPhotos) conteneurPhotos.classList.remove('selection-active');
+     updateDeleteButtonVisibility();
 
-                } else {
+} else {
                     console.error("La suppression a échoué côté serveur (réponse non interprétée comme succès):", response);
                     let errorMessage = "La suppression des photos a échoué.";
                     if (response && response.message) { errorMessage += ` Message du serveur : ${response.message}`; }
