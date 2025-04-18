@@ -1358,73 +1358,40 @@ function setupPhotoSelectionMode() {
 
    // --- NOUVELLES Fonctions Helper pour Ouvrir/Fermer la modale (MODIFIÉES pour être async) ---
 
- async function openDeleteModal() { // <<< Ajout de async
-     console.log("Attempting to open modal (async)...");
-     const modalElement = document.querySelector('[fs-modal-element="delete-confirm"]');
-     console.log("Modal Element trouvé:", modalElement);
+// --- Fonctions Helper pour Ouvrir/Fermer la modale (MODIFIÉES pour simulation clic) ---
 
-     try {
-         // Vérifier les prérequis
-         if (!modalElement) {
-             throw new Error("Élément modal [fs-modal-element='delete-confirm'] introuvable.");
-         }
-         if (!(window.fsAttributes && window.fsAttributes.modal)) {
-              // Ce cas ne devrait plus arriver d'après vos logs, mais sécurité
-              throw new Error("API Finsweet (window.fsAttributes.modal) non trouvée.");
-         }
+ function openDeleteModal() {
+     console.log("Attempting to open modal via hidden trigger...");
+     // Trouve le bouton déclencheur caché par son ID
+     const hiddenTrigger = document.getElementById('hidden-delete-modal-trigger');
 
-         // <<< ATTENDRE la fin du chargement/initialisation du module modal >>>
-         console.log("Attente de la promesse window.fsAttributes.modal.loading...");
-         await window.fsAttributes.modal.loading; // Attend que la promesse se résolve
-         console.log("Promesse de chargement Finsweet modal résolue.");
-
-         // Vérifier MAINTENANT si la fonction 'open' est disponible
-         if (typeof window.fsAttributes.modal.open === 'function') {
-             console.log("API prête, appel de modal.open()...");
-             window.fsAttributes.modal.open(modalElement);
-             console.log("modal.open() appelé avec succès.");
-         } else {
-              // Si même après await, la fonction n'est pas là (étrange)
-              console.error("Type de window.fsAttributes.modal.open après await:", typeof window.fsAttributes.modal.open);
-              throw new Error("API Finsweet (modal.open) n'est pas une fonction même après attente.");
-         }
-
-     } catch (error) {
-         console.error("Erreur lors de l'ouverture de la modale:", error);
-         alert(`Erreur: Impossible d'ouvrir la fenêtre de confirmation. Détails dans la console (F12). ${error.message}`);
+     if (hiddenTrigger) {
+         console.log("Hidden trigger found. Simulating click...");
+         hiddenTrigger.click(); // Simule un clic sur le bouton caché
+         console.log("Click simulated.");
+     } else {
+         console.error("Impossible d'ouvrir la modale : Déclencheur caché #hidden-delete-modal-trigger introuvable !");
+         alert("Erreur: Impossible d'afficher la fenêtre de confirmation (trigger manquant).");
      }
  }
 
- async function closeDeleteModal() { // <<< Ajout de async
-     console.log("Attempting to close modal (async)...");
+ function closeDeleteModal() {
+     // On essaie toujours de fermer via l'API si possible, mais sans attendre la promesse
+     // car elle ne semble pas garantir la présence de .close
+     console.log("Attempting to close modal via API (best effort)...");
      const modalElement = document.querySelector('[fs-modal-element="delete-confirm"]');
-
      try {
-          if (!modalElement) {
-             throw new Error("Élément modal [fs-modal-element='delete-confirm'] introuvable.");
-         }
-         if (!(window.fsAttributes && window.fsAttributes.modal)) {
-              throw new Error("API Finsweet (window.fsAttributes.modal) non trouvée.");
-         }
-
-         // <<< ATTENDRE la fin du chargement/initialisation >>>
-         console.log("Attente de la promesse window.fsAttributes.modal.loading (pour fermeture)...");
-         await window.fsAttributes.modal.loading;
-         console.log("Promesse de chargement Finsweet modal résolue (pour fermeture).");
-
-         // Vérifier si la fonction 'close' est disponible
-         if (typeof window.fsAttributes.modal.close === 'function') {
-             console.log("API prête, appel de modal.close()...");
+         // Vérification simple avant d'appeler
+         if (modalElement && window.fsAttributes && window.fsAttributes.modal && typeof window.fsAttributes.modal.close === 'function') {
              window.fsAttributes.modal.close(modalElement);
-             console.log("modal.close() appelé avec succès.");
+             console.log("Fermeture via API tentée.");
          } else {
-              console.error("Type de window.fsAttributes.modal.close après await:", typeof window.fsAttributes.modal.close);
-              throw new Error("API Finsweet (modal.close) n'est pas une fonction même après attente.");
+              console.warn("Impossible de fermer via API : fonction non trouvée au moment de l'appel.");
+              // Fallback : On pourrait essayer de simuler un clic sur un bouton fs-modal-close si nécessaire,
+              // mais souvent la fermeture dans le 'finally' n'est critique qu'en cas d'erreur avant fermeture naturelle.
          }
-
-     } catch (error) {
-         console.error("Erreur lors de la fermeture de la modale:", error);
-         // Pas besoin d'alerte pour une erreur de fermeture normalement
+     } catch(error) {
+         console.error("Erreur lors de la tentative de fermeture via API:", error);
      }
  }
 
