@@ -57,6 +57,11 @@
   
             // Met à jour la valeur de l'input caché dans le formulaire d'ajout
             hiddenRoomNameInput.value = roomTypeName;
+
+             // Déclenche manuellement l'événement 'input' sur cet input pour que
+            // l'autre script (qui surveille 'base_room_name') soit notifié du changement.
+            const inputEvent = new Event('input', { bubbles: true, cancelable: true });
+            hiddenRoomNameInput.dispatchEvent(inputEvent);
   
             // Optionnel : Gérer le feedback visuel (classe 'is-selected')
             // Enlève la classe de tous les boutons de type
