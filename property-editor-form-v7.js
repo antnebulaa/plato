@@ -794,29 +794,55 @@
               console.warn("renderPhotoItems: Placeholder '.photo-empty-state' non trouvé.");
          }
 
-         // 2. Afficher les photos (code existant)
+          // 2. Afficher les photos AVEC FADE-IN
          dataArray.forEach((item, index) => {
-             // ... (logique de clonage, data-photo-path, bindDataToElement, appendChild...)
-             // Code inchangé ici pour générer chaque photo
+             // --- Début logique pour UNE photo ---
              const clone = templateElement.tagName === 'TEMPLATE' ? templateElement.content.cloneNode(true).firstElementChild : templateElement.cloneNode(true);
              if (!clone) return;
-             if (item && item.path) clone.setAttribute('data-photo-path', item.path);
-             clone.style.display = '';
+
+             // Configurer le clone (standard)
+             clone.style.display = ''; // Assurer la visibilité du conteneur clone
              clone.removeAttribute('aria-hidden');
              clone.setAttribute('data-xano-list-item', '');
              clone.setAttribute('data-xano-item-index', index.toString());
+             if (item && item.path) clone.setAttribute('data-photo-path', item.path);
+
+             // *** Début Modifications Fade-in ***
+             // a. Trouver l'élément image DANS le clone
+             const imgElement = clone.querySelector('.photo-item-image');
+
+             // b. Lier les données Xano (ceci mettra à jour l'attribut src de imgElement)
              const boundElements = clone.querySelectorAll('[data-xano-bind]');
              boundElements.forEach(boundElement => { bindDataToElement(boundElement, item); });
              if (clone.hasAttribute('data-xano-bind')) { bindDataToElement(clone, item); }
+
+             // c. Ajouter classe initiale invisible (si img trouvée)
+             if (imgElement) {
+                  imgElement.classList.add('photo-item-loading');
+             } else {
+                  console.warn("renderPhotoItems: Image element (.photo-item-image) not found in clone for fade-in.");
+             }
+             // *** Fin Modifications Fade-in (Part 1) ***
+
+             // d. Ajouter le clone (avec image initialement invisible) au DOM
              container.appendChild(clone);
-         });
+
+             // *** Début Modifications Fade-in (Part 2) ***
+             // e. Planifier retrait classe pour déclencher transition (si img trouvée)
+             if (imgElement) {
+                  requestAnimationFrame(() => {
+                      requestAnimationFrame(() => {
+                           imgElement.classList.remove('photo-item-loading');
+                      });
+                  });
+             }
+             // *** Fin Modifications Fade-in (Part 2) ***
+             // --- Fin logique pour UNE photo ---
+         }); // Fin forEach
+
 
      } else {
          // *** CAS 2 : Il n'y a PAS de photos ***
-
-         // 1. S'assurer que le container des photos est vide (on l'a déjà fait mais double sécurité)
-         //    (Pas nécessaire de supprimer les photos ici car déjà fait avant)
-
          // 2. Afficher le placeholder (s'il existe)
          if (emptyStatePlaceholder) {
               // Mettez ici le style display correct pour afficher votre placeholder
