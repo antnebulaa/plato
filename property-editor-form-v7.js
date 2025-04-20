@@ -1396,22 +1396,24 @@ function setupPhotoSelectionMode() {
  }
 
  function closeDeleteModal() {
-     // Pour fermer, on va compter sur les boutons avec fs-modal-element=close OU
-     // trouver un bouton de fermeture caché et simuler un clic si nécessaire.
-     // Tenter via l'API n'est probablement pas fiable avec cette version.
-     console.log("Attempting to close modal by finding a close button...");
-     // Cherche un bouton visible ou caché qui a l'attribut fs-modal-element=close pour cette modale
-     const closeButton = document.querySelector('[fs-modal-element="close"]'); // Adaptez la valeur si besoin
+     // Cherche un élément (bouton X, Annuler...) qui a l'attribut
+     // configuré selon la méthode de l'utilisateur pour fermer cette instance.
+     console.log("Attempting to close modal by finding element [fs-modal-element='close']...");
+     const closeElement = document.querySelector('[fs-modal-element="close"]'); // Utilise VOTRE convention
 
-     if (closeButton) {
-          console.log("Close button found, simulating click...");
-          // closeButton.click(); // Décommentez si nécessaire, mais attention aux effets de bord.
-          // Souvent, il vaut mieux laisser la fermeture se faire naturellement via l'interaction utilisateur
-          // ou la logique dans 'finally' qui pourrait déclencher un bouton close.
-          // Pour l'instant, on logue juste qu'on pourrait le faire.
-          console.warn("Fermeture programmatique via .click() sur bouton close désactivée pour l'instant.");
+     if (closeElement) {
+          console.log("Close element found, simulating click...");
+          try {
+               closeElement.click(); // Simule un clic sur le bouton/lien de fermeture
+               console.log("Close click simulated.");
+          } catch(e) {
+               console.error("Erreur lors de la simulation du clic de fermeture:", e);
+          }
      } else {
-         console.warn("Aucun bouton de fermeture [fs-modal-element='close'] trouvé pour fermeture programmatique.");
+         // Si aucun élément avec fs-modal-element="close" n'est trouvé,
+         // la fermeture doit se faire via une interaction utilisateur sur un tel élément.
+         // Le finally dans executeDelete aura au moins essayé.
+         console.warn("Aucun élément de fermeture [fs-modal-element='close'] trouvé pour fermeture programmatique.");
      }
  }
 
