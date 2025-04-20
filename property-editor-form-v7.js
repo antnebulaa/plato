@@ -753,7 +753,7 @@
 
      // --- Chercher le placeholder pour l'état vide ---
      // Note: listContainerElement est probablement room-photos-display ici
-     const emptyStatePlaceholder = listContainerElement.querySelector('.photo-empty-state'); // Utilise la classe que vous avez définie
+     const emptyStatePlaceholder = document.getElementById('photo-empty-state-placeholder'); // Utilise la classe que vous avez définie
 
      const templateSelector = listContainerElement.getAttribute('data-xano-list');
      if (!templateSelector) { console.error("renderPhotoItems: data-xano-list manquant.", listContainerElement); return; }
