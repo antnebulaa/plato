@@ -847,7 +847,7 @@
          if (emptyStatePlaceholder) {
               // Mettez ici le style display correct pour afficher votre placeholder
               // (block, flex, grid - selon votre design)
-              emptyStatePlaceholder.style.display = 'block'; // Ou 'flex', etc.
+              emptyStatePlaceholder.style.display = 'flex'; // Ou 'flex', etc.
          } else {
               // Fallback si le placeholder n'a pas été trouvé dans le HTML
               console.warn("renderPhotoItems: Placeholder '.photo-empty-state' non trouvé. Affichage d'un message texte par défaut.");
