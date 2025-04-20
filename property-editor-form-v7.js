@@ -766,7 +766,7 @@
      const existingEmptyMessage = container.querySelector('.xano-empty-message');
      if (existingEmptyMessage) {
           console.log("renderPhotoItems: Suppression de l'ancien message vide."); // Log pour vérifier
-          container.removeChild(existingEmptyMessage);
+          container.removeChild(existingEmptyMessage); }
 
     // Vider le conteneur, en préservant le template s'il est à l'intérieur
     // Et en préservant les éléments qui ne sont PAS des data-xano-list-item générés précédemment
