@@ -1357,7 +1357,7 @@ function setupPhotoSelectionMode() {
 
     // --- NOUVEAUX Écouteurs pour les boutons CONFIRMER/ANNULER de la modale ---
     const modalConfirmBtn = document.getElementById('modal-confirm-delete-button');
-    const modalCancelBtn = document.getElementById('modal-cancel-delete-button'); // Si bouton Annuler SANS fs-modal-close
+    const modalCancelBtn = document.getElementById('modal-cancel-delete-button'); // Si bouton Annuler SANS fs-modal-element=close
 
     if (modalConfirmBtn) {
         // S'assurer qu'on n'ajoute pas l'écouteur plusieurs fois si setupPhotoSelectionMode est appelé plusieurs fois
@@ -1369,7 +1369,7 @@ function setupPhotoSelectionMode() {
         console.warn("Bouton de confirmation de la modale (#modal-confirm-delete-button) introuvable.");
     }
 
-    // Optionnel : Si le bouton Annuler n'a pas l'attribut fs-modal-close
+    // Optionnel : Si le bouton Annuler n'a pas l'attribut fs-modal-element=close
     if (modalCancelBtn) {
          if (!modalCancelBtn.listenerAdded) {
              modalCancelBtn.addEventListener('click', closeDeleteModal); // Appelle juste la fermeture
@@ -1396,12 +1396,12 @@ function setupPhotoSelectionMode() {
  }
 
  function closeDeleteModal() {
-     // Pour fermer, on va compter sur les boutons avec fs-modal-close OU
+     // Pour fermer, on va compter sur les boutons avec fs-modal-element=close OU
      // trouver un bouton de fermeture caché et simuler un clic si nécessaire.
      // Tenter via l'API n'est probablement pas fiable avec cette version.
      console.log("Attempting to close modal by finding a close button...");
-     // Cherche un bouton visible ou caché qui a l'attribut fs-modal-close pour cette modale
-     const closeButton = document.querySelector('[fs-modal-close="delete-confirm"]'); // Adaptez la valeur si besoin
+     // Cherche un bouton visible ou caché qui a l'attribut fs-modal-element=close pour cette modale
+     const closeButton = document.querySelector('[fs-modal-element="close"]'); // Adaptez la valeur si besoin
 
      if (closeButton) {
           console.log("Close button found, simulating click...");
@@ -1411,7 +1411,7 @@ function setupPhotoSelectionMode() {
           // Pour l'instant, on logue juste qu'on pourrait le faire.
           console.warn("Fermeture programmatique via .click() sur bouton close désactivée pour l'instant.");
      } else {
-         console.warn("Aucun bouton de fermeture [fs-modal-close='delete-confirm'] trouvé pour fermeture programmatique.");
+         console.warn("Aucun bouton de fermeture [fs-modal-element='close'] trouvé pour fermeture programmatique.");
      }
  }
 
