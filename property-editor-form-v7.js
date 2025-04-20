@@ -1134,63 +1134,42 @@ function setupPhotoSelectionMode() {
             const response = await xanoClient._request(deleteMethod, deleteEndpoint, payload, false); // false = Ce n'est pas FormData
             console.log('>>> RAW Response from _request:', response);
 
-           // --- Logique de Vérification du Succès (Basée sur les clés trouvées) ---
+           // --- Logique de Vérification du Succès (Version Simplifiée) ---
             let success = false;
-            let failureReason = "Unknown";
-            let actualSuccessKey = null; // Pour stocker la clé exacte trouvée
+            let failureReason = "Unknown (Simplified Check)";
 
-            console.log("--- Début Vérification Succès (Keys Check) ---");
+            console.log("--- Début Vérification Succès (Simplifiée) ---");
             console.log("Raw response:", response);
-            console.log("Type de response:", typeof response);
 
+            // On vérifie juste si la réponse est un objet et si une propriété
+            // qui ressemble à 'success' (avec ou sans quotes) est exactement true.
             if (response && typeof response === 'object') {
-                console.log("Response est un objet.");
-                try {
-                    const keys = Object.keys(response);
-                    console.log("Clés trouvées dans l'objet response:", keys);
-
-                    // Chercher une clé qui contient "success" (insensible à la casse et aux espaces)
-                    actualSuccessKey = keys.find(key => key.trim().toLowerCase() === 'success');
-                    console.log("Clé exacte trouvée pour 'success':", actualSuccessKey); // Peut être 'success', ' success', ou null
-
-                    if (actualSuccessKey && response[actualSuccessKey] === true) {
-                         console.log("  --> Condition 1 VRAIE (Clé trouvée et valeur === true)");
-                         success = true;
-                         failureReason = "N/A - Explicit Success via Key Check";
-                    } else if (actualSuccessKey && response[actualSuccessKey] === false) {
-                         console.log("  --> Condition 3 VRAIE (Clé trouvée et valeur === false)");
-                         success = false;
-                         failureReason = `Explicit Failure from API: ${response.message || 'No message'}`;
-                    } else if (actualSuccessKey) {
-                         console.log("  --> Condition 'else' atteinte (Clé trouvée mais valeur !== true/false)");
-                         success = false;
-                         failureReason = "Unexpected value for success key.";
-                         console.warn("  Valeur inattendue pour la clé success trouvée :", response[actualSuccessKey]);
-                    } else {
-                         console.log("  --> Condition 'else' atteinte (Aucune clé 'success' trouvée)");
-                         success = false;
-                         failureReason = "Propriété 'success' non trouvée dans les clés de la réponse.";
-                         console.warn("  Aucune clé correspondant à 'success' trouvée.");
-                    }
-
-                } catch (e) {
-                    console.error("  Erreur lors de l'analyse des clés ou accès propriété:", e);
-                    success = false;
-                    failureReason = "Erreur interne lors de l'analyse de la réponse.";
-                }
-
+                 // On essaie les deux clés possibles
+                 if (response.success === true || response["'success'"] === true) {
+                     success = true;
+                     failureReason = "N/A - Simplified Success Check OK";
+                     console.log("Succès détecté (Vérification Simplifiée)");
+                 } else {
+                     success = false;
+                     // Essayons de récupérer un message d'erreur potentiel
+                     const errorMessageFromApi = response.message || response["'message'"] || "Pas de message d'erreur explicite.";
+                     failureReason = `API indicated failure or unexpected success value. Message: ${errorMessageFromApi}`;
+                     console.warn("Échec détecté ou valeur 'success' inattendue (Vérification Simplifiée). Message API:", errorMessageFromApi);
+                 }
             } else if (response === null || response === undefined) {
-                 console.log("--> Condition 2 VRAIE (response est null/undefined)");
+                 // Cas 204 No Content ou réponse vide considérée comme succès
                  success = true;
                  failureReason = "N/A - Null/Undefined Response Assumed Success";
+                 console.log("Réponse null/undefined interprétée comme succès (Vérification Simplifiée)");
             } else {
-                 console.log("--> Condition 4 (else final) VRAIE (format inattendu)");
+                 // Format de réponse totalement inattendu
                  success = false;
-                 failureReason = "Unexpected response format/content.";
-                 console.warn("   Unexpected response format received:", response);
+                 failureReason = "Unexpected response format (not object/null/undefined)";
+                 console.warn("Format de réponse inattendu (Vérification Simplifiée):", response);
             }
-            console.log(`>>> Success Check Result: success=${success}, reason=${failureReason}`);
-            console.log("--- Fin Vérification Succès (Keys Check) ---");
+
+            console.log(`>>> Success Check Result (Simplified): success=${success}, reason=${failureReason}`);
+            console.log("--- Fin Vérification Succès (Simplifiée) ---");
             // --- Fin Vérification Succès ---
 
             if (success) {
