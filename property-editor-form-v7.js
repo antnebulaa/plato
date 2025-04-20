@@ -1134,51 +1134,63 @@ function setupPhotoSelectionMode() {
             const response = await xanoClient._request(deleteMethod, deleteEndpoint, payload, false); // false = Ce n'est pas FormData
             console.log('>>> RAW Response from _request:', response);
 
-           // --- Logique de Vérification du Succès (avec DEBUGGING DÉTAILLÉ) ---
+           // --- Logique de Vérification du Succès (Basée sur les clés trouvées) ---
             let success = false;
             let failureReason = "Unknown";
+            let actualSuccessKey = null; // Pour stocker la clé exacte trouvée
 
-            console.log("--- Début Vérification Succès ---");
+            console.log("--- Début Vérification Succès (Keys Check) ---");
             console.log("Raw response:", response);
             console.log("Type de response:", typeof response);
 
             if (response && typeof response === 'object') {
-                 console.log("Response est un objet.");
-                 console.log("Vérification de response.success...");
-                 console.log("  Valeur de response.success:", response.success);
-                 console.log("  Type de response.success:", typeof response.success);
-                 // Vérification stricte (=== true)
-                 console.log("  Test: response.success === true ?", (response.success === true));
-                 // Vérification souple (== true) juste au cas où
-                 console.log("  Test: response.success == true ?", (response.success == true));
+                console.log("Response est un objet.");
+                try {
+                    const keys = Object.keys(response);
+                    console.log("Clés trouvées dans l'objet response:", keys);
 
-                 if (response.success === true) {
-                     console.log("  --> Condition 1 VRAIE (success === true)");
-                     success = true;
-                     failureReason = "N/A - Explicit Success";
-                 } else if (response.success === false) {
-                     console.log("  --> Condition 3 VRAIE (success === false)");
-                     success = false;
-                     failureReason = `Explicit Failure from API: ${response.message || 'No message'}`;
-                 } else {
-                      console.log("  --> Condition 'else' atteinte (success n'est ni true ni false ?)");
-                      success = false;
-                      failureReason = "Unexpected value for response.success.";
-                      console.warn("  Unexpected value for response.success:", response.success);
-                  }
+                    // Chercher une clé qui contient "success" (insensible à la casse et aux espaces)
+                    actualSuccessKey = keys.find(key => key.trim().toLowerCase() === 'success');
+                    console.log("Clé exacte trouvée pour 'success':", actualSuccessKey); // Peut être 'success', ' success', ou null
+
+                    if (actualSuccessKey && response[actualSuccessKey] === true) {
+                         console.log("  --> Condition 1 VRAIE (Clé trouvée et valeur === true)");
+                         success = true;
+                         failureReason = "N/A - Explicit Success via Key Check";
+                    } else if (actualSuccessKey && response[actualSuccessKey] === false) {
+                         console.log("  --> Condition 3 VRAIE (Clé trouvée et valeur === false)");
+                         success = false;
+                         failureReason = `Explicit Failure from API: ${response.message || 'No message'}`;
+                    } else if (actualSuccessKey) {
+                         console.log("  --> Condition 'else' atteinte (Clé trouvée mais valeur !== true/false)");
+                         success = false;
+                         failureReason = "Unexpected value for success key.";
+                         console.warn("  Valeur inattendue pour la clé success trouvée :", response[actualSuccessKey]);
+                    } else {
+                         console.log("  --> Condition 'else' atteinte (Aucune clé 'success' trouvée)");
+                         success = false;
+                         failureReason = "Propriété 'success' non trouvée dans les clés de la réponse.";
+                         console.warn("  Aucune clé correspondant à 'success' trouvée.");
+                    }
+
+                } catch (e) {
+                    console.error("  Erreur lors de l'analyse des clés ou accès propriété:", e);
+                    success = false;
+                    failureReason = "Erreur interne lors de l'analyse de la réponse.";
+                }
+
             } else if (response === null || response === undefined) {
                  console.log("--> Condition 2 VRAIE (response est null/undefined)");
                  success = true;
                  failureReason = "N/A - Null/Undefined Response Assumed Success";
             } else {
-                 // Si la réponse n'est ni objet, ni null/undefined
                  console.log("--> Condition 4 (else final) VRAIE (format inattendu)");
                  success = false;
                  failureReason = "Unexpected response format/content.";
                  console.warn("   Unexpected response format received:", response);
             }
             console.log(`>>> Success Check Result: success=${success}, reason=${failureReason}`);
-            console.log("--- Fin Vérification Succès ---");
+            console.log("--- Fin Vérification Succès (Keys Check) ---");
             // --- Fin Vérification Succès ---
 
             if (success) {
