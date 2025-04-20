@@ -1119,6 +1119,10 @@ function setupPhotoSelectionMode() {
              // modalConfirmBtn.textContent = "Suppression...";
         }
 
+       // <<< 1. MÉMORISER LA POSITION DE SCROLL >>>
+        let scrollPos = window.scrollY || document.documentElement.scrollTop;
+        console.log("Scroll position before delete/refresh:", scrollPos);
+
         // Préparer le payload pour l'API Xano
         const payload = {
             // Assurez-vous que Xano attend bien un entier pour room_id
@@ -1189,6 +1193,15 @@ function setupPhotoSelectionMode() {
                         // Appel pour recharger et afficher les photos restantes
                         await fetchXanoData(xanoClient, fetchEndpoint, 'GET', params, conteneurPhotos, photoLoadingIndicator);
                         console.log("Rafraîchissement terminé.");
+
+                        // <<< 2. RESTAURER LA POSITION DE SCROLL APRÈS LE RENDU >>>
+                        // Utilise setTimeout pour exécuter après le cycle de rendu actuel
+                        setTimeout(() => {
+                             console.log("Attempting to restore scroll position to:", scrollPos);
+                             // 'auto' pour un saut instantané, 'smooth' pour un défilement doux
+                             window.scrollTo({ top: scrollPos, behavior: 'auto' });
+                        }, 0); // Le délai 0 pousse l'exécution après le rendu en cours
+                      
                     } catch (fetchError) {
                         console.error("Erreur lors du rafraîchissement des photos après suppression:", fetchError);
                         alert("Les photos ont été supprimées, mais l'affichage n'a pas pu être mis à jour automatiquement. Veuillez re-sélectionner la pièce ou rafraîchir.");
