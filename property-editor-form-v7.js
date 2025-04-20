@@ -1126,7 +1126,7 @@ function setupPhotoSelectionMode() {
             photo_paths: photosSelectionneesIds // Le tableau des chemins
         };
         // Vérifiez le nom exact de votre endpoint
-        const deleteEndpoint = 'photos/batch_delete'; // ou 'property_photos/batch_delete' ?
+        const deleteEndpoint = 'property_photos/batch_delete'; // ou 'property_photos/batch_delete' ?
         const deleteMethod = 'POST'; // ou 'DELETE' ? Vérifiez la méthode attendue par Xano
 
         try {
