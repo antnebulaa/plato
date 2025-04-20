@@ -1134,26 +1134,51 @@ function setupPhotoSelectionMode() {
             const response = await xanoClient._request(deleteMethod, deleteEndpoint, payload, false); // false = Ce n'est pas FormData
             console.log('>>> RAW Response from _request:', response);
 
-            // --- Logique de Vérification du Succès (à adapter si Xano répond différemment) ---
+           // --- Logique de Vérification du Succès (avec DEBUGGING DÉTAILLÉ) ---
             let success = false;
             let failureReason = "Unknown";
-            if (response && typeof response === 'object' && response.success === true) {
-                success = true; // Cas idéal: Xano renvoie { success: true }
-                failureReason = "N/A - Explicit Success";
+
+            console.log("--- Début Vérification Succès ---");
+            console.log("Raw response:", response);
+            console.log("Type de response:", typeof response);
+
+            if (response && typeof response === 'object') {
+                 console.log("Response est un objet.");
+                 console.log("Vérification de response.success...");
+                 console.log("  Valeur de response.success:", response.success);
+                 console.log("  Type de response.success:", typeof response.success);
+                 // Vérification stricte (=== true)
+                 console.log("  Test: response.success === true ?", (response.success === true));
+                 // Vérification souple (== true) juste au cas où
+                 console.log("  Test: response.success == true ?", (response.success == true));
+
+                 if (response.success === true) {
+                     console.log("  --> Condition 1 VRAIE (success === true)");
+                     success = true;
+                     failureReason = "N/A - Explicit Success";
+                 } else if (response.success === false) {
+                     console.log("  --> Condition 3 VRAIE (success === false)");
+                     success = false;
+                     failureReason = `Explicit Failure from API: ${response.message || 'No message'}`;
+                 } else {
+                      console.log("  --> Condition 'else' atteinte (success n'est ni true ni false ?)");
+                      success = false;
+                      failureReason = "Unexpected value for response.success.";
+                      console.warn("  Unexpected value for response.success:", response.success);
+                  }
             } else if (response === null || response === undefined) {
-                 // Si Xano renvoie 204 No Content ou juste rien en cas de succès
+                 console.log("--> Condition 2 VRAIE (response est null/undefined)");
                  success = true;
                  failureReason = "N/A - Null/Undefined Response Assumed Success";
-                 console.log("Interpreting null/undefined response as success.");
-            } else if (response && typeof response === 'object' && response.success === false) {
-                 success = false; // Cas: Xano renvoie { success: false, message: '...' }
-                 failureReason = `Explicit Failure from API: ${response.message || 'No message'}`;
             } else {
-                 success = false; // Tous les autres cas considérés comme échec
+                 // Si la réponse n'est ni objet, ni null/undefined
+                 console.log("--> Condition 4 (else final) VRAIE (format inattendu)");
+                 success = false;
                  failureReason = "Unexpected response format/content.";
-                 console.warn("Unexpected response format received:", response);
+                 console.warn("   Unexpected response format received:", response);
             }
             console.log(`>>> Success Check Result: success=${success}, reason=${failureReason}`);
+            console.log("--- Fin Vérification Succès ---");
             // --- Fin Vérification Succès ---
 
             if (success) {
