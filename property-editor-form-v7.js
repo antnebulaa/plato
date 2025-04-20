@@ -760,7 +760,14 @@
     // Conteneur: soit un enfant spécifique, soit l'élément lui-même
     const container = listContainerElement.querySelector('[data-xano-list-container]') ||
       listContainerElement;
-  
+
+    // --- MODIFICATION ICI : Vider le conteneur (message vide + anciens items) ---
+     // 1. Chercher et supprimer l'ancien message vide s'il existe
+     const existingEmptyMessage = container.querySelector('.xano-empty-message');
+     if (existingEmptyMessage) {
+          console.log("renderPhotoItems: Suppression de l'ancien message vide."); // Log pour vérifier
+          container.removeChild(existingEmptyMessage);
+
     // Vider le conteneur, en préservant le template s'il est à l'intérieur
     // Et en préservant les éléments qui ne sont PAS des data-xano-list-item générés précédemment
     let currentChild = container.firstChild;
@@ -782,11 +789,14 @@
       currentChild = nextChild;
     }
   
-    // S'assurer que le template est bien caché (s'il n'est pas déjà dans une balise <template>)
-    if (templateElement.tagName !== 'TEMPLATE') {
-      templateElement.style.display = 'none';
-      templateElement.setAttribute('aria-hidden', 'true'); // Pour l'accessibilité
-    }
+    // S'assurer que le template est bien caché (code existant)
+     if (templateElement.tagName !== 'TEMPLATE') {
+         // On vérifie si le style est déjà 'none' pour éviter des opérations DOM inutiles
+         if (templateElement.style.display !== 'none') {
+              templateElement.style.display = 'none';
+              templateElement.setAttribute('aria-hidden', 'true');
+         }
+     }
   
     // Générer les éléments de la liste
     if (dataArray.length > 0) {
