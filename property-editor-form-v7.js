@@ -1089,20 +1089,16 @@
                       console.log(`Input mis à jour (valeur=${roomDbIdInput.value})`);
                   } catch (e) { console.error("Erreur maj input:", e); }
             
-                // === Rendre la section photo visible ===
-              const photoSectionContainer = document.getElementById('room-photos-display');
-              if (photoSectionContainer) {
-                   // Remet le display défini dans Webflow (probablement Grid ou Block)
-                   // Mettre '' enlève le style inline 'display: none' et laisse le CSS/Webflow décider.
-                   photoSectionContainer.style.display = '';
-                   // OU si vous savez que c'est Grid :
-                   // photoSectionContainer.style.display = 'grid';
-                   console.log("Conteneur photos rendu visible.");
-              } else {
-                   console.error("Conteneur #room-photos-display non trouvé ! Impossible de l'afficher.");
-                   // Peut-être arrêter ici si le conteneur est essentiel ?
-                   // return;
-              }
+                // === MODIFICATION : Forcer l'affichage en JS ===
+            const photoSectionContainer = document.getElementById('room-photos-display');
+            if (photoSectionContainer) {
+                 // REMPLACER '' PAR la valeur de display souhaitée (ex: 'grid' ou 'block')
+                 // Ceci va surcharger le 'display: none' défini dans le CSS de Webflow
+                 photoSectionContainer.style.display = 'grid'; // <<< Essayez 'grid' ou 'block' ou 'flex'
+                 console.log("Conteneur photos rendu visible (via style.display = 'grid')."); // Log mis à jour
+            } else {
+                 console.error("Conteneur #room-photos-display non trouvé ! Impossible de l'afficher.");
+            }
               // === FIN  ===
                 
   
