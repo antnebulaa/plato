@@ -719,25 +719,22 @@
           clone; // Prend l'élément avec data-action, ou le clone entier par défaut
   
        if (item.id !== undefined) { // Vérifie que l'objet 'item' de Xano a bien un champ 'id'
-          // Définit l'ID (VOTRE CODE EXISTANT)
-          clickableElement.setAttribute('data-room-id', item.id);
+            // Définit l'ID (CODE EXISTANT)
+            clickableElement.setAttribute('data-room-id', item.id);
 
-          // Pour stocker le nom de la pièce
-          // Assurez-vous que 'item.name' est le bon champ venant de Xano
-          if (item.room_name) {
-               clickableElement.setAttribute('data-room-name', item.name);
-          } else {
-               // Optionnel: Mettre un nom par défaut ou logguer si le nom manque
-               console.warn("renderListData: Nom de pièce (item.name) manquant pour l'item:", item);
-               // clickableElement.setAttribute('data-room-name', 'Nom Inconnu');
-          }
-          // ===> FIN DE L'AJOUT <===
-          // ========================================
-           
-          // Assure-toi aussi que data-action est bien là (VOTRE CODE EXISTANT)
-          if (!clickableElement.hasAttribute('data-action')) {
-            clickableElement.setAttribute('data-action', 'select-created-room');
-          }
+            // Utiliser 'item.room_name' au lieu de 'item.name'
+            if (item.room_name) { // <<< Changer ici
+                 clickableElement.setAttribute('data-room-name', item.room_name); // <<< Changer ici
+            } else {
+                 // Message de log mis à jour pour refléter le bon nom de champ
+                 console.warn("renderListData: Propriété 'room_name' manquante pour l'item:", item);
+                 // clickableElement.setAttribute('data-room-name', 'Nom Inconnu'); // Optionnel
+            }
+
+            // Assure-toi aussi que data-action est bien là (CODE EXISTANT)
+            if (!clickableElement.hasAttribute('data-action')) {
+              clickableElement.setAttribute('data-action', 'select-created-room');
+            }
         } else {
           // ID manquant (VOTRE CODE EXISTANT)
           console.warn("renderListData: ID manquant pour l'item:", item);
