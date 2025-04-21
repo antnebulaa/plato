@@ -1088,7 +1088,22 @@
                       roomDbIdInput.value = roomDbId;
                       console.log(`Input mis à jour (valeur=${roomDbIdInput.value})`);
                   } catch (e) { console.error("Erreur maj input:", e); }
-  
+            
+                // === Rendre la section photo visible ===
+              const photoSectionContainer = document.getElementById('room-photos-display');
+              if (photoSectionContainer) {
+                   // Remet le display défini dans Webflow (probablement Grid ou Block)
+                   // Mettre '' enlève le style inline 'display: none' et laisse le CSS/Webflow décider.
+                   photoSectionContainer.style.display = '';
+                   // OU si vous savez que c'est Grid :
+                   // photoSectionContainer.style.display = 'grid';
+                   console.log("Conteneur photos rendu visible.");
+              } else {
+                   console.error("Conteneur #room-photos-display non trouvé ! Impossible de l'afficher.");
+                   // Peut-être arrêter ici si le conteneur est essentiel ?
+                   // return;
+              }
+              // === FIN  ===
                 
   
                   listContainer.querySelectorAll('[data-action="select-created-room"][data-room-id]').forEach(el => el.classList.remove('is-selected'));
