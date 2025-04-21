@@ -718,17 +718,32 @@
         const clickableElement = clone.querySelector('[data-action="select-created-room"]') ||
           clone; // Prend l'élément avec data-action, ou le clone entier par défaut
   
-        if (item.id !== undefined) { // Vérifie que l'objet 'item' de Xano a bien un champ 'id'
+       if (item.id !== undefined) { // Vérifie que l'objet 'item' de Xano a bien un champ 'id'
+          // Définit l'ID (VOTRE CODE EXISTANT)
           clickableElement.setAttribute('data-room-id', item.id);
-          // Assure-toi aussi que data-action est bien là (au cas où il n'est pas sur le clone lui-même)
+
+          // Pour stocker le nom de la pièce
+          // Assurez-vous que 'item.name' est le bon champ venant de Xano
+          if (item.room_name) {
+               clickableElement.setAttribute('data-room-name', item.name);
+          } else {
+               // Optionnel: Mettre un nom par défaut ou logguer si le nom manque
+               console.warn("renderListData: Nom de pièce (item.name) manquant pour l'item:", item);
+               // clickableElement.setAttribute('data-room-name', 'Nom Inconnu');
+          }
+          // ===> FIN DE L'AJOUT <===
+          // ========================================
+           
+          // Assure-toi aussi que data-action est bien là (VOTRE CODE EXISTANT)
           if (!clickableElement.hasAttribute('data-action')) {
             clickableElement.setAttribute('data-action', 'select-created-room');
           }
         } else {
+          // ID manquant (VOTRE CODE EXISTANT)
           console.warn("renderListData: ID manquant pour l'item:", item);
-          // Empêcher de cliquer si pas d'ID? clickableElement.style.pointerEvents = 'none';
+          // clickableElement.style.pointerEvents = 'none';
         }
-       // --- Fin Logique ROOMS ---
+       // --- Fin Logique ROOMS --- (Commentaire existant)
         
         // Ajouter le clone au conteneur
         container.appendChild(clone);
@@ -1051,8 +1066,23 @@
               console.log("--- CLIC DÉTECTÉ ---");
               const selectedElement = event.target.closest('[data-action="select-created-room"][data-room-id]');
               if (selectedElement) {
+                
                   const roomDbId = selectedElement.getAttribute('data-room-id');
                   console.log(`Room ID: ${roomDbId}`);
+
+                   // --- AJOUT : Récupérer le nom et mettre à jour l'affichage ---
+             const roomName = selectedElement.getAttribute('data-room-name') || `Pièce ID: ${roomDbId}`; // Récupère le nom, ou affiche l'ID par défaut
+             const roomNameDisplayElement = document.getElementById('current-room-name-display'); // Trouve l'élément d'affichage par ID
+
+             if (roomNameDisplayElement) {
+                  roomNameDisplayElement.textContent = roomName; // Met à jour le texte
+             } else {
+                  console.warn("Élément d'affichage du nom de pièce (#current-room-name-display) non trouvé.");
+             }
+             // --- FIN AJOUT ---
+
+             console.log(`Room ID: ${roomDbId}, Name: ${roomName}`); // Log amélioré
+
                
                 // currentSelectedRoomId = roomDbId;
                  currentSelectedRoomId = roomDbId;
