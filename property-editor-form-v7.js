@@ -1384,7 +1384,7 @@ function setupPhotoSelectionMode() {
             // 4. Envoyer l'ordre filtré à l'endpoint de réorganisation Xano
             if (filteredOrderedPaths.length > 0) {
                  // Adaptez l'URL et la méthode si nécessaire
-                 const reorderEndpoint = `property_photos_rooms/${currentSelectedRoomId}/reorder_photos`; // Endpoint PATCH/POST sur la room
+                 const reorderEndpoint = `property_photos_rooms/reorder_photos/${currentSelectedRoomId}`; // Endpoint PATCH/POST sur la room
                  const payload = { ordered_photo_paths: filteredOrderedPaths };
 
                  console.log("onEnd: Appel API de réorganisation - Endpoint:", reorderEndpoint, "Payload:", payload);
