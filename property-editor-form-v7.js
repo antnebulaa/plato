@@ -817,8 +817,26 @@
              clone.removeAttribute('aria-hidden');
              clone.setAttribute('data-xano-list-item', '');
              clone.setAttribute('data-xano-item-index', index.toString());
-             if (item && item.path) clone.setAttribute('data-photo-path', item.path);
+            
+             // --- AJOUT/Vérification Attributs ---
+             // Path (pour suppression si besoin, et pour trouver img URL si besoin)
+             if (item.path) { // Supposons que 'path' est dans l'objet item via le champ 'images'
+                 clone.setAttribute('data-photo-path', item.path);
+             } else if (item.images && item.images.path) { // Si 'images' est l'objet contenant path
+                  clone.setAttribute('data-photo-path', item.images.path);
+             } else {
+                  console.warn("renderPhotoItems: Path manquant pour l'item:", item);
+             }
 
+             // ID (pour la réorganisation) - ESSENTIEL
+             if (item.id) { // L'ID de l'enregistrement property_photos
+                 clone.setAttribute('data-photo-id', item.id);
+             } else {
+                 console.error("renderPhotoItems: ID de la photo MANQUANT ! La réorganisation échouera.", item);
+                 // On pourrait empêcher le drag ici ? Ou au moins logger une erreur claire.
+             }
+             // --- FIN AJOUT/Vérification Attributs ---
+           
              // *** Début Modifications Fade-in ***
              // a. Trouver l'élément image DANS le clone
              const imgElement = clone.querySelector('.photo-item-image');
@@ -1090,7 +1108,7 @@
                      currentSortableInstance.destroy();
                      currentSortableInstance = null;
                  }
-                 // === FIN AJOUT ===
+                 // === FIN DESCTRUCTION ===
                 
                   try {
                       roomDbIdInput.value = roomDbId;
@@ -1338,88 +1356,65 @@ function setupPhotoSelectionMode() {
         }
     } // --- FIN de executeDelete ---
 
-   // --- NOUVELLE FONCTION pour gérer la fin du drag & drop ---
+   // --- NOUVELLE FONCTION pour gérer la fin du drag & drop (utilise photo ID) ---
     async function handleSortEnd(event) {
-        // event.target est le conteneur (#photo-list-container)
-        const photoListContainerElement = event.target;
+        const photoListContainerElement = event.target; // Le conteneur #photo-list-container
+        const items = Array.from(photoListContainerElement.children); // Les éléments photo (clones)
 
-        // 1. Obtenir l'ordre actuel des éléments photo dans le DOM
-        const orderedDOMElements = Array.from(photoListContainerElement.children);
-        const newPathsOrderFromDOM = orderedDOMElements
-            .map(el => el.getAttribute('data-photo-path')) // Récupère les data-photo-path
-            .filter(path => path); // Filtre au cas où un élément n'aurait pas l'attribut
+        // Extrait les data-photo-id dans le nouvel ordre
+        const orderedPhotoIds = items
+            .map(el => el.getAttribute('data-photo-id')) // <<< Récupère les ID
+            .filter(id => id) // Filtre les éléments qui n'auraient pas d'ID
+            .map(id => parseInt(id, 10)); // Convertit les ID en nombres entiers
 
-        if (newPathsOrderFromDOM.length === 0) {
-             console.log("onEnd: Aucune photo détectée après drag.");
-             // Réactiver le bouton Supprimer si nécessaire (car finally ne sera pas appelé si on sort ici)
-             if (modeSelectionActif && boutonSupprimerSelection) boutonSupprimerSelection.disabled = false;
-             return;
+        if (orderedPhotoIds.length === 0) {
+            console.log("SortableJS onEnd: Aucun ID de photo détecté.");
+            if (modeSelectionActif && boutonSupprimerSelection) boutonSupprimerSelection.disabled = false;
+            return;
         }
 
-        console.log("onEnd: Nouvel ordre détecté depuis DOM:", newPathsOrderFromDOM);
+        console.log("SortableJS onEnd: Nouvel ordre d'IDs:", orderedPhotoIds);
 
-        // Mettre le bouton Supprimer en état 'sauvegarde...' (optionnel)
-        if (boutonSupprimerSelection) boutonSupprimerSelection.textContent = "Sauvegarde...";
+        // Optionnel: Mettre bouton Supprimer en "Sauvegarde..."
+        // if (boutonSupprimerSelection) boutonSupprimerSelection.textContent = "Sauvegarde...";
 
         try {
-            // 2. Récupérer la liste VALIDE des chemins depuis Xano MAINTENANT
-            //    pour éviter les conflits avec des suppressions récentes.
-            //    Utilise le même endpoint que pour afficher les photos.
-            console.log("onEnd: Récupération des chemins valides actuels depuis Xano...");
-            const photoEndpoint = `property_photos/photos/${currentSelectedRoomId}`;
-            const currentPhotosData = await xanoClient.get(photoEndpoint);
+            
+             // Adaptez l'URL et la méthode (POST ici est logique pour un batch update)
+             const reorderEndpoint = `property_photos/batch_reorder`;
+             const payload = {
+                     ordered_photo_ids: orderedPhotoIds,
+                     room_id: parseInt(currentSelectedRoomId, 10) // <<< AJOUTER L'ID DE LA ROOM ICI (converti en entier)
+                 };
 
-            // Extrait les chemins valides (adaptez si la structure de retour est différente)
-            const validPaths = Array.isArray(currentPhotosData) ? currentPhotosData.map(photo => photo.path) : [];
-            console.log("onEnd: Chemins valides depuis Xano:", validPaths);
-
-            // 3. Filtrer l'ordre du DOM pour ne garder que les chemins valides
-            const filteredOrderedPaths = newPathsOrderFromDOM.filter(path => validPaths.includes(path));
-
-            if (filteredOrderedPaths.length !== newPathsOrderFromDOM.length) {
-                 console.warn("onEnd: Certains chemins du DOM n'étaient plus valides dans Xano (probablement supprimés). Ordre filtré utilisé.");
-            }
-            console.log("onEnd: Ordre filtré à envoyer à Xano:", filteredOrderedPaths);
-
-            // 4. Envoyer l'ordre filtré à l'endpoint de réorganisation Xano
-            if (filteredOrderedPaths.length > 0) {
-                 // Adaptez l'URL et la méthode si nécessaire
-                 const reorderEndpoint = `property_photos_rooms/reorder_photos/${currentSelectedRoomId}`; // Endpoint PATCH/POST sur la room
-                 const payload = { ordered_photo_paths: filteredOrderedPaths };
-
-                 console.log("onEnd: Appel API de réorganisation - Endpoint:", reorderEndpoint, "Payload:", payload);
-                 await xanoClient.patch(reorderEndpoint, payload); // Ou .post
-                 console.log("onEnd: Nouvel ordre sauvegardé avec succès via API.");
-                 // Optionnel: feedback visuel succès (ex: message temporaire)
-
-            } else {
-                 console.log("onEnd: Aucune photo valide à réorganiser après filtrage.");
-            }
+             console.log("SortableJS onEnd: Appel API batch_reorder - Endpoint:", reorderEndpoint, "Payload:", payload);
+             // Note: Pas besoin de récupérer/filtrer ici car on envoie les IDs
+             // Xano doit gérer la mise à jour basée sur ces IDs
+             await xanoClient.post(reorderEndpoint, payload); // Ou .patch si vous préférez
+             console.log("SortableJS onEnd: Nouvel ordre sauvegardé avec succès via API.");
+             // Optionnel: feedback visuel succès
 
         } catch (error) {
             console.error("Erreur lors de la sauvegarde du nouvel ordre des photos:", error);
             alert("Erreur lors de la sauvegarde du nouvel ordre des photos.");
-            // En cas d'erreur, il est PRUDENT de recharger les photos depuis Xano
-            // pour réafficher l'ordre correct (celui avant la tentative échouée).
+            // Recharger les photos pour réafficher l'ordre correct d'avant l'erreur
             console.log("Tentative de rechargement des photos après échec sauvegarde ordre...");
             const photoSectionContainer = document.getElementById('room-photos-display');
             const photoLoadingIndicator = photoSectionContainer?.querySelector('[data-xano-loading]');
-            const fetchEndpoint = `property_photos/photos/${currentSelectedRoomId}`;
+            const fetchEndpoint = `property_photos/photos/${currentSelectedRoomId}`; // Utilise l'ID de room global
             if (photoSectionContainer && xanoClient) {
                  try {
                      if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'block';
-                     await fetchXanoData(xanoClient, fetchEndpoint, 'GET', null, photoSectionContainer, photoLoadingIndicator);
+                     await fetchXanoData(client, fetchEndpoint, 'GET', null, photoSectionContainer, photoLoadingIndicator);
                      if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'none';
                      console.log("Photos rechargées.");
-                 } catch (refreshError) {
-                      console.error("Erreur lors du rechargement des photos après échec sauvegarde:", refreshError);
-                 }
+                 } catch (refreshError) { console.error("Erreur lors du rechargement:", refreshError); }
             }
         } finally {
-            // IMPORTANT : Réactiver le bouton Supprimer si on est toujours en mode sélection
+            // Réactiver le bouton Supprimer si on est en mode sélection
              if (modeSelectionActif && boutonSupprimerSelection) {
                  boutonSupprimerSelection.disabled = false;
-                 boutonSupprimerSelection.textContent = "Supprimer la sélection"; // Remettre le texte normal
+                 boutonSupprimerSelection.textContent = "Supprimer la sélection";
                  console.log("Bouton Supprimer réactivé (drag end).");
              }
         }
