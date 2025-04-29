@@ -1,20 +1,21 @@
 // ==========================================
 // == Script Xano Unifié (Formulaires + Données) ==
 // ==========================================
-// Date: 2025-04-29 // Version 8.2 (v8 Modifié + Debug Logs Sélection/Drag)
-// NOTE: Ajout de console.log pour déboguer la sélection et le drag/drop.
-// PRÉREQUIS: Endpoint Xano GET /property_photos/photos/{room_id} retourne
-//            liste enregistrements 'property_photos', triés par 'display_order' ASC.
-//            Chaque enregistrement contient 'id', 'display_order', et un champ
-//            (ex: 'images') qui est un TABLEAU contenant l'objet métadonnées.
+// Date: 2025-04-29 // Version 8.3 (v8 + IDs Photos - Modifications Minimales)
+// NOTE: Basé sur v8 original. Adapté pour IDs photos et nouveaux endpoints.
+// PRÉREQUIS EXTERNES:
+// 1. CORRIGER LES ERREURS JS EXTERNES SUR LA PAGE (SyntaxError, ReferenceError) !
+// 2. Endpoint Xano GET /property_photos/photos/{room_id} retourne liste enregistrements complets, triés.
+// 3. Endpoints Xano batch_delete_by_ids et batch_reorder existent et fonctionnent avec les IDs.
 
 let xanoClient;
 let currentSortableInstance = null;
 let modeSelectionActif = false;
-let photosSelectionneesIds = []; // Contiendra les IDs numériques
+// MODIFIÉ v8 -> v8.3: Contiendra les IDs numériques des photos, pas les paths.
+let photosSelectionneesIds = [];
 let currentSelectedRoomId = null;
 
-// --- Fonctions Setup (Identiques v8.1) ---
+// --- Fonctions Setup (Identiques v8) ---
 function setupRoomTypeSelection() {
   // Cible le conteneur de ta Collection List (ajuste le sélecteur si besoin)
   const roomTypesListWrapper = document.querySelector(
@@ -87,7 +88,7 @@ function setupRoomTypeSelection() {
 }
 
 function setupCreatedRoomSelection(client) {
-    console.log("--- Entrée dans setupCreatedRoomSelection (v8.1) ---");
+    console.log("--- Entrée dans setupCreatedRoomSelection (v8.final) ---"); // Nommé v8.final mais correspond à v8.3
     if (!client) { console.error("ERREUR: Client Xano manquant !"); return; }
     const photoUploadForm = document.querySelector('[data-xano-form="upload_multiple_photos"]');
     const photoDisplayContainer = document.querySelector('#room-photos-display');
@@ -101,7 +102,7 @@ function setupCreatedRoomSelection(client) {
     console.log("setupCreatedRoomSelection: Vérifications OK.");
 
     listContainer.addEventListener('click', async function handleRoomClickFinal(event) {
-        console.log("--- CLIC ROOM DÉTECTÉ (v8.1) ---");
+        console.log("--- CLIC ROOM DÉTECTÉ (v8.final) ---");
         const selectedElement = event.target.closest('[data-action="select-created-room"][data-room-id]');
         if (selectedElement) {
             const roomDbId = selectedElement.getAttribute('data-room-id');
@@ -114,7 +115,7 @@ function setupCreatedRoomSelection(client) {
             try { roomDbIdInput.value = roomDbId; console.log(`Input upload mis à jour (valeur=${roomDbIdInput.value})`); }
             catch (e) { console.error("Erreur maj input:", e); }
 
-            // Destruction SortableJS (gardé de v9+)
+            // Destruction SortableJS (gardé pour éviter conflits)
             if (currentSortableInstance) { console.log("Destruction SortableJS précédente."); currentSortableInstance.destroy(); currentSortableInstance = null; }
 
             // Affichage section photos (logique v8)
@@ -127,67 +128,39 @@ function setupCreatedRoomSelection(client) {
             selectedElement.classList.add('is-selected');
             console.log("Feedback visuel appliqué.");
 
-            // Fetch photos (logique v8 modifiée pour helper)
+            // Fetch photos
             console.log("Préparation fetch photos...");
             if (client) {
-                 await refreshCurrentRoomPhotos(client); // Utilise helper
+                 await refreshCurrentRoomPhotos(client); // Utilise helper pour fetch et init sortable
             } else { console.warn("Client Xano manquant pour fetch photos."); }
         } else { console.log("Clic ignoré (pas sur un élément room valide)."); }
     });
     console.log("setupCreatedRoomSelection: Écouteur attaché.");
 }
 
-
-// --- Initialisation DOMContentLoaded (Identique v8.1) ---
+// --- Initialisation DOMContentLoaded (Identique v8) ---
 document.addEventListener('DOMContentLoaded', function() {
-  // --- Configuration ---
-  try { // Ajout d'un try/catch global pour l'init
-    xanoClient = new XanoClient({
-      apiGroupBaseUrl: 'https://xwxl-obyg-b3e3.p7.xano.io/api:qom0bt4V', // Adaptez URL
-    });
+  try {
+    xanoClient = new XanoClient({ apiGroupBaseUrl: 'https://xwxl-obyg-b3e3.p7.xano.io/api:qom0bt4V' }); // Adaptez URL
     console.log("1. Instance xanoClient créée.");
-
-    // --- Initialisation ---
     const authToken = getCookie('xano_auth_token');
-    if (authToken) {
-      xanoClient.setAuthToken(authToken);
-      console.log("2. Auth Token appliqué à xanoClient.");
-    } else {
-      console.log("2. Pas d'Auth Token trouvé.");
-    }
-
-    initXanoForms(xanoClient);
-    console.log("3. initXanoForms appelé.");
-    initXanoDataEndpoints(xanoClient); // Charge les données (y compris les rooms)
-    console.log("4. initXanoDataEndpoints appelé.");
-
-    setupRoomTypeSelection();
-    console.log("5. setupRoomTypeSelection appelé.");
-
-    initXanoLinkHandlers();
-    console.log("6. initXanoLinkHandlers appelé.");
-
+    if (authToken) { xanoClient.setAuthToken(authToken); console.log("2. Auth Token appliqué."); }
+    else { console.log("2. Pas d'Auth Token trouvé."); }
+    initXanoForms(xanoClient); console.log("3. initXanoForms appelé.");
+    initXanoDataEndpoints(xanoClient); console.log("4. initXanoDataEndpoints appelé.");
+    setupRoomTypeSelection(); console.log("5. setupRoomTypeSelection appelé.");
+    initXanoLinkHandlers(); console.log("6. initXanoLinkHandlers appelé.");
     console.log("7. PRÊT à appeler setupCreatedRoomSelection.");
-    console.log("   Vérification de xanoClient juste avant l'appel:", xanoClient);
+    console.log("   Vérification de xanoClient:", xanoClient);
     if (typeof setupCreatedRoomSelection !== 'function') { console.error("ERREUR CRITIQUE: setupCreatedRoomSelection n'est pas une fonction !"); return; }
-    if (!xanoClient) { console.error("ERREUR CRITIQUE: xanoClient est undefined/null avant l'appel !"); return; }
-
-    // Active la sélection des pièces créées (suppose que la liste est rendue par initXanoDataEndpoints)
-    setupCreatedRoomSelection(xanoClient);
-    console.log("8. Appel à setupCreatedRoomSelection TERMINÉ.");
-
-    // Initialise la logique de sélection/suppression photo
-    setupPhotoSelectionMode();
-    console.log("9. setupPhotoSelectionMode appelé.");
-
-    console.log("10. Initialisation UNIFIÉE terminée (fin du bloc try DOMContentLoaded).");
-
-  } catch (initError) {
-    console.error("ERREUR GLOBALE DANS DOMContentLoaded:", initError);
-  }
+    if (!xanoClient) { console.error("ERREUR CRITIQUE: xanoClient est undefined/null !"); return; }
+    setupCreatedRoomSelection(xanoClient); console.log("8. Appel setupCreatedRoomSelection TERMINÉ.");
+    setupPhotoSelectionMode(); console.log("9. setupPhotoSelectionMode appelé."); // Initialise sélection/suppression photo
+    console.log("10. Initialisation UNIFIÉE terminée.");
+  } catch (initError) { console.error("ERREUR GLOBALE DANS DOMContentLoaded:", initError); }
 });
 
-// --- Classe XanoClient (Identique v8.1) ---
+// --- Classe XanoClient (Modifiée v8.final pour DELETE avec body) ---
 class XanoClient {
     constructor(config) { this.apiGroupBaseUrl = config.apiGroupBaseUrl; this.authToken = null; }
     setAuthToken(token) { this.authToken = token; }
@@ -197,17 +170,14 @@ class XanoClient {
         if (this.authToken) { options.headers['Authorization'] = `Bearer ${this.authToken}`; }
         let finalUrl = url;
         if (method === 'GET' && paramsOrBody) { const queryParams = new URLSearchParams(paramsOrBody).toString(); if (queryParams) finalUrl = `${url}?${queryParams}`; }
-        else if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && paramsOrBody) { // MODIFIÉ v8.1: DELETE peut avoir un body JSON
+        // MODIFIÉ v8.final: DELETE peut avoir un body JSON pour envoyer les IDs
+        else if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && paramsOrBody) {
             if (isFormData) { options.body = paramsOrBody; }
             else { options.headers['Content-Type'] = 'application/json'; options.body = JSON.stringify(paramsOrBody); }
         }
         try {
             const response = await fetch(finalUrl, options);
-            // Gère 204 No Content
-            if (response.status === 204 || response.headers.get('content-length') === '0') {
-                if (!response.ok) throw new Error(`Erreur HTTP ${response.status}`);
-                return null; // Succès sans contenu
-            }
+            if (response.status === 204 || response.headers.get('content-length') === '0') { if (!response.ok) throw new Error(`Erreur HTTP ${response.status}`); return null; }
             const responseData = await response.json();
             if (!response.ok) throw new Error(responseData.message || `Erreur HTTP ${response.status}`);
             return responseData;
@@ -217,11 +187,11 @@ class XanoClient {
     post(endpoint, body = null, isFormData = false) { return this._request('POST', endpoint, body, isFormData); }
     put(endpoint, body = null, isFormData = false) { return this._request('PUT', endpoint, body, isFormData); }
     patch(endpoint, body = null, isFormData = false) { return this._request('PATCH', endpoint, body, isFormData); }
-    // MODIFIÉ v8 -> v8.1: La méthode delete peut maintenant envoyer un body JSON
+    // MODIFIÉ v8 -> v8.final: La méthode delete peut maintenant envoyer un body JSON
     delete(endpoint, body = null) { return this._request('DELETE', endpoint, body, false); } // false = assume JSON body
 }
 
-// --- Initialisation des Formulaires (Identique v8.1) ---
+// --- Initialisation des Formulaires (Identique v8) ---
 function initXanoForms(xanoClient) {
     const xanoForms = document.querySelectorAll('[data-xano-form]');
     xanoForms.forEach((form) => {
@@ -256,7 +226,7 @@ function initXanoForms(xanoClient) {
           form.dispatchEvent(successEvent);
           if (form.hasAttribute('data-xano-form-redirect')) { window.location.href = form.getAttribute('data-xano-form-redirect'); }
           else {
-             // INFO v8.1: Rafraîchissement après upload si nécessaire (gardé de v9/v10)
+             // INFO v8.final: Rafraîchissement après upload si nécessaire
              if (form.getAttribute('data-xano-form') === 'upload_multiple_photos' && currentSelectedRoomId) {
                  console.log("Upload photos réussi, rafraîchissement...");
                  await refreshCurrentRoomPhotos(xanoClient); // Utilise helper pour rafraîchir
@@ -277,7 +247,7 @@ function initXanoForms(xanoClient) {
     });
   }
 
-// --- Init Récupération/Affichage Données (Identique v8.1) ---
+// --- Init Récupération/Affichage Données (Identique v8) ---
 function initXanoDataEndpoints(xanoClient) {
     const xanoElements = document.querySelectorAll('[data-xano-endpoint]');
     xanoElements.forEach(element => {
@@ -295,7 +265,7 @@ function initXanoDataEndpoints(xanoClient) {
     });
   }
 
-// --- Init Gestionnaires de Liens (Identique v8.1) ---
+// --- Init Gestionnaires de Liens (Identique v8) ---
 function initXanoLinkHandlers() {
     document.addEventListener('xano:data-loaded', function (event) {
       const loadedElement = event.detail.element; const data = event.detail.data;
@@ -342,11 +312,11 @@ async function fetchXanoData(client, endpoint, method, params, targetElement, lo
     }
   }
 
-// MODIFIÉ v8 -> v8.1: renderData distingue maintenant le rendu des photos
+// MODIFIÉ v8 -> v8.final: renderData distingue maintenant le rendu des photos
 function renderData(data, element) {
     if (element.id === 'room-photos-display' && element.hasAttribute('data-xano-list')) {
-        console.log("renderData: Appel renderPhotoItems pour #room-photos-display");
-        // INFO v8.1: Attend une liste d'enregistrements complets de property_photos
+        console.log("renderData: Appel renderPhotoItems pour #room-photos-display (v8.final)");
+        // INFO v8.final: Attend une liste d'enregistrements complets de property_photos
         let listData = Array.isArray(data) ? data : [];
         if (!Array.isArray(data)) console.warn("renderData: Données photos non tableau:", data);
         renderPhotoItems(listData, element); // Appel rendu photos
@@ -412,11 +382,11 @@ function renderListData(dataArray, listContainerElement) {
     } else { const em = listContainerElement.getAttribute('data-xano-empty-message') || "Aucune donnée."; if (!container.querySelector('.xano-empty-message')) { const me = document.createElement('div'); me.className = 'xano-empty-message'; me.textContent = em; container.appendChild(me); } }
 }
 
-// MODIFIÉ v8 -> v8.1: renderPhotoItems utilise les IDs et la nouvelle structure de données
+// MODIFIÉ v8 -> v8.final: renderPhotoItems utilise les IDs et la nouvelle structure de données
 function renderPhotoItems(dataArray, listContainerElement) {
     // dataArray = liste des enregistrements complets de property_photos
     dataArray = Array.isArray(dataArray) ? dataArray : [];
-    console.log(`renderPhotoItems: Rendu de ${dataArray.length} photos (v8.1).`);
+    console.log(`renderPhotoItems: Rendu de ${dataArray.length} photos (v8.final).`);
 
     const emptyStatePlaceholder = document.getElementById('photo-empty-state-placeholder');
     const templateSelector = listContainerElement.getAttribute('data-xano-list');
@@ -442,7 +412,7 @@ function renderPhotoItems(dataArray, listContainerElement) {
             clone.style.display = ''; clone.removeAttribute('aria-hidden');
             clone.setAttribute('data-xano-list-item', ''); clone.setAttribute('data-xano-item-index', index.toString());
 
-            // --- ID (Essentiel pour v8.1) ---
+            // --- ID (Essentiel pour v8.final) ---
             if (item && item.id) {
                 clone.setAttribute('data-photo-id', item.id); // Utilise l'ID de l'enregistrement
             } else {
@@ -488,7 +458,7 @@ function renderPhotoItems(dataArray, listContainerElement) {
     }
 }
 
-// MODIFIÉ v8 -> v8.1: bindDataToElement gère l'accès au tableau metadata
+// MODIFIÉ v8 -> v8.final: bindDataToElement gère l'accès au tableau metadata
 function bindDataToElement(element, data) {
     // data = enregistrement complet de property_photos
     const dataKey = element.getAttribute('data-xano-bind');
@@ -506,6 +476,7 @@ function bindDataToElement(element, data) {
             // !! Adaptez 'images' au nom exact de votre champ tableau !!
             const metadataField = 'images'; // <--- VÉRIFIEZ CE NOM
             const metadataArray = data ? data[metadataField] : null;
+            // Prend le premier élément du tableau (index 0)
             const imageMetadata = (Array.isArray(metadataArray) && metadataArray.length > 0) ? metadataArray[0] : null;
 
             if (imageMetadata) {
@@ -517,7 +488,7 @@ function bindDataToElement(element, data) {
             else if (typeof displayValue === 'string' && (displayValue.startsWith('/vault/') || displayValue.startsWith('http'))) { imageUrl = displayValue; } // Fallback
 
             if (!imageUrl) console.warn(`bindData: URL image introuvable (clé: ${dataKey}):`, data);
-            element.src = imageUrl || '';
+            element.src = imageUrl || ''; // Définit src, ou vide si non trouvée
             break;
         // ... autres cas (input, textarea, etc. identiques à v8) ...
         case 'iframe': case 'video': case 'audio': case 'source': element.src = displayValue; break;
@@ -548,16 +519,14 @@ function bindDataToElement(element, data) {
     if (element.hasAttribute('data-xano-link-to') && data?.id !== undefined) element.setAttribute('data-xano-data-id', data.id);
 }
 
-// ============================================================
-// == Sélection/Suppression Photos (MODIFIÉ v8.1 -> v8.2 : Ajout Logs) ==
-// ============================================================
+// --- Sélection/Suppression Photos (MODIFIÉ v8 -> v8.final) ---
 function setupPhotoSelectionMode() {
-    console.log("SETUP: Initialisation mode sélection photo (v8.2).");
+    console.log("SETUP: Initialisation mode sélection photo (v8.final).");
     const boutonModeSelection = document.getElementById('bouton-mode-selection');
-    const conteneurPhotos = document.getElementById('room-photos-display');
-    const photoListContainer = document.getElementById('photo-list-container');
+    const conteneurPhotosParent = document.getElementById('room-photos-display'); // Conteneur parent stable
+    const photoListContainer = document.getElementById('photo-list-container'); // Conteneur des items
     const boutonSupprimerSelection = document.getElementById('bouton-supprimer-selection');
-    if (!boutonModeSelection || !conteneurPhotos || !photoListContainer || !boutonSupprimerSelection) { console.error("SETUP ERROR: Éléments HTML manquants pour sélection photo."); return; }
+    if (!boutonModeSelection || !conteneurPhotosParent || !photoListContainer || !boutonSupprimerSelection) { console.error("SETUP ERROR: Éléments HTML manquants pour sélection photo."); return; }
 
     function updateDeleteButtonVisibility() {
         if (!boutonSupprimerSelection) return;
@@ -570,169 +539,102 @@ function setupPhotoSelectionMode() {
         }
     }
 
-    // MODIFIÉ v8 -> v8.1: Utilise les IDs et le nouvel endpoint
+    // MODIFIÉ v8 -> v8.final: Utilise les IDs et le nouvel endpoint delete
     async function executeDelete() {
-        // Utilise photosSelectionneesIds qui contient maintenant des IDs numériques
         if (photosSelectionneesIds.length === 0 || currentSelectedRoomId === null) { console.error("executeDelete: Aucune photo sélectionnée ou room ID inconnu."); return; }
         console.log(`Exécution suppression pour ${photosSelectionneesIds.length} photo(s) [IDs: ${photosSelectionneesIds.join(', ')}] dans room ${currentSelectedRoomId}.`);
-
         const modalConfirmBtn = document.getElementById('modal-confirm-delete-button');
         if (modalConfirmBtn) modalConfirmBtn.disabled = true;
         let scrollPos = window.scrollY || document.documentElement.scrollTop;
-
-        // Payload pour le nouvel endpoint batch_delete_by_ids
-        const payload = {
-            photo_ids: photosSelectionneesIds, // Envoie les IDs numériques
-            room_id: parseInt(currentSelectedRoomId, 10)
-        };
-        // !! VÉRIFIEZ LE NOM ET LA MÉTHODE DE VOTRE ENDPOINT !!
-        const deleteEndpoint = 'property_photos/batch_delete_by_ids'; // Endpoint qui attend les IDs
-        const deleteMethod = 'DELETE'; // Ou 'POST' selon votre config Xano
-
+        const payload = { photo_ids: photosSelectionneesIds, room_id: parseInt(currentSelectedRoomId, 10) };
+        const deleteEndpoint = 'property_photos/batch_delete_by_ids'; // !! VÉRIFIEZ NOM ENDPOINT !!
+        const deleteMethod = 'DELETE'; // !! VÉRIFIEZ MÉTHODE (DELETE ou POST) !!
         try {
-            // Utilise la méthode delete de XanoClient qui peut envoyer un body JSON
-            const response = await xanoClient.delete(deleteEndpoint, payload);
-            console.log('Réponse API suppression:', response); // Peut être null si succès 204
-
-            // Suppression réussie (supposant que l'API renvoie une erreur si échec)
+            await xanoClient.delete(deleteEndpoint, payload); // Utilise la méthode delete modifiée
             console.log('Photos supprimées avec succès (API call OK)!');
-            await refreshCurrentRoomPhotos(xanoClient); // Rafraîchit la liste
-
-            setTimeout(() => { window.scrollTo({ top: scrollPos, behavior: 'auto' }); }, 100); // Restaure scroll
-
-            // Réinitialise l'état
+            await refreshCurrentRoomPhotos(xanoClient);
+            setTimeout(() => { window.scrollTo({ top: scrollPos, behavior: 'auto' }); }, 100);
             photosSelectionneesIds = []; modeSelectionActif = false;
             if (boutonModeSelection) boutonModeSelection.textContent = "Sélectionner les photos";
-            if (conteneurPhotos) conteneurPhotos.classList.remove('selection-active');
+            if (conteneurPhotosParent) conteneurPhotosParent.classList.remove('selection-active'); // Utilise conteneur parent
             updateDeleteButtonVisibility();
-
-        } catch (error) {
-            console.error("Erreur processus suppression API:", error);
-            alert("Erreur suppression photos: " + error.message);
-        } finally {
-            closeDeleteModal();
-            if (modalConfirmBtn) modalConfirmBtn.disabled = false;
-        }
+        } catch (error) { console.error("Erreur processus suppression API:", error); alert("Erreur suppression photos: " + error.message); }
+        finally { closeDeleteModal(); if (modalConfirmBtn) modalConfirmBtn.disabled = false; }
     }
 
-    // MODIFIÉ v8.1 -> v8.2: Ajout Logs
+    // MODIFIÉ v8 -> v8.final: Utilise les IDs et le nouvel endpoint reorder
     async function handleSortEnd(event) {
-        console.log("DEBUG: handleSortEnd START"); // Log début
+        console.log("DEBUG: handleSortEnd START (v8.final)");
         const photoListContainerElement = event.target;
         const items = Array.from(photoListContainerElement.children);
-        const orderedPhotoIds = items
-            .map(el => el.getAttribute('data-photo-id'))
-            .filter(id => id)
-            .map(id => parseInt(id, 10))
-            .filter(id => !isNaN(id));
-
+        const orderedPhotoIds = items.map(el => el.getAttribute('data-photo-id')).filter(id => id).map(id => parseInt(id, 10)).filter(id => !isNaN(id));
         if (orderedPhotoIds.length === 0 || currentSelectedRoomId === null) { console.log("DEBUG: handleSortEnd: Aucun ID photo valide ou room ID inconnu."); if (modeSelectionActif && boutonSupprimerSelection) boutonSupprimerSelection.disabled = false; return; }
         console.log("DEBUG: handleSortEnd: Nouvel ordre IDs:", orderedPhotoIds);
-
-        // !! VÉRIFIEZ LE NOM DE VOTRE ENDPOINT !!
-        const reorderEndpoint = `property_photos/batch_reorder`; // Endpoint qui attend les IDs
-        const payload = {
-            ordered_photo_ids: orderedPhotoIds, // Envoie les IDs numériques ordonnés
-            room_id: parseInt(currentSelectedRoomId, 10)
-        };
+        const reorderEndpoint = `property_photos/batch_reorder`; // !! VÉRIFIEZ NOM ENDPOINT !!
+        const payload = { ordered_photo_ids: orderedPhotoIds, room_id: parseInt(currentSelectedRoomId, 10) };
         console.log("DEBUG: handleSortEnd: Préparation appel API batch_reorder - Payload:", payload);
-
         try {
             console.log("DEBUG: handleSortEnd: Tentative appel xanoClient.post...");
-            await xanoClient.post(reorderEndpoint, payload); // Ou .patch
+            await xanoClient.post(reorderEndpoint, payload); // !! VÉRIFIEZ MÉTHODE (POST ou PATCH) !!
             console.log("DEBUG: handleSortEnd: Appel API batch_reorder RÉUSSI.");
-        } catch (error) {
-            console.error("DEBUG: handleSortEnd: ERREUR lors appel API batch_reorder:", error);
-            alert("Erreur sauvegarde ordre photos.");
-            console.log("DEBUG: handleSortEnd: Tentative rechargement photos après erreur...");
-            await refreshCurrentRoomPhotos(xanoClient); // Recharge en cas d'erreur
-        } finally {
-            if (modeSelectionActif && boutonSupprimerSelection) { boutonSupprimerSelection.disabled = false; console.log("DEBUG: handleSortEnd: Bouton Supprimer réactivé."); }
-            console.log("DEBUG: handleSortEnd END"); // Log fin
-        }
+        } catch (error) { console.error("DEBUG: handleSortEnd: ERREUR lors appel API batch_reorder:", error); alert("Erreur sauvegarde ordre photos."); await refreshCurrentRoomPhotos(xanoClient); }
+        finally { if (modeSelectionActif && boutonSupprimerSelection) { boutonSupprimerSelection.disabled = false; console.log("DEBUG: handleSortEnd: Bouton Supprimer réactivé."); } console.log("DEBUG: handleSortEnd END"); }
     }
 
-    // --- Écouteur bouton Gérer/Annuler (Identique v8.1) ---
+    // --- Écouteur bouton Gérer/Annuler (Identique v8) ---
     boutonModeSelection.addEventListener('click', function() {
         modeSelectionActif = !modeSelectionActif;
         console.log("Mode sélection photos :", modeSelectionActif);
-        if (modeSelectionActif) {
-            boutonModeSelection.textContent = "Annuler";
-            conteneurPhotos.classList.add('selection-active');
-            updateDeleteButtonVisibility(); // Cache si 0 sélection
-        } else {
-            boutonModeSelection.textContent = "Sélectionner les photos";
-            conteneurPhotos.classList.remove('selection-active');
-            photosSelectionneesIds = []; // Vider le tableau des IDs
-            if (photoListContainer) {
-                photoListContainer.querySelectorAll('.is-photo-selected').forEach(photoEl => {
-                    photoEl.classList.remove('is-photo-selected');
-                });
-            }
-            updateDeleteButtonVisibility(); // Cache le bouton
-        }
+        if (modeSelectionActif) { boutonModeSelection.textContent = "Annuler"; conteneurPhotosParent.classList.add('selection-active'); } // Utilise conteneur parent
+        else { boutonModeSelection.textContent = "Sélectionner les photos"; conteneurPhotosParent.classList.remove('selection-active'); photosSelectionneesIds = []; if (photoListContainer) photoListContainer.querySelectorAll('.is-photo-selected').forEach(el => el.classList.remove('is-photo-selected')); }
+        updateDeleteButtonVisibility();
      });
-    console.log("SETUP: Écouteur bouton mode sélection OK.");
+    console.log("SETUP: Écouteur bouton mode sélection OK (v8.final).");
 
 
-    // --- Écouteur sélection individuelle (MODIFIÉ v8.1 -> v8.2: Ajout Logs) ---
-    photoListContainer.addEventListener('click', function(event) {
-        console.log("DEBUG: Clic détecté sur photoListContainer."); // Log clic conteneur
-        if (!modeSelectionActif) {
-             console.log("DEBUG: Clic ignoré (mode sélection inactif).");
-             return;
-        }
-        // Cible l'élément avec data-photo-id
-        const clickedPhotoElement = event.target.closest('[data-photo-id]');
-        if (!clickedPhotoElement) {
-             console.log("DEBUG: Clic ignoré (cible sans data-photo-id). Cible réelle:", event.target);
-             return;
-        }
+    // --- Écouteur sélection individuelle (MODIFIÉ v8 -> v8.final: utilise ID et délégation) ---
+    conteneurPhotosParent.addEventListener('click', function(event) { // Écouteur sur le parent
+        console.log("DEBUG: Clic détecté sur conteneurPhotosParent (#room-photos-display).");
+        if (!modeSelectionActif) { console.log("DEBUG: Clic ignoré (mode sélection inactif)."); return; }
+        const clickedPhotoElement = event.target.closest('#photo-list-container [data-photo-id]'); // Cible une photo DANS le list-container
+        if (!clickedPhotoElement) { console.log("DEBUG: Clic ignoré (cible pas une photo valide). Cible:", event.target); return; }
         console.log("DEBUG: Élément photo cliqué trouvé:", clickedPhotoElement);
-
-        // Récupère l'ID numérique
         const photoIdString = clickedPhotoElement.getAttribute('data-photo-id');
         const photoId = parseInt(photoIdString, 10);
         if (isNaN(photoId)) { console.warn("DEBUG: Clic photo mais ID invalide:", photoIdString); return; }
         console.log(`DEBUG: ID photo extrait: ${photoId}`);
-
-        // Toggle classe et màj tableau
         clickedPhotoElement.classList.toggle('is-photo-selected');
         const isNowSelected = clickedPhotoElement.classList.contains('is-photo-selected');
         console.log(`DEBUG: Photo [ID: ${photoId}] sélectionnée: ${isNowSelected}`);
         const indexInSelection = photosSelectionneesIds.indexOf(photoId);
-        if (isNowSelected && indexInSelection === -1) {
-             photosSelectionneesIds.push(photoId);
-             console.log("DEBUG: ID ajouté à photosSelectionneesIds.");
-        } else if (!isNowSelected && indexInSelection > -1) {
-             photosSelectionneesIds.splice(indexInSelection, 1);
-             console.log("DEBUG: ID retiré de photosSelectionneesIds.");
-        }
+        if (isNowSelected && indexInSelection === -1) { photosSelectionneesIds.push(photoId); console.log("DEBUG: ID ajouté."); }
+        else if (!isNowSelected && indexInSelection > -1) { photosSelectionneesIds.splice(indexInSelection, 1); console.log("DEBUG: ID retiré."); }
         console.log("DEBUG: photosSelectionneesIds actuel:", photosSelectionneesIds);
         updateDeleteButtonVisibility();
     });
-    console.log("SETUP: Écouteur sélection photo (par ID) OK (v8.2).");
+    console.log("SETUP: Écouteur sélection photo (par délégation sur #room-photos-display) OK (v8.final).");
 
     // --- Écouteur bouton Supprimer (Ouvre modale - Identique v8.1) ---
     if (boutonSupprimerSelection) {
         boutonSupprimerSelection.addEventListener('click', function() {
-            if (photosSelectionneesIds.length === 0 || currentSelectedRoomId === null) return;
-            const modalElement = document.querySelector('[fs-modal-element="delete-confirm"]');
-            const thumbnailElement = modalElement?.querySelector('[data-modal-element="photo-thumbnail"]');
-            const badgeElement = modalElement?.querySelector('[data-modal-element="photo-badge"]');
-            const textElement = modalElement?.querySelector('[data-modal-element="confirm-text"]');
-            if (!modalElement || !thumbnailElement || !badgeElement || !textElement) { console.error("Éléments modale confirmation introuvables !"); const fb = window.confirm(`MODALE INTROUVABLE - Supprimer ${photosSelectionneesIds.length} photo(s) ?`); if (fb) executeDelete(); return; }
-            const count = photosSelectionneesIds.length; const firstPhotoId = photosSelectionneesIds[0];
-            const firstPhotoDOMElement = photoListContainer.querySelector(`[data-photo-id="${firstPhotoId}"]`);
-            const firstPhotoPath = firstPhotoDOMElement ? firstPhotoDOMElement.getAttribute('data-photo-path') : null;
-            let firstPhotoUrl = firstPhotoPath || '';
-            thumbnailElement.src = firstPhotoUrl; thumbnailElement.alt = `Aperçu (${count} photo(s))`;
-            if (count > 1) { badgeElement.textContent = `+${count - 1}`; badgeElement.style.display = 'flex'; } else badgeElement.style.display = 'none';
-            textElement.textContent = `Supprimer ${count} photo${count > 1 ? 's' : ''} ? Action irréversible.`;
-            openDeleteModal();
+             if (photosSelectionneesIds.length === 0 || currentSelectedRoomId === null) return;
+             const modalElement = document.querySelector('[fs-modal-element="delete-confirm"]');
+             const thumbnailElement = modalElement?.querySelector('[data-modal-element="photo-thumbnail"]');
+             const badgeElement = modalElement?.querySelector('[data-modal-element="photo-badge"]');
+             const textElement = modalElement?.querySelector('[data-modal-element="confirm-text"]');
+             if (!modalElement || !thumbnailElement || !badgeElement || !textElement) { console.error("Éléments modale confirmation introuvables !"); const fb = window.confirm(`MODALE INTROUVABLE - Supprimer ${photosSelectionneesIds.length} photo(s) ?`); if (fb) executeDelete(); return; }
+             const count = photosSelectionneesIds.length; const firstPhotoId = photosSelectionneesIds[0];
+             const firstPhotoDOMElement = photoListContainer.querySelector(`[data-photo-id="${firstPhotoId}"]`);
+             const firstPhotoPath = firstPhotoDOMElement ? firstPhotoDOMElement.getAttribute('data-photo-path') : null;
+             let firstPhotoUrl = firstPhotoPath || '';
+             thumbnailElement.src = firstPhotoUrl; thumbnailElement.alt = `Aperçu (${count} photo(s))`;
+             if (count > 1) { badgeElement.textContent = `+${count - 1}`; badgeElement.style.display = 'flex'; } else badgeElement.style.display = 'none';
+             textElement.textContent = `Supprimer ${count} photo${count > 1 ? 's' : ''} ? Action irréversible.`;
+             openDeleteModal();
         });
-        console.log("SETUP: Écouteur bouton supprimer sélection OK.");
+        console.log("SETUP: Écouteur bouton supprimer sélection OK (v8.final).");
     }
+
 
     // --- Écouteurs modale (Identique v8.1) ---
     const modalConfirmBtn = document.getElementById('modal-confirm-delete-button');
@@ -744,11 +646,9 @@ function setupPhotoSelectionMode() {
     updateDeleteButtonVisibility();
 }
 
-// ==========================================
-// == Fonctions Utilitaires (Helpers)      ==
-// ==========================================
+// --- Fonctions Utilitaires (Helpers) ---
 
-// MODIFIÉ v8.1 -> v8.2: Ajout Logs dans refresh et init SortableJS
+// INFO v8.final: Helper pour rafraîchir (ajouté pour cohérence)
 async function refreshCurrentRoomPhotos(client) {
      if (!currentSelectedRoomId || !client) { console.warn("refreshCurrentRoomPhotos: Room ID ou client manquant."); return; }
      const photoDisplayContainer = document.getElementById('room-photos-display');
@@ -762,37 +662,23 @@ async function refreshCurrentRoomPhotos(client) {
      try {
          console.log("refreshCurrentRoomPhotos: Appel fetchXanoData...");
          await fetchXanoData(client, photoEndpoint, 'GET', null, photoDisplayContainer, photoLoadingIndicator);
-         console.log(`refreshCurrentRoomPhotos: Rafraîchissement photos terminé pour room ${currentSelectedRoomId}.`);
-
-         // Ré-init SortableJS
+         console.log(`refreshCurrentRoomPhotos: Rafraîchissement photos terminé.`);
          const photoList = document.getElementById('photo-list-container');
          if (photoList && photoList.children.length > 0) {
              console.log("refreshCurrentRoomPhotos: Tentative ré-initialisation SortableJS...");
              if (typeof Sortable !== 'undefined') {
                  currentSortableInstance = new Sortable(photoList, {
                      animation: 150, ghostClass: 'sortable-ghost',
-                     onStart: function(evt) {
-                         console.log("DEBUG: SortableJS onStart"); // Log début drag
-                         const btn = document.getElementById('bouton-supprimer-selection');
-                         if (modeSelectionActif && btn) btn.disabled = true;
-                     },
-                     onEnd: function(evt) {
-                         console.log("DEBUG: SortableJS onEnd"); // Log fin drag
-                         handleSortEnd(evt); // Appelle la fonction modifiée avec logs
-                     }
+                     onStart: function(evt) { console.log("DEBUG: SortableJS onStart"); const btn = document.getElementById('bouton-supprimer-selection'); if (modeSelectionActif && btn) btn.disabled = true; },
+                     onEnd: function(evt) { console.log("DEBUG: SortableJS onEnd"); handleSortEnd(evt); } // Appelle la fonction modifiée
                  });
                  console.log("refreshCurrentRoomPhotos: SortableJS ré-initialisé:", currentSortableInstance);
-             } else {
-                 console.error("refreshCurrentRoomPhotos: SortableJS n'est pas défini ! Librairie manquante ?");
-             }
-         } else console.log("refreshCurrentRoomPhotos: Pas de photos à trier après refresh.");
-     } catch (error) {
-         console.error(`refreshCurrentRoomPhotos: Erreur refresh photos room ${currentSelectedRoomId}:`, error);
-         if (errorElement) { errorElement.textContent = "Erreur refresh photos."; errorElement.style.display = 'block'; }
-     } finally { if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'none'; }
+             } else { console.error("refreshCurrentRoomPhotos: SortableJS n'est pas défini !"); }
+         } else console.log("refreshCurrentRoomPhotos: Pas de photos à trier.");
+     } catch (error) { console.error(`refreshCurrentRoomPhotos: Erreur refresh:`, error); if (errorElement) { errorElement.textContent = "Erreur refresh photos."; errorElement.style.display = 'block'; } }
+     finally { if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'none'; }
 }
 
-// --- Autres Helpers (Identiques v8.1) ---
 // collectFormDataWithFiles (Identique v8)
 function collectFormDataWithFiles(form) {
     const formData = new FormData(); const inputs = form.querySelectorAll('input, select, textarea');
@@ -803,7 +689,7 @@ function collectFormDataWithFiles(form) {
         else if (input.type === 'radio') { if (input.checked) formData.append(fieldName, input.value); }
         else { formData.append(fieldName, input.value); }
     });
-     // Ajout ID room pour upload (gardé de v9+)
+     // Ajout ID room pour upload (ajouté pour cohérence)
      if (form.getAttribute('data-xano-form') === 'upload_multiple_photos') {
           const roomIdInput = form.querySelector('[data-xano-field-name="property_photos_rooms_id"]');
           if (roomIdInput && roomIdInput.value) { formData.append('property_photos_rooms_id', roomIdInput.value); }
