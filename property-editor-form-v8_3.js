@@ -88,7 +88,7 @@ function setupRoomTypeSelection() {
 }
 
 function setupCreatedRoomSelection(client) {
-    console.log("--- Entrée dans setupCreatedRoomSelection (v8.3) ---");
+    console.log("--- Entrée dans setupCreatedRoomSelection (v8.6) ---");
     if (!client) { console.error("ERREUR: Client Xano manquant !"); return; }
     const photoUploadForm = document.querySelector('[data-xano-form="upload_multiple_photos"]');
     const photoDisplayContainer = document.querySelector('#room-photos-display');
@@ -102,7 +102,7 @@ function setupCreatedRoomSelection(client) {
     console.log("setupCreatedRoomSelection: Vérifications OK.");
 
     listContainer.addEventListener('click', async function handleRoomClickFinal(event) {
-        console.log("--- CLIC ROOM DÉTECTÉ (v8.3) ---");
+        console.log("--- CLIC ROOM DÉTECTÉ (v8.6) ---");
         const selectedElement = event.target.closest('[data-action="select-created-room"][data-room-id]');
         if (selectedElement) {
             const roomDbId = selectedElement.getAttribute('data-room-id');
