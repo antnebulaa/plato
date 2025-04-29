@@ -519,9 +519,9 @@ function bindDataToElement(element, data) {
     if (element.hasAttribute('data-xano-link-to') && data?.id !== undefined) element.setAttribute('data-xano-data-id', data.id);
 }
 
-// --- Sélection/Suppression Photos (MODIFIÉ v8 -> v8.3) ---
+// --- Sélection/Suppression Photos (MODIFIÉ v8.3 -> v8.7 : Écouteur Clic Corrigé) ---
 function setupPhotoSelectionMode() {
-    console.log("SETUP: Initialisation mode sélection photo (v8.3).");
+    console.log("SETUP: Initialisation mode sélection photo (v8.7).");
     const boutonModeSelection = document.getElementById('bouton-mode-selection');
     const conteneurPhotosParent = document.getElementById('room-photos-display'); // Conteneur parent stable
     const photoListContainer = document.getElementById('photo-list-container'); // Conteneur des items
@@ -596,11 +596,12 @@ function setupPhotoSelectionMode() {
     conteneurPhotosParent.addEventListener('click', function(event) { // Écouteur sur le parent
         console.log("DEBUG: Clic détecté sur conteneurPhotosParent (#room-photos-display).");
         if (!modeSelectionActif) { console.log("DEBUG: Clic ignoré (mode sélection inactif)."); return; }
-        const clickedPhotoElement = event.target.closest('[data-photo-id]'); // Cible l'élément parent avec l'ID
-        // Vérifie si l'élément trouvé est bien DANS le conteneur de liste ET est un item généré
-        if (!clickedPhotoElement || !clickedPhotoElement.hasAttribute('data-xano-list-item') || !photoListContainer.contains(clickedPhotoElement)) {
-            console.log("DEBUG: Clic ignoré (cible n'est pas un item photo valide). Cible:", event.target);
-            return;
+       const clickedPhotoElement = event.target.closest('[data-xano-list-item][data-photo-id]'); // Cible l'élément parent avec l'ID
+      
+        // Vérifie si cet élément est bien un item de liste généré
+    if (!clickedPhotoElement || !clickedPhotoElement.hasAttribute('data-xano-list-item')) {
+        // Clic ignoré
+        return;
         }
         console.log("DEBUG: Élément photo cliqué trouvé:", clickedPhotoElement);
         const photoIdString = clickedPhotoElement.getAttribute('data-photo-id');
