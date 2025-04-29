@@ -521,7 +521,7 @@ function bindDataToElement(element, data) {
 
 // --- Sélection/Suppression Photos (MODIFIÉ v8 -> v8.final) ---
 function setupPhotoSelectionMode() {
-    console.log("SETUP: Initialisation mode sélection photo (v8.final).");
+    console.log("SETUP: Initialisation mode sélection photo (v8.5).");
     const boutonModeSelection = document.getElementById('bouton-mode-selection');
     const conteneurPhotosParent = document.getElementById('room-photos-display'); // Conteneur parent stable
     const photoListContainer = document.getElementById('photo-list-container'); // Conteneur des items
@@ -589,16 +589,22 @@ function setupPhotoSelectionMode() {
         else { boutonModeSelection.textContent = "Sélectionner les photos"; conteneurPhotosParent.classList.remove('selection-active'); photosSelectionneesIds = []; if (photoListContainer) photoListContainer.querySelectorAll('.is-photo-selected').forEach(el => el.classList.remove('is-photo-selected')); }
         updateDeleteButtonVisibility();
      });
-    console.log("SETUP: Écouteur bouton mode sélection OK (v8.final).");
+    console.log("SETUP: Écouteur bouton mode sélection OK (v8.5).");
 
 
     // --- Écouteur sélection individuelle (MODIFIÉ v8 -> v8.final: utilise ID et délégation) ---
     conteneurPhotosParent.addEventListener('click', function(event) { // Écouteur sur le parent
         console.log("DEBUG: Clic détecté sur conteneurPhotosParent (#room-photos-display).");
         if (!modeSelectionActif) { console.log("DEBUG: Clic ignoré (mode sélection inactif)."); return; }
-        const clickedPhotoElement = event.target.closest('#photo-list-container [data-photo-id]'); // Cible une photo DANS le list-container
-        if (!clickedPhotoElement) { console.log("DEBUG: Clic ignoré (cible pas une photo valide). Cible:", event.target); return; }
+        const clickedPhotoElement = event.target.closest('[data-photo-id]'); // Cible une photo DANS le list-container
+      
+         // Vérifie si l'élément trouvé est bien DANS le conteneur de liste (pour éviter de sélectionner autre chose)
+        if (!clickedPhotoElement || !photoListContainer.contains(clickedPhotoElement)) {
+            console.log("DEBUG: Clic ignoré (cible n'est pas une photo [data-photo-id] dans #photo-list-container). Cible réelle:", event.target);
+            return;
+        }
         console.log("DEBUG: Élément photo cliqué trouvé:", clickedPhotoElement);
+
         const photoIdString = clickedPhotoElement.getAttribute('data-photo-id');
         const photoId = parseInt(photoIdString, 10);
         if (isNaN(photoId)) { console.warn("DEBUG: Clic photo mais ID invalide:", photoIdString); return; }
