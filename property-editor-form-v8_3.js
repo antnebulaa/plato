@@ -88,7 +88,7 @@ function setupRoomTypeSelection() {
 }
 
 function setupCreatedRoomSelection(client) {
-    console.log("--- Entrée dans setupCreatedRoomSelection (v8.6) ---");
+    console.log("--- Entrée dans setupCreatedRoomSelection (v8.9) ---");
     if (!client) { console.error("ERREUR: Client Xano manquant !"); return; }
     const photoUploadForm = document.querySelector('[data-xano-form="upload_multiple_photos"]');
     const photoDisplayContainer = document.querySelector('#room-photos-display');
@@ -102,7 +102,7 @@ function setupCreatedRoomSelection(client) {
     console.log("setupCreatedRoomSelection: Vérifications OK.");
 
     listContainer.addEventListener('click', async function handleRoomClickFinal(event) {
-        console.log("--- CLIC ROOM DÉTECTÉ (v8.6) ---");
+        console.log("--- CLIC ROOM DÉTECTÉ (v8.9) ---");
         const selectedElement = event.target.closest('[data-action="select-created-room"][data-room-id]');
         if (selectedElement) {
             const roomDbId = selectedElement.getAttribute('data-room-id');
@@ -519,9 +519,9 @@ function bindDataToElement(element, data) {
     if (element.hasAttribute('data-xano-link-to') && data?.id !== undefined) element.setAttribute('data-xano-data-id', data.id);
 }
 
-// --- Sélection/Suppression Photos (MODIFIÉ v8.3 -> v8.7 : Écouteur Clic Corrigé) ---
+// --- Sélection/Suppression Photos (MODIFIÉ v8.3 -> v8.9 : Écouteur Clic Corrigé) ---
 function setupPhotoSelectionMode() {
-    console.log("SETUP: Initialisation mode sélection photo (v8.7).");
+    console.log("SETUP: Initialisation mode sélection photo (v8.9).");
     const boutonModeSelection = document.getElementById('bouton-mode-selection');
     const conteneurPhotosParent = document.getElementById('room-photos-display'); // Conteneur parent stable
     const photoListContainer = document.getElementById('photo-list-container'); // Conteneur des items
@@ -592,18 +592,23 @@ function setupPhotoSelectionMode() {
     console.log("SETUP: Écouteur bouton mode sélection OK (v8.3).");
 
 
-    // --- Écouteur sélection individuelle (MODIFIÉ v8 -> v8.3: utilise ID et délégation) ---
-    conteneurPhotosParent.addEventListener('click', function(event) { // Écouteur sur le parent
-        console.log("DEBUG: Clic détecté sur conteneurPhotosParent (#room-photos-display).");
-        if (!modeSelectionActif) { console.log("DEBUG: Clic ignoré (mode sélection inactif)."); return; }
-       const clickedPhotoElement = event.target.closest('[data-xano-list-item][data-photo-id]'); // Cible l'élément parent avec l'ID
-      
-        // Vérifie si cet élément est bien un item de liste généré
-    if (!clickedPhotoElement || !clickedPhotoElement.hasAttribute('data-xano-list-item')) {
-        // Clic ignoré
-        return;
+    // --- Écouteur sélection individuelle (MODIFIÉ v8.3 -> v8.9: Clic Direct Corrigé) ---
+    // On attache l'écouteur directement au conteneur des items photos
+    photoListContainer.addEventListener('click', function(event) {
+        console.log("DEBUG v8.9: Clic détecté sur photoListContainer.");
+        if (!modeSelectionActif) { console.log("DEBUG v8.9: Clic ignoré (mode sélection inactif)."); return; }
+
+        // Cherche l'élément parent le plus proche qui est un item de la liste ET qui a un ID photo
+        // C'est l'élément qui a été cloné et qui représente une photo
+        const clickedPhotoElement = event.target.closest('[data-xano-list-item][data-photo-id]');
+
+        if (!clickedPhotoElement) {
+            // Si on ne trouve pas en remontant depuis la cible, le clic n'était pas sur un item photo valide.
+            console.log("DEBUG v8.9: Clic ignoré (cible n'est pas un item photo valide [data-xano-list-item][data-photo-id]). Cible réelle:", event.target);
+            return;
         }
-        console.log("DEBUG: Élément photo cliqué trouvé:", clickedPhotoElement);
+        console.log("DEBUG v8.9: Élément photo cliqué trouvé:", clickedPhotoElement);
+
         const photoIdString = clickedPhotoElement.getAttribute('data-photo-id');
         const photoId = parseInt(photoIdString, 10);
         if (isNaN(photoId)) { console.warn("DEBUG: Clic photo mais ID invalide:", photoIdString); return; }
