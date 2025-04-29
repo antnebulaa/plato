@@ -594,7 +594,8 @@ function setupPhotoSelectionMode() {
 
  // --- Écouteur sélection individuelle (CORRIGÉ pour cibler l'embed) ---
 photoListContainer.addEventListener('click', function(event) {
-    console.log("DEBUG: Clic détecté sur photoListContainer.");
+    console.log("!!! PHOTO CLICK HANDLER DÉCLENCHÉ !!!");
+  console.log(">>> Cible initiale du clic (event.target):", event.target);
     if (!modeSelectionActif) {
         console.log("DEBUG: Clic ignoré (mode sélection inactif).");
         return;
@@ -635,7 +636,7 @@ photoListContainer.addEventListener('click', function(event) {
         console.log("DEBUG: photosSelectionneesIds actuel:", photosSelectionneesIds);
         updateDeleteButtonVisibility();
     });
-    console.log("SETUP: Écouteur sélection photo (par délégation sur #room-photos-display) OK (v8.3).");
+    console.log("DEBUG: Attachement écouteur clic photo sur photoListContainer EXÉCUTÉ.");
 
     // --- Écouteur bouton Supprimer (Ouvre modale - Identique v8.1) ---
     if (boutonSupprimerSelection) {
