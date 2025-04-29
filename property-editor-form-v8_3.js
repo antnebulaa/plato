@@ -592,51 +592,7 @@ function setupPhotoSelectionMode() {
     console.log("SETUP: Écouteur bouton mode sélection OK (v8.3).");
 
 
- // --- Écouteur sélection individuelle (CORRIGÉ pour cibler l'embed) ---
-photoListContainer.addEventListener('click', function(event) {
-    console.log("!!! PHOTO CLICK HANDLER DÉCLENCHÉ !!!");
-  console.log(">>> Cible initiale du clic (event.target):", event.target);
-    if (!modeSelectionActif) {
-        console.log("DEBUG: Clic ignoré (mode sélection inactif).");
-        return;
-    }
 
-        // 1. Trouver l'élément de liste parent (photo-item-template cloné)
-    const clickedListItem = event.target.closest('[data-xano-list-item][data-photo-id]');
-
-    if (!clickedListItem) {
-        console.log("DEBUG: Clic ignoré (cible n'est pas un item photo valide). Cible réelle:", event.target);
-        return;
-    }
-    console.log("DEBUG: Élément liste cliqué trouvé:", clickedListItem);
-
-  // 2. *** NOUVEAU: Trouver l'élément EMBED à l'intérieur de l'élément de liste ***
-    // ▼▼▼ REMPLACEZ '.div-room-photo-embed' par le VRAI sélecteur de votre embed Div ▼▼▼
-    const photoEmbedElement = clickedListItem.querySelector('.Div.Room.Photo');
-    // ▲▲▲ REMPLACEZ '.div-room-photo-embed' par le VRAI sélecteur de votre embed Div ▲▲▲
-
-    if (!photoEmbedElement) {
-         console.warn("DEBUG: Élément embed (.div-room-photo-embed ou autre sélecteur) non trouvé dans l'item:", clickedListItem);
-         // Si l'embed n'est pas trouvé, on ne peut pas appliquer le style comme attendu.
-         // Vous pourriez choisir d'arrêter ici ou d'appliquer au parent comme avant (mais ça ne corrigera pas le visuel).
-         return; // Arrêter si l'embed est essentiel pour le style.
-    }
-
-        const photoIdString = clickedPhotoElement.getAttribute('data-photo-id');
-        const photoId = parseInt(photoIdString, 10);
-        if (isNaN(photoId)) { console.warn("DEBUG: Clic photo mais ID invalide:", photoIdString); return; }
-        console.log(`DEBUG: ID photo extrait: ${photoId}`);
-  
-        clickedPhotoElement.classList.toggle('is-photo-selected');
-        const isNowSelected = clickedPhotoElement.classList.contains('is-photo-selected');
-        console.log(`DEBUG: Photo [ID: ${photoId}] sélectionnée: ${isNowSelected}`);
-        const indexInSelection = photosSelectionneesIds.indexOf(photoId);
-        if (isNowSelected && indexInSelection === -1) { photosSelectionneesIds.push(photoId); console.log("DEBUG: ID ajouté."); }
-        else if (!isNowSelected && indexInSelection > -1) { photosSelectionneesIds.splice(indexInSelection, 1); console.log("DEBUG: ID retiré."); }
-        console.log("DEBUG: photosSelectionneesIds actuel:", photosSelectionneesIds);
-        updateDeleteButtonVisibility();
-    });
-    console.log("DEBUG: Attachement écouteur clic photo sur photoListContainer EXÉCUTÉ.");
 
     // --- Écouteur bouton Supprimer (Ouvre modale - Identique v8.1) ---
     if (boutonSupprimerSelection) {
@@ -668,6 +624,83 @@ photoListContainer.addEventListener('click', function(event) {
     function openDeleteModal() { const h = document.getElementById('hidden-delete-modal-trigger'); if (h) h.click(); else console.error("Trigger modal caché introuvable !"); }
     function closeDeleteModal() { const c = document.querySelector('[fs-modal-element="close"]'); if (c) try { c.click(); } catch(e) { console.error("Erreur clic fermeture:", e); } else console.warn("Élément fermeture modal introuvable."); }
     updateDeleteButtonVisibility();
+
+
+  // Placez ce bloc par exemple à la fin de la fonction setupPhotoSelectionMode,
+// ou juste avant la fin du bloc DOMContentLoaded
+
+document.addEventListener('click', function(event) {
+    // 1. Vérifier si le mode sélection est actif
+    //    (Assurez-vous que la variable 'modeSelectionActif' est accessible ici.
+    //     Si ce code est HORS de setupPhotoSelectionMode, elle doit être globale)
+    if (typeof modeSelectionActif === 'undefined' || !modeSelectionActif) {
+        return; // Ignorer si le mode n'est pas actif
+    }
+
+    // 2. Vérifier si la cible du clic est bien à l'intérieur du conteneur de photos
+    const photoListContainer = document.getElementById('photo-list-container');
+    // Vérifier aussi l'existence de event.target avant d'appeler contains
+    if (!photoListContainer || !event.target || !photoListContainer.contains(event.target)) {
+        return; // Clic en dehors de la zone des photos
+    }
+
+    console.log("!!! DOCUMENT CLICK LISTENER: Clic détecté dans la zone photos en mode sélection.");
+    console.log(">>> Cible initiale du clic (event.target):", event.target);
+
+    // 3. Trouver l'élément de liste parent le plus proche (celui avec data-photo-id)
+    const clickedListItem = event.target.closest('[data-xano-list-item][data-photo-id]');
+
+    if (!clickedListItem) {
+        // Le clic était dans le conteneur mais pas sur un item photo identifiable
+        console.log("DEBUG (document listener): Clic dans container mais pas sur item photo valide.");
+        return;
+    }
+
+    // 4. Trouver l'élément embed à l'intérieur
+    const photoEmbedElement = clickedListItem.querySelector('.Div.Room.Photo'); // Utilise le sélecteur correct
+
+    if (!photoEmbedElement) {
+         console.warn("DEBUG (document listener): Embed Div (.Div.Room.Photo) non trouvé dans l'item:", clickedListItem);
+         return; // Ne peut pas appliquer le style si l'embed n'est pas trouvé
+    }
+
+    // --- Le reste de la logique pour sélectionner/désélectionner ---
+    const photoIdString = clickedListItem.getAttribute('data-photo-id');
+    const photoId = parseInt(photoIdString, 10);
+
+    if (isNaN(photoId)) {
+        console.warn("DEBUG (document listener): ID photo invalide sur l'item:", photoIdString);
+        return;
+    }
+
+    console.log(`DEBUG (document listener): Traitement clic pour photo ID: ${photoId}`);
+
+    photoEmbedElement.classList.toggle('is-photo-selected');
+    const isNowSelected = photoEmbedElement.classList.contains('is-photo-selected');
+
+    console.log(`DEBUG: Photo [ID: ${photoId}] sélectionnée: ${isNowSelected}`); // Log existant
+
+    // Mettre à jour le tableau des IDs sélectionnés (assurez-vous que photosSelectionneesIds est accessible)
+    const indexInSelection = photosSelectionneesIds.indexOf(photoId);
+    if (isNowSelected && indexInSelection === -1) {
+        photosSelectionneesIds.push(photoId);
+        console.log("DEBUG: ID ajouté."); // Log existant
+    } else if (!isNowSelected && indexInSelection > -1) {
+        photosSelectionneesIds.splice(indexInSelection, 1);
+        console.log("DEBUG: ID retiré."); // Log existant
+    }
+    console.log("DEBUG: photosSelectionneesIds actuel:", photosSelectionneesIds); // Log existant
+
+    // Mettre à jour la visibilité du bouton Supprimer
+    // (Assurez-vous que updateDeleteButtonVisibility est accessible ou déplacez cet appel)
+    if (typeof updateDeleteButtonVisibility === 'function') {
+         updateDeleteButtonVisibility();
+    }
+
+
+}, true); // <--- IMPORTANT: Le 'true' utilise la phase de capture
+
+console.log("DEBUG: Écouteur de clic global (document, capture phase) attaché.");
 }
 
 // --- Fonctions Utilitaires (Helpers) ---
