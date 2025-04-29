@@ -592,27 +592,40 @@ function setupPhotoSelectionMode() {
     console.log("SETUP: Écouteur bouton mode sélection OK (v8.3).");
 
 
-    // --- Écouteur sélection individuelle (MODIFIÉ v8.3 -> v8.9: Clic Direct Corrigé) ---
-    // On attache l'écouteur directement au conteneur des items photos
-    photoListContainer.addEventListener('click', function(event) {
-        console.log("DEBUG v8.9: Clic détecté sur photoListContainer.");
-        if (!modeSelectionActif) { console.log("DEBUG v8.9: Clic ignoré (mode sélection inactif)."); return; }
+ // --- Écouteur sélection individuelle (CORRIGÉ pour cibler l'embed) ---
+photoListContainer.addEventListener('click', function(event) {
+    console.log("DEBUG: Clic détecté sur photoListContainer.");
+    if (!modeSelectionActif) {
+        console.log("DEBUG: Clic ignoré (mode sélection inactif).");
+        return;
+    }
 
-        // Cherche l'élément parent le plus proche qui est un item de la liste ET qui a un ID photo
-        // C'est l'élément qui a été cloné et qui représente une photo
-        const clickedPhotoElement = event.target.closest('[data-xano-list-item][data-photo-id]');
+        // 1. Trouver l'élément de liste parent (photo-item-template cloné)
+    const clickedListItem = event.target.closest('[data-xano-list-item][data-photo-id]');
 
-        if (!clickedPhotoElement) {
-            // Si on ne trouve pas en remontant depuis la cible, le clic n'était pas sur un item photo valide.
-            console.log("DEBUG v8.9: Clic ignoré (cible n'est pas un item photo valide [data-xano-list-item][data-photo-id]). Cible réelle:", event.target);
-            return;
-        }
-        console.log("DEBUG v8.9: Élément photo cliqué trouvé:", clickedPhotoElement);
+    if (!clickedListItem) {
+        console.log("DEBUG: Clic ignoré (cible n'est pas un item photo valide). Cible réelle:", event.target);
+        return;
+    }
+    console.log("DEBUG: Élément liste cliqué trouvé:", clickedListItem);
+
+  // 2. *** NOUVEAU: Trouver l'élément EMBED à l'intérieur de l'élément de liste ***
+    // ▼▼▼ REMPLACEZ '.div-room-photo-embed' par le VRAI sélecteur de votre embed Div ▼▼▼
+    const photoEmbedElement = clickedListItem.querySelector('.Div.Room.Photo');
+    // ▲▲▲ REMPLACEZ '.div-room-photo-embed' par le VRAI sélecteur de votre embed Div ▲▲▲
+
+    if (!photoEmbedElement) {
+         console.warn("DEBUG: Élément embed (.div-room-photo-embed ou autre sélecteur) non trouvé dans l'item:", clickedListItem);
+         // Si l'embed n'est pas trouvé, on ne peut pas appliquer le style comme attendu.
+         // Vous pourriez choisir d'arrêter ici ou d'appliquer au parent comme avant (mais ça ne corrigera pas le visuel).
+         return; // Arrêter si l'embed est essentiel pour le style.
+    }
 
         const photoIdString = clickedPhotoElement.getAttribute('data-photo-id');
         const photoId = parseInt(photoIdString, 10);
         if (isNaN(photoId)) { console.warn("DEBUG: Clic photo mais ID invalide:", photoIdString); return; }
         console.log(`DEBUG: ID photo extrait: ${photoId}`);
+  
         clickedPhotoElement.classList.toggle('is-photo-selected');
         const isNowSelected = clickedPhotoElement.classList.contains('is-photo-selected');
         console.log(`DEBUG: Photo [ID: ${photoId}] sélectionnée: ${isNowSelected}`);
