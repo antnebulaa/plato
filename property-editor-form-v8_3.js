@@ -548,103 +548,107 @@ function setupPhotoSelectionMode() {
     }
 
     // --- Fonction Principale pour Exécuter la Suppression (VERSION V8 - utilise les paths) ---
+// MODIFIÉ v8.3: Utilise les IDs et le nouvel endpoint delete (CORRIGÉ pour clé payload + check succès)
 async function executeDelete() {
-    // photosSelectionneesIds contient des PATHS ici
-    console.log(`Exécution suppression confirmée pour ${photosSelectionneesIds.length} photo(s) dans la room ${currentSelectedRoomId}. Paths:`, photosSelectionneesIds);
-    const modalConfirmBtn = document.getElementById('modal-confirm-delete-button');
-    if (modalConfirmBtn) {
-         modalConfirmBtn.disabled = true;
+    // photosSelectionneesIds contient maintenant des IDs numériques (correct grâce à la modif précédente)
+    if (photosSelectionneesIds.length === 0 || currentSelectedRoomId === null) {
+         console.error("executeDelete: Aucune photo sélectionnée ou room ID inconnu.");
+         return;
     }
-
+    // Log qui montre bien les IDs
+    console.log(`Exécution suppression pour ${photosSelectionneesIds.length} photo(s) [IDs: ${photosSelectionneesIds.join(', ')}] dans room ${currentSelectedRoomId}.`);
+    const modalConfirmBtn = document.getElementById('modal-confirm-delete-button');
+    if (modalConfirmBtn) modalConfirmBtn.disabled = true;
     let scrollPos = window.scrollY || document.documentElement.scrollTop;
-    console.log("Scroll position before delete/refresh:", scrollPos);
 
-    // Préparer le payload pour l'API Xano V8 (attend les paths)
+    // *** CORRECTION CLÉ : Utiliser 'photo_ids' comme nom de clé dans le payload ***
     const payload = {
-        room_id: parseInt(currentSelectedRoomId, 10),
-        photo_paths: photosSelectionneesIds // <<< Envoie les paths
+         photo_ids: photosSelectionneesIds, // <<< CORRIGÉ: Utilise 'photo_ids'
+         room_id: parseInt(currentSelectedRoomId, 10)
     };
-    // Endpoint V8 (vérifiez le nom exact utilisé par votre V8)
-    const deleteEndpoint = 'property_photos/batch_delete_by_ids'; // <<< Endpoint V8 qui prend les paths
-    const deleteMethod = 'POST'; // <<< Méthode V8 (souvent POST pour un batch)
-    // OU 'DELETE' si votre API v8 utilisait DELETE avec un body (moins courant mais possible)
+    // **************************************************************************
+
+    const deleteEndpoint = 'property_photos/batch_delete_by_ids'; // Endpoint correct
+    // Vérifiez la méthode HTTP attendue par VOTRE endpoint /batch_delete_by_ids
+    // Si c'est DELETE (comme dans les versions précédentes du script v8.3):
+    const deleteMethod = 'DELETE';
+    // Si c'est POST:
+    // const deleteMethod = 'POST'; // Décommentez si c'est POST et commentez la ligne DELETE
+
+    console.log("Appel API - Endpoint:", deleteEndpoint, "Méthode:", deleteMethod, "Payload:", payload); // Log pour vérifier l'envoi
 
     try {
-        // Appel API via le client Xano
-        // Note: Dans V8, xanoClient._request n'était peut-être pas utilisé directement
-        // ou la vérification de succès était différente. Adaptez si besoin.
-        // Utilisation de la méthode _request pour être cohérent avec les versions récentes
-        // Si votre V8 utilisait xanoClient.post ou .delete directement:
-        // const response = await xanoClient.post(deleteEndpoint, payload); // Ou .delete
+         let response;
+         // Adapter l'appel en fonction de la méthode HTTP de votre endpoint
+         if (deleteMethod === 'DELETE') {
+              // Utilise la méthode delete du client qui peut envoyer un body JSON (version v8.3 du client)
+              response = await xanoClient.delete(deleteEndpoint, payload);
+         } else if (deleteMethod === 'POST') {
+              // Utilise la méthode post du client
+              response = await xanoClient.post(deleteEndpoint, payload, false); // false = not FormData
+         } else {
+              throw new Error(`Méthode ${deleteMethod} non gérée pour la suppression.`);
+         }
 
-        const response = await xanoClient._request(deleteMethod, deleteEndpoint, payload, false); // false = not FormData
-        console.log('>>> RAW Response from _request (V8 logic):', response);
+        console.log(">>> RAW Response from API:", response); // Log de la réponse brute
 
-        // --- Logique de Vérification du Succès V8 (Simplifiée/Adaptée) ---
-        // V8 n'avait peut-être pas de check 'success'. Une réponse non-erreur suffisait.
-        let success = true; // Supposons succès sauf si erreur levée
-        // Alternative: vérifier si response est null/undefined (pour 204) ou un objet attendu
-        if (response && typeof response === 'object' && response.success === false) {
-             success = false; // Si l'API renvoie explicitement success: false
-             console.warn("API a indiqué un échec (V8 logic check). Response:", response);
+        // --- Logique de Vérification du Succès AMÉLIORÉE ---
+        let success = false;
+        let deletedCount = 0; // Initialise à 0
+
+        if (response && typeof response === 'object') {
+             // Si l'API renvoie bien un objet avec success et deleted_count
+             if (response.success === true) {
+                  success = true;
+                  deletedCount = parseInt(response.deleted_count, 10) || 0; // Récupère le compte
+             }
+             // Si l'API renvoie { deleted_count: X } sans 'success', on peut le considérer comme succès si > 0
+             // else if (response.deleted_count !== undefined && parseInt(response.deleted_count, 10) > 0) {
+             //      success = true;
+             //      deletedCount = parseInt(response.deleted_count, 10);
+             // }
+        } else if (deleteMethod === 'DELETE' && response === null) {
+             // Cas d'un DELETE réussi avec 204 No Content
+             success = true;
+             deletedCount = photosSelectionneesIds.length; // On suppose qu'elles ont toutes été supprimées
+             console.warn("Suppression DELETE a réussi (204 No Content), deleted_count supposé.");
         }
         // --- Fin Vérification Succès ---
 
-        if (success) {
-            console.log('Photos supprimées avec succès (API call V8 logic OK)!');
+        // On vérifie maintenant si success ET si deletedCount > 0
+        if (success && deletedCount > 0) {
+             console.log(`${deletedCount} photo(s) supprimée(s) avec succès (API OK)!`);
 
-            // Rafraîchissement (identique à v8.3)
-            console.log(`Rafraîchissement des photos pour la room ${currentSelectedRoomId}...`);
-            const conteneurPhotos = document.getElementById('room-photos-display'); // Assure-toi que c'est la bonne variable
-            const photoLoadingIndicator = conteneurPhotos ? conteneurPhotos.querySelector('[data-xano-loading]') : null;
-            const fetchEndpoint = `property_photos/photos/${currentSelectedRoomId}`;
+             // Rafraîchissement seulement si la suppression a réussi ET a supprimé qqc
+             await refreshCurrentRoomPhotos(xanoClient); // Assurez-vous que refreshCurrentRoomPhotos est bien définie et accessible
+             setTimeout(() => { window.scrollTo({ top: scrollPos, behavior: 'auto' }); }, 100);
 
-            if (conteneurPhotos && xanoClient) {
-                if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'block';
-                try {
-                    // fetchXanoData est une fonction commune, ok de la garder
-                    await fetchXanoData(xanoClient, fetchEndpoint, 'GET', null, conteneurPhotos, photoLoadingIndicator);
-                    console.log("Rafraîchissement terminé.");
-                    // Restaurer scroll
-                    setTimeout(() => {
-                      console.log("Attempting to restore scroll position to:", scrollPos);
-                      window.scrollTo({ top: scrollPos, behavior: 'auto' });
-                    }, 100); // Léger délai peut aider
-                } catch (fetchError) {
-                    console.error("Erreur lors du rafraîchissement post-suppression:", fetchError);
-                    alert("Photos supprimées, mais erreur lors de la mise à jour de l'affichage.");
-                } finally {
-                    if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'none';
-                }
-            } else {
-                console.warn("Impossible de rafraîchir: conteneurPhotos ou xanoClient manquant.");
-                alert("Photos supprimées, mais rafraîchissement auto échoué.");
-            }
+             // Réinitialiser l'état
+             photosSelectionneesIds = [];
+             modeSelectionActif = false;
+             if (boutonModeSelection) boutonModeSelection.textContent = "Sélectionner les photos";
+             // Récupérer le conteneur principal pour enlever la classe active
+             const photoDisplayContainer = document.getElementById('room-photos-display');
+             if (photoDisplayContainer) photoDisplayContainer.classList.remove('selection-active');
 
-            // Réinitialiser l'état (identique v8.3)
-            photosSelectionneesIds = []; // Vider tableau des paths
-            modeSelectionActif = false;
-            if (boutonModeSelection) boutonModeSelection.textContent = "Sélectionner les photos";
-            // 'conteneurPhotosParent' n'existe pas ici, utiliser 'conteneurPhotos' (la variable de cette fonction)
-            if (conteneurPhotos) conteneurPhotos.classList.remove('selection-active');
-            updateDeleteButtonVisibility();
+             // Mettre à jour bouton supprimer (updateDeleteButtonVisibility doit être accessible)
+             if(typeof updateDeleteButtonVisibility === 'function') updateDeleteButtonVisibility();
 
         } else {
-            // Échec API v8
-            console.error(`La suppression V8 a échoué. Raw response:`, response);
-            let errorMessage = "La suppression des photos a échoué.";
-            if (response && response.message) { errorMessage += ` Message: ${response.message}`; }
-            alert(errorMessage);
+             // La suppression a échoué OU n'a rien supprimé (deleted_count: 0)
+             console.error(`La suppression a échoué ou n'a supprimé aucune photo (deleted_count: ${deletedCount}). Response:`, response);
+             alert(`Erreur: La suppression a échoué ou aucune photo correspondante n'a été trouvée (Count: ${deletedCount}). Vérifiez la console.`);
         }
 
-    } catch (error) { // Erreur réseau ou autre
-        console.error("Erreur lors du processus de suppression V8:", error);
-        alert("Erreur réseau/technique lors de la suppression: " + error.message);
+    } catch (error) { // Erreur réseau/JS pendant l'appel
+        console.error("Erreur processus suppression API:", error);
+        alert("Erreur technique lors de la suppression: " + error.message);
     } finally {
-        closeDeleteModal(); // Fonction helper V8
-        if (modalConfirmBtn) {
-             modalConfirmBtn.disabled = false;
-        }
+         // Assurer la fermeture de la modale et la réactivation du bouton
+         if (typeof closeDeleteModal === 'function') { // Vérifie que la fonction existe
+             closeDeleteModal();
+         } else { console.warn("La fonction closeDeleteModal n'est pas définie."); }
+         if (modalConfirmBtn) modalConfirmBtn.disabled = false;
     }
 } // --- FIN de executeDelete (VERSION V8) ---
 
