@@ -861,15 +861,33 @@ async function refreshCurrentRoomPhotos(client) {
          await fetchXanoData(client, photoEndpoint, 'GET', null, photoDisplayContainer, photoLoadingIndicator);
          console.log(`refreshCurrentRoomPhotos: Rafraîchissement photos terminé.`);
          const photoList = document.getElementById('photo-list-container');
-         if (photoList && photoList.children.length > 0) {
+        
+       if (photoList && photoList.children.length > 0) {
              console.log("refreshCurrentRoomPhotos: Tentative ré-initialisation SortableJS...");
              if (typeof Sortable !== 'undefined') {
-                 currentSortableInstance = new Sortable(photoList, {
-                     animation: 150, ghostClass: 'sortable-ghost',
-                     onStart: function(evt) { console.log("DEBUG: SortableJS onStart"); const btn = document.getElementById('bouton-supprimer-selection'); if (modeSelectionActif && btn) btn.disabled = true; },
-                     onEnd: function(evt) { console.log("DEBUG: SortableJS onEnd"); handleSortEnd(evt); } // Appelle la fonction modifiée
-                 });
-                 console.log("refreshCurrentRoomPhotos: SortableJS ré-initialisé:", currentSortableInstance);
+               
+                 currentSortableInstance = new Sortable(photoList, { // Début des options
+               // === OPTION À GARDER ===
+               animation: 150,
+
+               // === OPTIONS À METTRE EN COMMENTAIRE (AJOUTEZ // DEVANT) ===
+               // ghostClass: 'sortable-ghost', // Ligne commentée
+
+               // onStart: function(evt) { // Ligne commentée
+               //     console.log("DEBUG: SortableJS onStart"); // Ligne commentée
+               //     const btn = document.getElementById('bouton-supprimer-selection'); // Ligne commentée
+               //     if (modeSelectionActif && btn) btn.disabled = true; // Ligne commentée
+               // }, // Ligne commentée
+
+               // onEnd: function(evt) { // Ligne commentée
+               //     console.log("DEBUG: SortableJS onEnd"); // Ligne commentée
+               //     handleSortEnd(evt); // Ligne commentée
+               // } // Ligne commentée
+               // ============================================================
+
+           }); // Fin des options
+               
+                 console.log("refreshCurrentRoomPhotos: SortableJS ré-initialisé (TEST MINIMAL):", currentSortableInstance); // GARDER CE LOG
              } else { console.error("refreshCurrentRoomPhotos: SortableJS n'est pas défini !"); }
          } else console.log("refreshCurrentRoomPhotos: Pas de photos à trier.");
      } catch (error) { console.error(`refreshCurrentRoomPhotos: Erreur refresh:`, error); if (errorElement) { errorElement.textContent = "Erreur refresh photos."; errorElement.style.display = 'block'; } }
