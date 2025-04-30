@@ -565,7 +565,7 @@ async function executeDelete() {
         photo_paths: photosSelectionneesIds // <<< Envoie les paths
     };
     // Endpoint V8 (vérifiez le nom exact utilisé par votre V8)
-    const deleteEndpoint = 'property_photos/batch_delete'; // <<< Endpoint V8 qui prend les paths
+    const deleteEndpoint = 'property_photos/batch_delete_by_ids'; // <<< Endpoint V8 qui prend les paths
     const deleteMethod = 'POST'; // <<< Méthode V8 (souvent POST pour un batch)
     // OU 'DELETE' si votre API v8 utilisait DELETE avec un body (moins courant mais possible)
 
