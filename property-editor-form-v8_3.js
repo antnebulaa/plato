@@ -872,7 +872,7 @@ async function refreshCurrentRoomPhotos(client) {
                animation: 150,
 
                // === OPTIONS À METTRE EN COMMENTAIRE (AJOUTEZ // DEVANT) ===
-               // ghostClass: 'sortable-ghost', // Ligne commentée
+                ghostClass: 'sortable-ghost', 
 
                // onStart: function(evt) { // Ligne commentée
                //     console.log("DEBUG: SortableJS onStart"); // Ligne commentée
@@ -880,10 +880,10 @@ async function refreshCurrentRoomPhotos(client) {
                //     if (modeSelectionActif && btn) btn.disabled = true; // Ligne commentée
                // }, // Ligne commentée
 
-               // onEnd: function(evt) { // Ligne commentée
-               //     console.log("DEBUG: SortableJS onEnd"); // Ligne commentée
-               //     handleSortEnd(evt); // Ligne commentée
-               // } // Ligne commentée
+                onEnd: function(evt) { 
+                   console.log("DEBUG: SortableJS onEnd"); 
+                   handleSortEnd(evt);
+               } 
                // ============================================================
 
            }); // Fin des options
