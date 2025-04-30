@@ -577,6 +577,45 @@ function renderListData(dataArray, listContainerElement) {
                  else { clone.setAttribute('data-xano-link-target', linkTarget); clone.style.cursor = 'pointer'; }
              }
 
+             // --- NOUVEAU CODE POUR L'IMAGE DE FOND ---
+            // Trouvez la div spécifique dans le clone qui représente la room
+            // Ajustez le sélecteur si nécessaire. S'il n'y a qu'une seule div avec ces attributs par item, ceci devrait fonctionner.
+             // --- NOUVEAU CODE POUR L'IMAGE DE FOND (version photo_order == 1) ---
+            const roomDiv = clone.querySelector(`[data-action="select-created-room"][data-room-id]`);
+
+            // Vérifiez si la div a été trouvée et si les données de l'item (room) contiennent un tableau 'images'
+            // Remplacez 'images' par le nom réel du tableau si différent
+            if (roomDiv && item.images && Array.isArray(item.images)) {
+
+                // Trouver la photo avec photo_order === 1
+                // Remplacez 'photo_order' par le nom exact du champ dans vos données Xano si différent
+                const targetPhoto = item.images.find(photo => photo.photo_order === 1);
+
+                // Vérifier si une photo avec photo_order === 1 a été trouvée et si elle a une URL
+                // Remplacez 'url' par le nom exact du champ URL si différent
+                if (targetPhoto && targetPhoto.url) {
+                    const photoUrl = targetPhoto.url;
+                    roomDiv.style.backgroundImage = `url('${photoUrl}')`;
+                    // Optionnel : Styles pour l'affichage du fond
+                    // roomDiv.style.backgroundSize = 'cover';
+                    // roomDiv.style.backgroundPosition = 'center';
+                    // roomDiv.style.backgroundRepeat = 'no-repeat';
+                } else {
+                    // Optionnel : Si aucune photo avec order=1 n'est trouvée, utiliser la première photo comme fallback ?
+                    // Ou définir un fond par défaut.
+                    if (item.images.length > 0 && item.images[0].url) {
+                        console.warn(`Photo avec order=1 non trouvée pour room ID ${item.id}. Utilisation de la première photo.`);
+                        roomDiv.style.backgroundImage = `url('${item.images[0].url}')`;
+                    } else {
+                        console.warn(`Aucune photo valide (ni order=1, ni la première) trouvée pour room ID ${item.id}.`);
+                        // roomDiv.style.backgroundColor = '#f0f0f0'; // Fond par défaut
+                    }
+                }
+            } else if (roomDiv) {
+                 console.warn("Tableau 'images' non trouvé ou invalide pour room ID:", item.id);
+                 // roomDiv.style.backgroundColor = '#f0f0f0'; // Fond par défaut
+            }
+            // --- FIN DU NOUVEAU CODE ---
 
             // Ajouter le clone au conteneur
             container.appendChild(clone);
