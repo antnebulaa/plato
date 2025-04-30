@@ -771,19 +771,37 @@ console.log("SETUP (v8 adapted logic): Écouteur ajouté au conteneur photos pou
             }
 
             const count = photosSelectionneesIds.length;
-            const firstPhotoPath = photosSelectionneesIds[0];
-            let firstPhotoUrl = '';
-             // Trouver l'URL de la miniature depuis le DOM (logique V8)
-            const firstPhotoDOMElement = conteneurPhotos.querySelector(`[data-photo-path="${firstPhotoPath}"]`);
-            const imgInside = firstPhotoDOMElement?.querySelector('img.photo-item-image');
-            if (imgInside && imgInside.src) { firstPhotoUrl = imgInside.src; }
-            else { console.warn("Impossible de trouver l'URL src pour la première photo:", firstPhotoPath); }
+    // 'photosSelectionneesIds' contient maintenant des IDs, ex: [60]
+    const firstPhotoId = photosSelectionneesIds[0]; // Contient l'ID numérique (ex: 60)
+    let firstPhotoUrl = ''; // Initialise l'URL
 
-            thumbnailElement.src = firstPhotoUrl;
-            thumbnailElement.alt = `Aperçu (${count} photo(s))`;
-            if (count > 1) { badgeElement.textContent = `+${count - 1}`; badgeElement.style.display = 'flex'; }
-            else { badgeElement.style.display = 'none'; }
-            textElement.textContent = `Supprimer ${count} photo${count > 1 ? 's' : ''} ? Action irréversible.`;
+    // Étape 1 : Trouver l'élément photo dans la liste en utilisant l'ID numérique
+    const firstPhotoDOMElement = conteneurPhotos.querySelector(`[data-photo-id="${firstPhotoId}"]`); // Cherche l'élément via [data-photo-id="60"]
+
+    // Étape 2 : Une fois l'élément trouvé, récupérer l'URL depuis son attribut data-photo-path
+    if (firstPhotoDOMElement) {
+        // On lit l'attribut data-photo-path de l'élément qu'on a trouvé grâce à l'ID
+        firstPhotoUrl = firstPhotoDOMElement.getAttribute('data-photo-path'); // Récupère l'URL stockée dans data-photo-path
+        if (!firstPhotoUrl) {
+             // Si l'attribut data-photo-path est manquant ou vide sur cet élément
+             console.warn("Attribut data-photo-path vide ou manquant sur l'élément trouvé pour l'ID:", firstPhotoId);
+             firstPhotoUrl = ''; // Assurer une chaîne vide pour éviter les erreurs
+        }
+    } else {
+         // Si on n'a même pas trouvé l'élément avec le bon data-photo-id
+         console.warn("Impossible de trouver l'élément DOM dans la liste pour l'ID photo:", firstPhotoId);
+         firstPhotoUrl = ''; // Assurer une chaîne vide
+    }
+
+    // Étape 3 : Mettre à jour l'image DANS LA MODALE avec l'URL trouvée (ou une chaîne vide)
+    console.log("Mise à jour src de thumbnailElement avec:", firstPhotoUrl || "URL vide"); // Pour déboguer ce qui est appliqué
+    thumbnailElement.src = firstPhotoUrl;
+    thumbnailElement.alt = `Aperçu (${count} photo(s))`;
+
+    // ... (Mise à jour badgeElement, textElement - reste inchangé) ...
+     if (count > 1) { badgeElement.textContent = `+${count - 1}`; badgeElement.style.display = 'flex'; }
+     else { badgeElement.style.display = 'none'; }
+     textElement.textContent = `Supprimer ${count} photo${count > 1 ? 's' : ''} ? Action irréversible.`;
 
             openDeleteModal(); // Appel Helper V8
         });
