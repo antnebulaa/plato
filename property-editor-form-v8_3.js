@@ -694,37 +694,53 @@ async function executeDelete() {
     console.log("SETUP (v8 logic): Écouteur ajouté au bouton mode sélection.");
 
     // --- Écouteur sur le Conteneur des Photos (pour sélection individuelle - LOGIQUE V8) ---
-    conteneurPhotos.addEventListener('click', function(event) { // <<< Écouteur sur #room-photos-display
-        if (!modeSelectionActif) return; // Ne rien faire si pas en mode sélection
+    // --- Écouteur sur le Conteneur des Photos (MODIFIÉ pour stocker les IDs - Logique V8 adaptée) ---
+conteneurPhotos.addEventListener('click', function(event) { // <<< Écouteur sur #room-photos-display (comme V8)
+    // 1. Vérifier si le mode sélection est actif (inchangé)
+    if (!modeSelectionActif) return;
 
-        // Cible l'élément le plus proche ayant data-photo-path
-        const clickedPhotoElement = event.target.closest('[data-photo-path]');
-        if (!clickedPhotoElement) return; // Clic en dehors d'un élément photo
+    // 2. Trouver l'élément cliqué (logique V8 mais on s'assure qu'il a aussi l'ID)
+    //    On cible l'élément qui a à la fois data-photo-path (pour être sûr que c'est la même cible que V8)
+    //    ET data-photo-id (pour pouvoir récupérer l'ID).
+    const clickedPhotoElement = event.target.closest('[data-photo-path][data-photo-id]');
+    if (!clickedPhotoElement) {
+         console.log("Clic ignoré ou élément photo sans ID/path trouvé.");
+         return; // Clic en dehors ou élément mal configuré
+    }
 
-        const photoPath = clickedPhotoElement.getAttribute('data-photo-path');
-        if (!photoPath) return; // Sécurité
+    // *** 3. MODIFICATION CLÉ : Récupérer l'ID numérique ***
+    const photoIdString = clickedPhotoElement.getAttribute('data-photo-id'); // Récupère l'attribut ID
+    const photoId = parseInt(photoIdString, 10); // Convertit en nombre entier
 
-        // Gérer la classe visuelle SUR L'ÉLÉMENT AVEC data-photo-path
-        clickedPhotoElement.classList.toggle('is-photo-selected');
+    // Vérifier si la conversion en nombre a réussi
+    if (isNaN(photoId)) {
+         console.warn("ID photo invalide (pas un nombre) ou manquant sur l'élément cliqué:", clickedPhotoElement);
+         return; // Ne pas continuer si l'ID n'est pas un nombre valide
+    }
 
-        const isNowSelected = clickedPhotoElement.classList.contains('is-photo-selected');
-        console.log(`Photo [path: ${photoPath}] sélectionnée: ${isNowSelected}`);
+    // 4. Gérer la classe visuelle SUR L'ÉLÉMENT CLIQUE (comme en V8)
+    clickedPhotoElement.classList.toggle('is-photo-selected');
+    const isNowSelected = clickedPhotoElement.classList.contains('is-photo-selected');
+    // Log avec l'ID maintenant pour confirmation
+    console.log(`Photo [ID: ${photoId}] sélectionnée: ${isNowSelected}`);
 
-        // Mettre à jour le tableau des IDs sélectionnés (qui contient des PATHS ici)
-        const indexInSelection = photosSelectionneesIds.indexOf(photoPath);
-        if (isNowSelected && indexInSelection === -1) {
-            photosSelectionneesIds.push(photoPath); // Ajoute le path
-            console.log(`   -> Photo ajoutée au tableau: ${photoPath}`);
-        } else if (!isNowSelected && indexInSelection > -1) {
-            photosSelectionneesIds.splice(indexInSelection, 1); // Retire le path
-            console.log(`   -> Photo retirée du tableau: ${photoPath}`);
-        }
-        console.log("Photos sélectionnées (paths):", photosSelectionneesIds);
+    // *** 5. MODIFICATION CLÉ : Mettre à jour le tableau photosSelectionneesIds avec les IDs ***
+    const indexInSelection = photosSelectionneesIds.indexOf(photoId); // Cherche l'ID numérique
+    if (isNowSelected && indexInSelection === -1) {
+        photosSelectionneesIds.push(photoId); // Ajoute l'ID numérique
+        console.log(`   -> ID ajouté au tableau: ${photoId}`);
+    } else if (!isNowSelected && indexInSelection > -1) {
+        photosSelectionneesIds.splice(indexInSelection, 1); // Retire l'ID numérique
+        console.log(`   -> ID retiré du tableau: ${photoId}`);
+    }
+    // Afficher le tableau contenant maintenant des IDs
+    console.log("Photos sélectionnées (IDs):", photosSelectionneesIds);
 
-        // Mettre à jour la visibilité du bouton Supprimer
-        updateDeleteButtonVisibility();
-    });
-    console.log("SETUP (v8 logic): Écouteur ajouté au conteneur de photos (#room-photos-display).");
+    // 6. Mettre à jour la visibilité du bouton Supprimer (inchangé)
+    updateDeleteButtonVisibility();
+});
+
+console.log("SETUP (v8 adapted logic): Écouteur ajouté au conteneur photos pour sélection par ID."); // Log mis à jour
 
     // --- Le reste de la logique V8 pour la MODALE (Ouverture, Confirmation, Annulation) ---
     // Note: Cette partie est identique à celle de la v8.1/v8.3 dans les versions précédentes
