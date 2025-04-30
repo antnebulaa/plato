@@ -585,9 +585,37 @@ function setupPhotoSelectionMode() {
     boutonModeSelection.addEventListener('click', function() {
         modeSelectionActif = !modeSelectionActif;
         console.log("Mode sélection photos :", modeSelectionActif);
-        if (modeSelectionActif) { boutonModeSelection.textContent = "Annuler"; conteneurPhotosParent.classList.add('selection-active'); } // Utilise conteneur parent
-        else { boutonModeSelection.textContent = "Sélectionner les photos"; conteneurPhotosParent.classList.remove('selection-active'); photosSelectionneesIds = []; if (photoListContainer) photoListContainer.querySelectorAll('.is-photo-selected').forEach(el => el.classList.remove('is-photo-selected')); }
-        updateDeleteButtonVisibility();
+
+        if (modeSelectionActif) { 
+          boutonModeSelection.textContent = "Annuler"; 
+          conteneurPhotosParent.classList.add('selection-active'); } // Utilise conteneur parent
+
+          // *** NOUVEAU : Désactiver SortableJS ***
+        if (currentSortableInstance) {
+            currentSortableInstance.option('disabled', true);
+            console.log("SortableJS désactivé pour la sélection.");
+        }
+        // ************************************
+          
+        } else { // Mode sélection DÉSACTIVÉ
+        boutonModeSelection.textContent = "Sélectionner les photos";
+        conteneurPhotosParent.classList.remove('selection-active'); // Utilise conteneur parent
+        photosSelectionneesIds = []; // Vide la sélection
+        // Enlève le style des éléments (important si on quitte le mode)
+        // Note: On cible bien photoEmbedElement maintenant si on utilise le listener corrigé.
+        //       Il faut trouver tous les éléments sélectionnés pour enlever la classe.
+         const selectedEmbeds = photoListContainer.querySelectorAll('.Div.Room.Photo.is-photo-selected'); // Cible les embeds sélectionnés
+         selectedEmbeds.forEach(el => el.classList.remove('is-photo-selected'));
+
+
+        // *** NOUVEAU : Réactiver SortableJS ***
+        if (currentSortableInstance) {
+            currentSortableInstance.option('disabled', false);
+            console.log("SortableJS réactivé.");
+        }
+        // ************************************
+    }
+    updateDeleteButtonVisibility(); // Met à jour l'état du bouton Supprimer
      });
     console.log("SETUP: Écouteur bouton mode sélection OK (v8.3).");
 
@@ -625,82 +653,64 @@ function setupPhotoSelectionMode() {
     function closeDeleteModal() { const c = document.querySelector('[fs-modal-element="close"]'); if (c) try { c.click(); } catch(e) { console.error("Erreur clic fermeture:", e); } else console.warn("Élément fermeture modal introuvable."); }
     updateDeleteButtonVisibility();
 
+// Remettre cet écouteur DANS la fonction setupPhotoSelectionMode
+// (Assurez-vous d'avoir supprimé l'écouteur sur 'document')
 
-  // Placez ce bloc par exemple à la fin de la fonction setupPhotoSelectionMode,
-// ou juste avant la fin du bloc DOMContentLoaded
-
-document.addEventListener('click', function(event) {
-    // 1. Vérifier si le mode sélection est actif
-    //    (Assurez-vous que la variable 'modeSelectionActif' est accessible ici.
-    //     Si ce code est HORS de setupPhotoSelectionMode, elle doit être globale)
-    if (typeof modeSelectionActif === 'undefined' || !modeSelectionActif) {
-        return; // Ignorer si le mode n'est pas actif
+// --- Écouteur sélection individuelle (REMIS sur photoListContainer, cible l'embed) ---
+photoListContainer.addEventListener('click', function(event) {
+    // On vérifie SI le mode sélection est actif
+    if (!modeSelectionActif) {
+        return; // Si on n'est pas en mode sélection, on ignore le clic ici
     }
 
-    // 2. Vérifier si la cible du clic est bien à l'intérieur du conteneur de photos
-    const photoListContainer = document.getElementById('photo-list-container');
-    // Vérifier aussi l'existence de event.target avant d'appeler contains
-    if (!photoListContainer || !event.target || !photoListContainer.contains(event.target)) {
-        return; // Clic en dehors de la zone des photos
-    }
-
-    console.log("!!! DOCUMENT CLICK LISTENER: Clic détecté dans la zone photos en mode sélection.");
+    console.log("DEBUG (photoListContainer listener): Clic détecté.");
     console.log(">>> Cible initiale du clic (event.target):", event.target);
 
-    // 3. Trouver l'élément de liste parent le plus proche (celui avec data-photo-id)
+
+    // 1. Trouver l'élément de liste parent (photo-item-template cloné)
     const clickedListItem = event.target.closest('[data-xano-list-item][data-photo-id]');
 
     if (!clickedListItem) {
-        // Le clic était dans le conteneur mais pas sur un item photo identifiable
-        console.log("DEBUG (document listener): Clic dans container mais pas sur item photo valide.");
+        console.log("DEBUG: Clic ignoré (cible n'est pas un item photo valide).");
         return;
     }
 
-    // 4. Trouver l'élément embed à l'intérieur
-    const photoEmbedElement = clickedListItem.querySelector('.Div.Room.Photo'); // Utilise le sélecteur correct
+    // 2. Trouver l'élément EMBED à l'intérieur
+    const photoEmbedElement = clickedListItem.querySelector('.Div.Room.Photo'); // Sélecteur correct
 
     if (!photoEmbedElement) {
-         console.warn("DEBUG (document listener): Embed Div (.Div.Room.Photo) non trouvé dans l'item:", clickedListItem);
-         return; // Ne peut pas appliquer le style si l'embed n'est pas trouvé
+         console.warn("DEBUG: Élément embed (.Div.Room.Photo) non trouvé dans l'item:", clickedListItem);
+         return;
     }
 
-    // --- Le reste de la logique pour sélectionner/désélectionner ---
+    // 3. Récupérer l'ID
     const photoIdString = clickedListItem.getAttribute('data-photo-id');
     const photoId = parseInt(photoIdString, 10);
-
     if (isNaN(photoId)) {
-        console.warn("DEBUG (document listener): ID photo invalide sur l'item:", photoIdString);
+        console.warn("DEBUG: Clic photo mais ID invalide:", photoIdString);
         return;
     }
 
-    console.log(`DEBUG (document listener): Traitement clic pour photo ID: ${photoId}`);
-
+    // 4. Appliquer/Retirer la classe sur l'élément EMBED
     photoEmbedElement.classList.toggle('is-photo-selected');
     const isNowSelected = photoEmbedElement.classList.contains('is-photo-selected');
+    console.log(`DEBUG: Photo [ID: ${photoId}] sélectionnée: ${isNowSelected}`);
 
-    console.log(`DEBUG: Photo [ID: ${photoId}] sélectionnée: ${isNowSelected}`); // Log existant
-
-    // Mettre à jour le tableau des IDs sélectionnés (assurez-vous que photosSelectionneesIds est accessible)
+    // 5. Mettre à jour la liste des IDs sélectionnés
     const indexInSelection = photosSelectionneesIds.indexOf(photoId);
     if (isNowSelected && indexInSelection === -1) {
         photosSelectionneesIds.push(photoId);
-        console.log("DEBUG: ID ajouté."); // Log existant
+        console.log("DEBUG: ID ajouté.");
     } else if (!isNowSelected && indexInSelection > -1) {
         photosSelectionneesIds.splice(indexInSelection, 1);
-        console.log("DEBUG: ID retiré."); // Log existant
+        console.log("DEBUG: ID retiré.");
     }
-    console.log("DEBUG: photosSelectionneesIds actuel:", photosSelectionneesIds); // Log existant
+    console.log("DEBUG: photosSelectionneesIds actuel:", photosSelectionneesIds);
+    updateDeleteButtonVisibility(); // Met à jour le bouton Supprimer
+});
 
-    // Mettre à jour la visibilité du bouton Supprimer
-    // (Assurez-vous que updateDeleteButtonVisibility est accessible ou déplacez cet appel)
-    if (typeof updateDeleteButtonVisibility === 'function') {
-         updateDeleteButtonVisibility();
-    }
+console.log("SETUP: Écouteur sélection photo (sur #photoListContainer, cible embed) ré-attaché.");
 
-
-}, true); // <--- IMPORTANT: Le 'true' utilise la phase de capture
-
-console.log("DEBUG: Écouteur de clic global (document, capture phase) attaché.");
 }
 
 // --- Fonctions Utilitaires (Helpers) ---
