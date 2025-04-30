@@ -120,7 +120,7 @@ function setupCreatedRoomSelection(client) {
 
             // Affichage section photos (logique v8)
             const photoSectionContainer = document.getElementById('room-photos-display');
-            if (photoSectionContainer) { photoSectionContainer.style.display = 'grid'; console.log("Conteneur photos rendu visible (style.display = 'grid')."); }
+            if (photoSectionContainer) { photoSectionContainer.style.display = 'block'; console.log("Conteneur photos rendu visible (style.display = 'block')."); }
             else { console.error("Conteneur #room-photos-display non trouvé !"); }
 
             // Feedback visuel (logique v8)
