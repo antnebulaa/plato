@@ -409,7 +409,8 @@ function renderPhotoItems(dataArray, listContainerElement) {
         dataArray.forEach((item, index) => { // item = enregistrement property_photos
             const clone = templateElement.tagName === 'TEMPLATE' ? templateElement.content.cloneNode(true).firstElementChild : templateElement.cloneNode(true);
             if (!clone) return;
-            clone.style.display = ''; clone.removeAttribute('aria-hidden');
+            clone.style.display = 'block'; // OU 'grid', ou 'flex' selon ce que doit être un item photo individuel
+            clone.removeAttribute('aria-hidden');
             clone.setAttribute('data-xano-list-item', ''); clone.setAttribute('data-xano-item-index', index.toString());
 
             // --- ID (Essentiel pour v8.3) ---
