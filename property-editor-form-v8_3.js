@@ -583,30 +583,29 @@ function setupPhotoSelectionMode() {
 
     // --- Écouteur bouton Gérer/Annuler (Identique v8) ---
     boutonModeSelection.addEventListener('click', function() {
-        modeSelectionActif = !modeSelectionActif;
-        console.log("Mode sélection photos :", modeSelectionActif);
+    modeSelectionActif = !modeSelectionActif;
+    console.log("Mode sélection photos :", modeSelectionActif);
 
-        if (modeSelectionActif) { 
-          boutonModeSelection.textContent = "Annuler"; 
-          conteneurPhotosParent.classList.add('selection-active'); } // Utilise conteneur parent
+    if (modeSelectionActif) { // Accolade OUVRANTE pour le bloc IF
+        boutonModeSelection.textContent = "Annuler";
+        conteneurPhotosParent.classList.add('selection-active'); // Utilise conteneur parent
 
-          // *** NOUVEAU : Désactiver SortableJS ***
+        // *** NOUVEAU : Désactiver SortableJS (MAINTENANT DANS LE IF) ***
         if (currentSortableInstance) {
             currentSortableInstance.option('disabled', true);
             console.log("SortableJS désactivé pour la sélection.");
         }
         // ************************************
-          
-        } else { // Mode sélection DÉSACTIVÉ
+
+    } else { // Accolade FERMANTE du IF et début du ELSE ici
+        // Mode sélection DÉSACTIVÉ
         boutonModeSelection.textContent = "Sélectionner les photos";
         conteneurPhotosParent.classList.remove('selection-active'); // Utilise conteneur parent
         photosSelectionneesIds = []; // Vide la sélection
-        // Enlève le style des éléments (important si on quitte le mode)
-        // Note: On cible bien photoEmbedElement maintenant si on utilise le listener corrigé.
-        //       Il faut trouver tous les éléments sélectionnés pour enlever la classe.
-         const selectedEmbeds = photoListContainer.querySelectorAll('.Div.Room.Photo.is-photo-selected'); // Cible les embeds sélectionnés
-         selectedEmbeds.forEach(el => el.classList.remove('is-photo-selected'));
 
+        // Enlève le style des éléments sélectionnés
+        const selectedEmbeds = photoListContainer.querySelectorAll('.Div.Room.Photo.is-photo-selected');
+        selectedEmbeds.forEach(el => el.classList.remove('is-photo-selected'));
 
         // *** NOUVEAU : Réactiver SortableJS ***
         if (currentSortableInstance) {
@@ -614,7 +613,8 @@ function setupPhotoSelectionMode() {
             console.log("SortableJS réactivé.");
         }
         // ************************************
-    }
+    } // Accolade FERMANTE pour le bloc ELSE
+
     updateDeleteButtonVisibility(); // Met à jour l'état du bouton Supprimer
      });
     console.log("SETUP: Écouteur bouton mode sélection OK (v8.3).");
