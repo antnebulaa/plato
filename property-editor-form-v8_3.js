@@ -521,15 +521,23 @@ function bindDataToElement(element, data) {
 
 // --- Sélection/Suppression Photos (MODIFIÉ v8.3 -> v8.9 : Écouteur Clic Corrigé) ---
 function setupPhotoSelectionMode() {
-    console.log("SETUP: Initialisation mode sélection photo (v8.9).");
+    console.log("SETUP: Initialisation du bouton mode sélection photo (v8 logic).");
+    // Récupération des éléments DOM essentiels
     const boutonModeSelection = document.getElementById('bouton-mode-selection');
-    const conteneurPhotosParent = document.getElementById('room-photos-display'); // Conteneur parent stable
-    const photoListContainer = document.getElementById('photo-list-container'); // Conteneur des items
+    const conteneurPhotos = document.getElementById('room-photos-display'); // <<< Cible V8
+    const photoListContainer = document.getElementById('photo-list-container'); // Utilisé pour trouver les éléments sélectionnés
     const boutonSupprimerSelection = document.getElementById('bouton-supprimer-selection');
-    if (!boutonModeSelection || !conteneurPhotosParent || !photoListContainer || !boutonSupprimerSelection) { console.error("SETUP ERROR: Éléments HTML manquants pour sélection photo."); return; }
 
+    // Vérification initiale
+    if (!boutonModeSelection || !conteneurPhotos || !photoListContainer || !boutonSupprimerSelection) {
+        console.error("SETUP ERROR (v8 logic): Un ou plusieurs éléments HTML manquants. IDs requis: bouton-mode-selection, room-photos-display, photo-list-container, bouton-supprimer-selection");
+        return;
+    }
+
+    // --- Fonction HELPER pour gérer la visibilité du bouton Supprimer ---
     function updateDeleteButtonVisibility() {
         if (!boutonSupprimerSelection) return;
+        // 'photosSelectionneesIds' contient des PATHS dans cette version
         if (modeSelectionActif && photosSelectionneesIds.length > 0) {
             boutonSupprimerSelection.classList.remove('button-is-hidden');
             boutonSupprimerSelection.classList.add('button-is-visible');
@@ -581,137 +589,145 @@ function setupPhotoSelectionMode() {
         finally { if (modeSelectionActif && boutonSupprimerSelection) { boutonSupprimerSelection.disabled = false; console.log("DEBUG: handleSortEnd: Bouton Supprimer réactivé."); } console.log("DEBUG: handleSortEnd END"); }
     }
 
-    // --- Écouteur bouton Gérer/Annuler (Identique v8) ---
+  // --- Écouteur sur le bouton Gérer/Annuler (Logique V8 - Pas de gestion SortableJS ici) ---
     boutonModeSelection.addEventListener('click', function() {
-    modeSelectionActif = !modeSelectionActif;
-    console.log("Mode sélection photos :", modeSelectionActif);
-
-    if (modeSelectionActif) { // Accolade OUVRANTE pour le bloc IF
-        boutonModeSelection.textContent = "Annuler";
-        conteneurPhotosParent.classList.add('selection-active'); // Utilise conteneur parent
-
-        // *** NOUVEAU : Désactiver SortableJS (MAINTENANT DANS LE IF) ***
-        if (currentSortableInstance) {
-            currentSortableInstance.option('disabled', true);
-            console.log("SortableJS désactivé pour la sélection.");
+        modeSelectionActif = !modeSelectionActif;
+        console.log("Mode sélection photos :", modeSelectionActif);
+        if (modeSelectionActif) {
+            boutonModeSelection.textContent = "Annuler";
+            conteneurPhotos.classList.add('selection-active'); // <<< Classe sur #room-photos-display
+            updateDeleteButtonVisibility(); // Cache si 0 sélection
+        } else {
+            // Sortir du mode sélection
+            boutonModeSelection.textContent = "Sélectionner les photos";
+            conteneurPhotos.classList.remove('selection-active');
+            console.log("Annulation sélection : Désélection de toutes les photos.");
+            photosSelectionneesIds = []; // Vider le tableau (des paths)
+            // Retirer la classe visuelle des éléments ciblés par [data-photo-path]
+            if (photoListContainer) {
+                 // On cible les éléments qui ont la classe ET l'attribut path dans v8
+                photoListContainer.querySelectorAll('[data-photo-path].is-photo-selected').forEach(photoEl => {
+                    photoEl.classList.remove('is-photo-selected');
+                });
+            }
+            updateDeleteButtonVisibility(); // Doit cacher le bouton
         }
-        // ************************************
+    });
+    console.log("SETUP (v8 logic): Écouteur ajouté au bouton mode sélection.");
 
-    } else { // Accolade FERMANTE du IF et début du ELSE ici
-        // Mode sélection DÉSACTIVÉ
-        boutonModeSelection.textContent = "Sélectionner les photos";
-        conteneurPhotosParent.classList.remove('selection-active'); // Utilise conteneur parent
-        photosSelectionneesIds = []; // Vide la sélection
+    // --- Écouteur sur le Conteneur des Photos (pour sélection individuelle - LOGIQUE V8) ---
+    conteneurPhotos.addEventListener('click', function(event) { // <<< Écouteur sur #room-photos-display
+        if (!modeSelectionActif) return; // Ne rien faire si pas en mode sélection
 
-        // Enlève le style des éléments sélectionnés
-        const selectedEmbeds = photoListContainer.querySelectorAll('.Div.Room.Photo.is-photo-selected');
-        selectedEmbeds.forEach(el => el.classList.remove('is-photo-selected'));
+        // Cible l'élément le plus proche ayant data-photo-path
+        const clickedPhotoElement = event.target.closest('[data-photo-path]');
+        if (!clickedPhotoElement) return; // Clic en dehors d'un élément photo
 
-        // *** NOUVEAU : Réactiver SortableJS ***
-        if (currentSortableInstance) {
-            currentSortableInstance.option('disabled', false);
-            console.log("SortableJS réactivé.");
+        const photoPath = clickedPhotoElement.getAttribute('data-photo-path');
+        if (!photoPath) return; // Sécurité
+
+        // Gérer la classe visuelle SUR L'ÉLÉMENT AVEC data-photo-path
+        clickedPhotoElement.classList.toggle('is-photo-selected');
+
+        const isNowSelected = clickedPhotoElement.classList.contains('is-photo-selected');
+        console.log(`Photo [path: ${photoPath}] sélectionnée: ${isNowSelected}`);
+
+        // Mettre à jour le tableau des IDs sélectionnés (qui contient des PATHS ici)
+        const indexInSelection = photosSelectionneesIds.indexOf(photoPath);
+        if (isNowSelected && indexInSelection === -1) {
+            photosSelectionneesIds.push(photoPath); // Ajoute le path
+            console.log(`   -> Photo ajoutée au tableau: ${photoPath}`);
+        } else if (!isNowSelected && indexInSelection > -1) {
+            photosSelectionneesIds.splice(indexInSelection, 1); // Retire le path
+            console.log(`   -> Photo retirée du tableau: ${photoPath}`);
         }
-        // ************************************
-    } // Accolade FERMANTE pour le bloc ELSE
+        console.log("Photos sélectionnées (paths):", photosSelectionneesIds);
 
-    updateDeleteButtonVisibility(); // Met à jour l'état du bouton Supprimer
-     });
-    console.log("SETUP: Écouteur bouton mode sélection OK (v8.3).");
+        // Mettre à jour la visibilité du bouton Supprimer
+        updateDeleteButtonVisibility();
+    });
+    console.log("SETUP (v8 logic): Écouteur ajouté au conteneur de photos (#room-photos-display).");
 
+    // --- Le reste de la logique V8 pour la MODALE (Ouverture, Confirmation, Annulation) ---
+    // Note: Cette partie est identique à celle de la v8.1/v8.3 dans les versions précédentes
+    // que nous avions déjà, elle utilise les HELPER open/closeModal etc.
+    // Assurez-vous que les fonctions openDeleteModal et closeDeleteModal sont celles
+    // qui simulent le clic sur les triggers/close elements.
 
-
-
-    // --- Écouteur bouton Supprimer (Ouvre modale - Identique v8.1) ---
+    const boutonSupprimerSelection = document.getElementById('bouton-supprimer-selection'); // Redéclaré pour clarté ici
     if (boutonSupprimerSelection) {
         boutonSupprimerSelection.addEventListener('click', function() {
-             if (photosSelectionneesIds.length === 0 || currentSelectedRoomId === null) return;
-             const modalElement = document.querySelector('[fs-modal-element="delete-confirm"]');
-             const thumbnailElement = modalElement?.querySelector('[data-modal-element="photo-thumbnail"]');
-             const badgeElement = modalElement?.querySelector('[data-modal-element="photo-badge"]');
-             const textElement = modalElement?.querySelector('[data-modal-element="confirm-text"]');
-             if (!modalElement || !thumbnailElement || !badgeElement || !textElement) { console.error("Éléments modale confirmation introuvables !"); const fb = window.confirm(`MODALE INTROUVABLE - Supprimer ${photosSelectionneesIds.length} photo(s) ?`); if (fb) executeDelete(); return; }
-             const count = photosSelectionneesIds.length; const firstPhotoId = photosSelectionneesIds[0];
-             const firstPhotoDOMElement = photoListContainer.querySelector(`[data-photo-id="${firstPhotoId}"]`);
-             const firstPhotoPath = firstPhotoDOMElement ? firstPhotoDOMElement.getAttribute('data-photo-path') : null;
-             let firstPhotoUrl = firstPhotoPath || '';
-             thumbnailElement.src = firstPhotoUrl; thumbnailElement.alt = `Aperçu (${count} photo(s))`;
-             if (count > 1) { badgeElement.textContent = `+${count - 1}`; badgeElement.style.display = 'flex'; } else badgeElement.style.display = 'none';
-             textElement.textContent = `Supprimer ${count} photo${count > 1 ? 's' : ''} ? Action irréversible.`;
-             openDeleteModal();
+            if (photosSelectionneesIds.length === 0) return;
+            if (currentSelectedRoomId === null) { alert("Erreur : Room ID inconnu."); return; }
+
+            const modalElement = document.querySelector('[fs-modal-element="delete-confirm"]');
+            const thumbnailElement = modalElement?.querySelector('[data-modal-element="photo-thumbnail"]');
+            const badgeElement = modalElement?.querySelector('[data-modal-element="photo-badge"]');
+            const textElement = modalElement?.querySelector('[data-modal-element="confirm-text"]');
+
+            if (!modalElement || !thumbnailElement || !badgeElement || !textElement) {
+                console.error("Éléments de la modale de confirmation introuvables !");
+                const fb = window.confirm(`MODALE INTROUVABLE - Supprimer ${photosSelectionneesIds.length} photo(s) ?`);
+                if (fb && typeof executeDelete === 'function') executeDelete(); // Assure que executeDelete existe
+                return;
+            }
+
+            const count = photosSelectionneesIds.length;
+            const firstPhotoPath = photosSelectionneesIds[0];
+            let firstPhotoUrl = '';
+             // Trouver l'URL de la miniature depuis le DOM (logique V8)
+            const firstPhotoDOMElement = conteneurPhotos.querySelector(`[data-photo-path="${firstPhotoPath}"]`);
+            const imgInside = firstPhotoDOMElement?.querySelector('img.photo-item-image');
+            if (imgInside && imgInside.src) { firstPhotoUrl = imgInside.src; }
+            else { console.warn("Impossible de trouver l'URL src pour la première photo:", firstPhotoPath); }
+
+            thumbnailElement.src = firstPhotoUrl;
+            thumbnailElement.alt = `Aperçu (${count} photo(s))`;
+            if (count > 1) { badgeElement.textContent = `+${count - 1}`; badgeElement.style.display = 'flex'; }
+            else { badgeElement.style.display = 'none'; }
+            textElement.textContent = `Supprimer ${count} photo${count > 1 ? 's' : ''} ? Action irréversible.`;
+
+            openDeleteModal(); // Appel Helper V8
         });
-        console.log("SETUP: Écouteur bouton supprimer sélection OK (v8.3).");
+        console.log("SETUP (v8 logic): Écouteur ajouté au bouton supprimer sélection.");
     }
 
-
-    // --- Écouteurs modale (Identique v8.1) ---
     const modalConfirmBtn = document.getElementById('modal-confirm-delete-button');
-    const modalCancelBtn = document.getElementById('modal-cancel-delete-button');
-    if (modalConfirmBtn && !modalConfirmBtn.listenerAdded) { modalConfirmBtn.addEventListener('click', executeDelete); modalConfirmBtn.listenerAdded = true; }
-    if (modalCancelBtn && !modalCancelBtn.listenerAdded) { modalCancelBtn.addEventListener('click', closeDeleteModal); modalCancelBtn.listenerAdded = true; }
-    function openDeleteModal() { const h = document.getElementById('hidden-delete-modal-trigger'); if (h) h.click(); else console.error("Trigger modal caché introuvable !"); }
-    function closeDeleteModal() { const c = document.querySelector('[fs-modal-element="close"]'); if (c) try { c.click(); } catch(e) { console.error("Erreur clic fermeture:", e); } else console.warn("Élément fermeture modal introuvable."); }
+    const modalCancelBtn = document.getElementById('modal-cancel-delete-button'); // Non utilisé dans v8 si fs-modal-element=close existe
+
+    if (modalConfirmBtn) {
+        if (!modalConfirmBtn.listenerAdded) {
+             // Assurez-vous que la fonction executeDelete (celle de v8!) est bien définie globalement ou passée en paramètre
+             if (typeof executeDelete === 'function') {
+                 modalConfirmBtn.addEventListener('click', executeDelete);
+                 modalConfirmBtn.listenerAdded = true;
+             } else {
+                 console.error("ERREUR SETUP (v8 logic): La fonction executeDelete n'est pas définie au moment d'attacher l'écouteur au bouton de confirmation modal.")
+             }
+         }
+    } else {
+        console.warn("Bouton confirmation modale (#modal-confirm-delete-button) introuvable.");
+    }
+
+    // Fonctions Helper V8 pour la modale (simulation clic)
+    function openDeleteModal() {
+         console.log("Attempting to open modal via hidden trigger (v8 logic)...");
+         const hiddenTrigger = document.getElementById('hidden-delete-modal-trigger');
+         if (hiddenTrigger) { hiddenTrigger.click(); }
+         else { console.error("Trigger modal caché #hidden-delete-modal-trigger introuvable !"); }
+    }
+
+    function closeDeleteModal() {
+         console.log("Attempting to close modal via [fs-modal-element='close'] (v8 logic)...");
+         const closeElement = document.querySelector('[fs-modal-element="close"]');
+         if (closeElement) { try { closeElement.click(); } catch(e) { console.error("Erreur clic fermeture:", e); } }
+         else { console.warn("Élément fermeture modal [fs-modal-element='close'] introuvable."); }
+    }
+
+    // Appel initial pour cacher le bouton Supprimer
     updateDeleteButtonVisibility();
 
-// Remettre cet écouteur DANS la fonction setupPhotoSelectionMode
-// (Assurez-vous d'avoir supprimé l'écouteur sur 'document')
-
-// --- Écouteur sélection individuelle (REMIS sur photoListContainer, cible l'embed) ---
-photoListContainer.addEventListener('click', function(event) {
-    // On vérifie SI le mode sélection est actif
-    if (!modeSelectionActif) {
-        return; // Si on n'est pas en mode sélection, on ignore le clic ici
-    }
-
-    console.log("DEBUG (photoListContainer listener): Clic détecté.");
-    console.log(">>> Cible initiale du clic (event.target):", event.target);
-
-
-    // 1. Trouver l'élément de liste parent (photo-item-template cloné)
-    const clickedListItem = event.target.closest('[data-xano-list-item][data-photo-id]');
-
-    if (!clickedListItem) {
-        console.log("DEBUG: Clic ignoré (cible n'est pas un item photo valide).");
-        return;
-    }
-
-    // 2. Trouver l'élément EMBED à l'intérieur
-    const photoEmbedElement = clickedListItem.querySelector('.Div.Room.Photo'); // Sélecteur correct
-
-    if (!photoEmbedElement) {
-         console.warn("DEBUG: Élément embed (.Div.Room.Photo) non trouvé dans l'item:", clickedListItem);
-         return;
-    }
-
-    // 3. Récupérer l'ID
-    const photoIdString = clickedListItem.getAttribute('data-photo-id');
-    const photoId = parseInt(photoIdString, 10);
-    if (isNaN(photoId)) {
-        console.warn("DEBUG: Clic photo mais ID invalide:", photoIdString);
-        return;
-    }
-
-    // 4. Appliquer/Retirer la classe sur l'élément EMBED
-    photoEmbedElement.classList.toggle('is-photo-selected');
-    const isNowSelected = photoEmbedElement.classList.contains('is-photo-selected');
-    console.log(`DEBUG: Photo [ID: ${photoId}] sélectionnée: ${isNowSelected}`);
-
-    // 5. Mettre à jour la liste des IDs sélectionnés
-    const indexInSelection = photosSelectionneesIds.indexOf(photoId);
-    if (isNowSelected && indexInSelection === -1) {
-        photosSelectionneesIds.push(photoId);
-        console.log("DEBUG: ID ajouté.");
-    } else if (!isNowSelected && indexInSelection > -1) {
-        photosSelectionneesIds.splice(indexInSelection, 1);
-        console.log("DEBUG: ID retiré.");
-    }
-    console.log("DEBUG: photosSelectionneesIds actuel:", photosSelectionneesIds);
-    updateDeleteButtonVisibility(); // Met à jour le bouton Supprimer
-});
-
-console.log("SETUP: Écouteur sélection photo (sur #photoListContainer, cible embed) ré-attaché.");
-
-}
+} // --- FIN de setupPhotoSelectionMode (VERSION v8) ---
 
 // --- Fonctions Utilitaires (Helpers) ---
 
