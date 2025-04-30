@@ -571,9 +571,7 @@ async function executeDelete() {
     const deleteEndpoint = 'property_photos/batch_delete_by_ids'; // Endpoint correct
     // Vérifiez la méthode HTTP attendue par VOTRE endpoint /batch_delete_by_ids
     // Si c'est DELETE (comme dans les versions précédentes du script v8.3):
-    const deleteMethod = 'DELETE';
-    // Si c'est POST:
-    // const deleteMethod = 'POST'; // Décommentez si c'est POST et commentez la ligne DELETE
+    const deleteMethod = 'POST';
 
     console.log("Appel API - Endpoint:", deleteEndpoint, "Méthode:", deleteMethod, "Payload:", payload); // Log pour vérifier l'envoi
 
