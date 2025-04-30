@@ -732,7 +732,7 @@ async function executeDelete() {
     // Assurez-vous que les fonctions openDeleteModal et closeDeleteModal sont celles
     // qui simulent le clic sur les triggers/close elements.
 
-    const boutonSupprimerSelection = document.getElementById('bouton-supprimer-selection'); // Redéclaré pour clarté ici
+    
     if (boutonSupprimerSelection) {
         boutonSupprimerSelection.addEventListener('click', function() {
             if (photosSelectionneesIds.length === 0) return;
