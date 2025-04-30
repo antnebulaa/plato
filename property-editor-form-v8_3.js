@@ -652,23 +652,7 @@ async function executeDelete() {
 } // --- FIN de executeDelete (VERSION V8) ---
 
     // MODIFIÉ v8 -> v8.3: Utilise les IDs et le nouvel endpoint reorder
-    async function handleSortEnd(event) {
-        console.log("DEBUG: handleSortEnd START (v8.3)");
-        const photoListContainerElement = event.target;
-        const items = Array.from(photoListContainerElement.children);
-        const orderedPhotoIds = items.map(el => el.getAttribute('data-photo-id')).filter(id => id).map(id => parseInt(id, 10)).filter(id => !isNaN(id));
-        if (orderedPhotoIds.length === 0 || currentSelectedRoomId === null) { console.log("DEBUG: handleSortEnd: Aucun ID photo valide ou room ID inconnu."); if (modeSelectionActif && boutonSupprimerSelection) boutonSupprimerSelection.disabled = false; return; }
-        console.log("DEBUG: handleSortEnd: Nouvel ordre IDs:", orderedPhotoIds);
-        const reorderEndpoint = `property_photos/batch_reorder`; // !! VÉRIFIEZ NOM ENDPOINT !!
-        const payload = { ordered_photo_ids: orderedPhotoIds, room_id: parseInt(currentSelectedRoomId, 10) };
-        console.log("DEBUG: handleSortEnd: Préparation appel API batch_reorder - Payload:", payload);
-        try {
-            console.log("DEBUG: handleSortEnd: Tentative appel xanoClient.post...");
-            await xanoClient.post(reorderEndpoint, payload); // !! VÉRIFIEZ MÉTHODE (POST ou PATCH) !!
-            console.log("DEBUG: handleSortEnd: Appel API batch_reorder RÉUSSI.");
-        } catch (error) { console.error("DEBUG: handleSortEnd: ERREUR lors appel API batch_reorder:", error); alert("Erreur sauvegarde ordre photos."); await refreshCurrentRoomPhotos(xanoClient); }
-        finally { if (modeSelectionActif && boutonSupprimerSelection) { boutonSupprimerSelection.disabled = false; console.log("DEBUG: handleSortEnd: Bouton Supprimer réactivé."); } console.log("DEBUG: handleSortEnd END"); }
-    }
+    
 
   // --- Écouteur sur le bouton Gérer/Annuler (Logique V8 - Pas de gestion SortableJS ici) ---
     boutonModeSelection.addEventListener('click', function() {
@@ -856,7 +840,26 @@ async function refreshCurrentRoomPhotos(client) {
      console.log(`refreshCurrentRoomPhotos: Rafraîchissement photos pour room ${currentSelectedRoomId}...`);
      if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'block'; if (errorElement) errorElement.style.display = 'none';
      if (currentSortableInstance) { console.log("refreshCurrentRoomPhotos: Destruction SortableJS précédente."); currentSortableInstance.destroy(); currentSortableInstance = null; }
-     const photoEndpoint = `property_photos/photos/${currentSelectedRoomId}`;
+
+async function handleSortEnd(event) {
+        console.log("DEBUG: handleSortEnd START (v8.3)");
+        const photoListContainerElement = event.target;
+        const items = Array.from(photoListContainerElement.children);
+        const orderedPhotoIds = items.map(el => el.getAttribute('data-photo-id')).filter(id => id).map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+        if (orderedPhotoIds.length === 0 || currentSelectedRoomId === null) { console.log("DEBUG: handleSortEnd: Aucun ID photo valide ou room ID inconnu."); if (modeSelectionActif && boutonSupprimerSelection) boutonSupprimerSelection.disabled = false; return; }
+        console.log("DEBUG: handleSortEnd: Nouvel ordre IDs:", orderedPhotoIds);
+        const reorderEndpoint = `property_photos/batch_reorder`; // !! VÉRIFIEZ NOM ENDPOINT !!
+        const payload = { ordered_photo_ids: orderedPhotoIds, room_id: parseInt(currentSelectedRoomId, 10) };
+        console.log("DEBUG: handleSortEnd: Préparation appel API batch_reorder - Payload:", payload);
+        try {
+            console.log("DEBUG: handleSortEnd: Tentative appel xanoClient.post...");
+            await xanoClient.post(reorderEndpoint, payload); // !! VÉRIFIEZ MÉTHODE (POST ou PATCH) !!
+            console.log("DEBUG: handleSortEnd: Appel API batch_reorder RÉUSSI.");
+        } catch (error) { console.error("DEBUG: handleSortEnd: ERREUR lors appel API batch_reorder:", error); alert("Erreur sauvegarde ordre photos."); await refreshCurrentRoomPhotos(xanoClient); }
+        finally { if (modeSelectionActif && boutonSupprimerSelection) { boutonSupprimerSelection.disabled = false; console.log("DEBUG: handleSortEnd: Bouton Supprimer réactivé."); } console.log("DEBUG: handleSortEnd END"); }
+    }
+  
+  const photoEndpoint = `property_photos/photos/${currentSelectedRoomId}`;
      try {
          console.log("refreshCurrentRoomPhotos: Appel fetchXanoData...");
          await fetchXanoData(client, photoEndpoint, 'GET', null, photoDisplayContainer, photoLoadingIndicator);
