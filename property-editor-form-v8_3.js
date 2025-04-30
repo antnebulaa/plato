@@ -770,7 +770,7 @@ console.log("SETUP (v8 adapted logic): Écouteur ajouté au conteneur photos pou
                 return;
             }
 
-            const count = photosSelectionneesIds.length;
+            const count = photosSelectionneesIds.length; 
     // 'photosSelectionneesIds' contient maintenant des IDs, ex: [60]
     const firstPhotoId = photosSelectionneesIds[0]; // Contient l'ID numérique (ex: 60)
     let firstPhotoUrl = ''; // Initialise l'URL
