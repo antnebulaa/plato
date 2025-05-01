@@ -494,11 +494,13 @@ function renderPhotoItems(dataArray, listContainerElement) { // listContainerEle
     // --- Fin Vidage Sécurisé ---
 
     // --- !! RÉCUPÉRATION DU TEMPLATE (Maintenant qu'on est sûr qu'il n'a pas été supprimé) !! ---
-    console.log("renderPhotoItems: Recherche template avec sélecteur:", templateSelector);
-    const templateElement = document.querySelector(templateSelector); // Recherche dans tout le document
+     console.log("renderPhotoItems: Recherche template avec sélecteur:", templateSelector, "DANS l'élément:", listContainerElement);
+    // const templateElement = document.querySelector(templateSelector); // Ancienne ligne
+    const templateElement = listContainerElement.querySelector(templateSelector); // NOUVELLE LIGNE : Cherche DANS l'élément parent
+
 
     if (!templateElement) {
-         console.error(`renderPhotoItems: ERREUR FATALE - Template "${templateSelector}" INTROUVABLE.`);
+         console.error(`renderPhotoItems: ERREUR FATALE - Template "${templateSelector}" INTROUVABLE DANS listContainerElement.`); // Message d'erreur mis à jour
          if (emptyStatePlaceholder) emptyStatePlaceholder.style.display = 'flex'; // Afficher état vide en cas d'erreur majeure
          return; // Arrêter
     } else {
