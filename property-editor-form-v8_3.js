@@ -379,53 +379,61 @@ function renderListData(dataArray, listContainerElement) {
             else console.warn("renderListData: ID manquant room:", item);
           
 
-            // --- NOUVEAU CODE POUR L'IMAGE DE FOND ---
+            // --- NOUVEAU CODE POUR L'IMAGE DE FOND (adapté à la structure Xano simplifiée via checkboxes) ---
             // Trouvez la div spécifique dans le clone qui représente la room
             // Ajustez le sélecteur si nécessaire. S'il n'y a qu'une seule div avec ces attributs par item, ceci devrait fonctionner.
-            // --- NOUVEAU CODE POUR L'IMAGE DE FOND (avec logs) ---
+           
             console.log('Traitement de la room :', item); // Voir les données de la room
             const roomDiv = clone.querySelector(`[data-action="select-created-room"][data-room-id]`);
-            console.log('Div cible (roomDiv) trouvée :', roomDiv); // Vérifier si la div est trouvée
+            // console.log('Div cible (roomDiv) trouvée :', roomDiv); // Gardez les logs si besoin
 
-            if (roomDiv && item.images && Array.isArray(item.images)) {
-                console.log('Tableau images trouvé :', item.images); // Voir le contenu du tableau
+            // Utilisez le nom exact que vous avez mis dans "Return As" (ex: photo_list)
+            const photoInfoArray = item.photo_list; // <--- VÉRIFIEZ QUE C'EST BIEN 'photo_list'
+            // console.log('Tableau simplifié de photos trouvé :', photoInfoArray);
 
-                const targetPhoto = item.images.find(photo => photo.photo_order === 1); // Assurez-vous que 1 est le bon type (nombre ou string)
-                console.log('Photo avec order=1 trouvée (targetPhoto) :', targetPhoto); // Voir si la photo est trouvée
+            if (roomDiv && photoInfoArray && Array.isArray(photoInfoArray)) {
+
+                // Trouver l'objet photo avec photo_order === 1
+                const targetPhotoInfo = photoInfoArray.find(photo => photo.photo_order === 1);
+                // console.log('Info photo avec order=1 trouvée :', targetPhotoInfo);
 
                 let photoUrl = null; // Initialiser photoUrl
 
-                if (targetPhoto && targetPhoto.url) {
-                    photoUrl = targetPhoto.url;
-                    console.log('URL trouvée (order=1) :', photoUrl);
+                // Vérifier si l'objet a été trouvé ET accéder à l'URL via images[0].url
+                // Utilisation de l'optional chaining (?.)
+                if (targetPhotoInfo?.images?.[0]?.url) { // <--- AJUSTEMENT ICI: AJOUT DE [0]
+                    // Extraire l'URL depuis la structure tableau->objet
+                    photoUrl = targetPhotoInfo.images[0].url; // <--- AJUSTEMENT ICI: AJOUT DE [0]
+                    // console.log('URL trouvée (order=1) :', photoUrl);
                 } else {
-                     console.warn(`Photo avec order=1 non trouvée ou sans URL pour room ID ${item.id}.`);
-                    // Fallback éventuel
-                    if (item.images.length > 0 && item.images[0].url) {
-                        console.log('Utilisation de la première photo comme fallback.');
-                        photoUrl = item.images[0].url;
+                    // console.warn(`Info photo avec order=1 non trouvée, ou structure 'images[0].url' invalide pour room ID ${item.id}.`);
+                    // Fallback éventuel : Chercher la première photo du tableau qui a une URL valide
+                    const fallbackPhotoInfo = photoInfoArray.find(photo => photo?.images?.[0]?.url); // <--- AJUSTEMENT ICI AUSSI
+                    if (fallbackPhotoInfo) {
+                         photoUrl = fallbackPhotoInfo.images[0].url; // <--- AJUSTEMENT ICI AUSSI
+                         // console.log('Utilisation de la première photo valide comme fallback :', photoUrl);
                     } else {
-                        console.warn(`Aucune photo valide trouvée pour room ID ${item.id}.`);
+                        // console.warn(`Aucune photo valide trouvée pour room ID ${item.id}.`);
                     }
                 }
 
                 // Appliquer le style seulement si on a une URL valide
                 if (photoUrl) {
-                     console.log(`Application de l'image de fond (${photoUrl}) sur :`, roomDiv);
+                     // console.log(`Application de l'image de fond (${photoUrl}) sur :`, roomDiv);
                      roomDiv.style.backgroundImage = `url('${photoUrl}')`;
-                     // Ajoutez aussi les autres styles ici si vous ne les avez pas en CSS
-                     // roomDiv.style.backgroundSize = 'cover';
-                     // roomDiv.style.backgroundPosition = 'center';
-                     // roomDiv.style.backgroundRepeat = 'no-repeat';
-                     // roomDiv.style.minHeight = '200px'; // **Très important pour la visibilité**
+                     // Styles CSS importants
+                     roomDiv.style.backgroundSize = 'cover';
+                     roomDiv.style.backgroundPosition = 'center';
+                     roomDiv.style.backgroundRepeat = 'no-repeat';
+                     roomDiv.style.minHeight = '200px'; // Assurez-vous que la div a une hauteur !
                 } else {
-                    console.log('Aucune URL de photo à appliquer pour room ID:', item.id);
+                    // console.log('Aucune URL de photo à appliquer pour room ID:', item.id);
                 }
 
             } else if (roomDiv) {
-                 console.warn("Tableau 'images' non trouvé ou invalide pour room ID:", item.id);
+                 // console.warn(`Tableau '${/* METTRE LE NOM ICI AUSSI */ "photo_list"}' non trouvé ou invalide pour room ID:`, item.id);
             } else {
-                 console.error("La div cible [data-action='select-created-room'] n'a pas été trouvée dans le clone !");
+                 // console.error("La div cible [data-action='select-created-room'] n'a pas été trouvée dans le clone !");
             }
             // --- FIN DU NOUVEAU CODE ---
           
