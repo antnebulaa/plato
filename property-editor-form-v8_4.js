@@ -290,101 +290,55 @@ function initXanoLinkHandlers() {
   }
 
 // --- Fonctions Logiques (Fetch, Render) ---
-// Dans fetchXanoData
 async function fetchXanoData(client, endpoint, method, params, targetElement, loadingIndicator) {
     try {
       let responseData;
-      console.log(`WorkspaceXanoData: Début fetch pour ${endpoint} sur element:`, targetElement ? targetElement.id || targetElement.tagName : 'ELEMENT INTROUVABLE'); // Log 1
       switch (method) {
-          case 'GET': responseData = await client.get(endpoint, params); break;
-          case 'POST': responseData = await client.post(endpoint, params); break;
-          default: throw new Error(`Méthode HTTP non supportée: ${method}`);
+      case 'GET': responseData = await client.get(endpoint, params); break;
+      case 'POST': responseData = await client.post(endpoint, params); break;
+      // ... (autres cas de la v8 si présents) ...
+      default: throw new Error(`Méthode HTTP non supportée pour data-xano-endpoint: ${method}`);
       }
-      console.log(`WorkspaceXanoData: Réponse reçue pour ${endpoint}:`, responseData); // Log 2: Voir la réponse brute
-
       if (loadingIndicator) loadingIndicator.style.display = 'none';
-
-      console.log(`WorkspaceXanoData: Prêt à appeler renderData pour ${targetElement ? targetElement.id : 'ELEMENT INCONNU'}.`); // Log 3
-      renderData(responseData, targetElement);
-      console.log(`WorkspaceXanoData: Appel renderData terminé pour ${targetElement ? targetElement.id : 'ELEMENT INCONNU'}.`); // Log 4
-
+      renderData(responseData, targetElement); // Appel rendu
       const successEvent = new CustomEvent('xano:data-loaded', { detail: { data: responseData, element: targetElement }, bubbles: true });
       targetElement.dispatchEvent(successEvent);
-
     } catch (error) {
-      // Attention: Si une erreur se produit ICI (avant renderData), renderData ne sera jamais appelé.
-      console.error(`Erreur fetch ${endpoint} (AVANT potentiel appel renderData):`, error);
+      console.error(`Erreur fetch ${endpoint}:`, error);
       if (loadingIndicator) loadingIndicator.style.display = 'none';
-      const errorDisplay = targetElement ? targetElement.querySelector('[data-xano-error]') : null;
-      if (errorDisplay) { errorDisplay.textContent = `Erreur: ${error.message || 'Impossible de charger.'}`; errorDisplay.style.color = 'red'; errorDisplay.style.display = 'block'; }
+      const errorDisplay = targetElement.querySelector('[data-xano-error]') || targetElement;
+      if (errorDisplay) { errorDisplay.textContent = `Erreur: ${error.message || 'Impossible de charger.'}`; errorDisplay.style.color = 'red'; }
       const errorEvent = new CustomEvent('xano:data-error', { detail: { error: error, element: targetElement }, bubbles: true });
-      if (targetElement) targetElement.dispatchEvent(errorEvent);
+      targetElement.dispatchEvent(errorEvent);
     }
-}
+  }
 
-// Dans renderData (gardez votre version actuelle de renderPhotoItems pour l'instant)
-// Fonction renderData restaurée (basée sur v8.3) avec logs ciblés
+// MODIFIÉ v8 -> v8.3: renderData distingue maintenant le rendu des photos
 function renderData(data, element) {
-    console.log(`--- renderData: Entrée pour element:`, element ? element.id || element.tagName : 'ELEMENT INTROUVABLE'); // Log 1
-
-    if (!element) {
-        console.error("renderData: ERREUR CRITIQUE, element est null ou undefined !");
-        return;
-    }
-
-    // ===== Condition pour l'affichage des PHOTOS =====
     if (element.id === 'room-photos-display' && element.hasAttribute('data-xano-list')) {
-         console.log("renderData: Condition OK -> Déclenchement affichage photos pour #room-photos-display"); // Log 2
-
-         // Extraction des données photos (attend un tableau directement)
-         let listData = Array.isArray(data) ? data : [];
-         if (!Array.isArray(data)) {
-             console.warn("renderData: Données photos reçues non-tableau:", data, "(Attendu tableau d'objets photo)");
-             // Si votre API renvoie les photos dans une propriété, adaptez ici :
-             // Exemple: if (data && Array.isArray(data.photos)) listData = data.photos; else listData = [];
-         }
-
-         console.log(`renderData: Prêt à appeler renderPhotoItems avec ${listData.length} photo(s).`); // Log 3 (AVANT l'appel)
-         if (typeof renderPhotoItems === 'function') {
-            // ====> APPEL DE LA FONCTION QUI AFFICHE LES PHOTOS <====
-            renderPhotoItems(listData, element);
-            // =======================================================
-            console.log("renderData: Appel renderPhotoItems TERMINÉ."); // Log 4 (APRÈS l'appel)
-         } else {
-             console.error("renderData: ERREUR - La fonction renderPhotoItems n'est pas définie!");
-         }
-
-    // ===== Condition pour les LISTES GÉNÉRIQUES (comme les rooms) =====
+        console.log("renderData: Appel renderPhotoItems pour #room-photos-display (v8.3)");
+        // INFO v8.3: Attend une liste d'enregistrements complets de property_photos
+        let listData = Array.isArray(data) ? data : [];
+        if (!Array.isArray(data)) console.warn("renderData: Données photos non tableau:", data);
+        renderPhotoItems(listData, element); // Appel rendu photos
     } else if (element.hasAttribute('data-xano-list')) {
-         console.log("renderData: Condition OK -> Appel renderListData (générique) pour:", element.id || element.tagName); // Log 5
-
-         // Logique originale (v8_3) pour extraire la liste
-         let listData = null;
-         const potentialDataSources = [ data, data?.body, data?.items, data?.body?.items ]; // Cherche la liste dans différentes structures possibles
-         for (const source of potentialDataSources) { if (Array.isArray(source)) { listData = source; break; } if (source && typeof source === 'object') { for (const key in source) { if (Array.isArray(source[key])) { listData = source[key]; break; } } } if (listData) break; }
-
-         if (!listData) { console.warn("renderData: Aucune liste trouvée pour", element, "dans", data); listData = []; }
-
-         // Appel de la fonction qui affiche la liste (ex: les rooms)
-         if (typeof renderListData === 'function') {
-             renderListData(listData, element);
-         } else {
-             console.error("renderData: ERREUR - La fonction renderListData n'est pas définie!");
-         }
-
-    // ===== Condition pour les ÉLÉMENTS UNIQUES =====
+        console.log("renderData: Appel renderListData (générique) pour:", element);
+        // Logique v8 pour extraire la liste (rooms, etc.)
+        let listData = null;
+        const potentialDataSources = [ data, data?.body, data?.items, data?.body?.items ];
+        for (const source of potentialDataSources) { if (Array.isArray(source)) { listData = source; break; } if (source && typeof source === 'object') { for (const key in source) { if (Array.isArray(source[key])) { listData = source[key]; break; } } } if (listData) break; }
+        if (!listData) { console.warn("renderData: Aucune liste trouvée pour", element, "dans", data); listData = []; }
+        renderListData(listData, element); // Appel rendu liste générique
     } else {
-        console.log("renderData: Condition OK -> Affichage élément unique pour:", element.id || element.tagName); // Log 6
-        // Logique originale (v8_3) pour éléments uniques
+        console.log("renderData: Affichage élément unique pour:", element);
+        // Logique v8 pour éléments uniques
         const sourceData = data?.body ? data.body : data;
          if (sourceData && typeof sourceData === 'object') {
              const boundElements = element.querySelectorAll('[data-xano-bind]');
-             // ... (liaison des données pour élément unique via bindDataToElement) ...
              if (boundElements.length > 0) { boundElements.forEach(be => { if (!be.closest('[data-xano-list-item]')) bindDataToElement(be, sourceData); }); }
              else if (element.hasAttribute('data-xano-bind')) bindDataToElement(element, sourceData);
          } else console.warn("renderData: Données élément unique non objet:", sourceData);
     }
-     console.log(`--- renderData: Sortie pour element:`, element.id || element.tagName); // Log 7
 }
 
 // renderListData (Identique v8.1)
@@ -490,141 +444,79 @@ function renderListData(dataArray, listContainerElement) {
     } else { const em = listContainerElement.getAttribute('data-xano-empty-message') || "Aucune donnée."; if (!container.querySelector('.xano-empty-message')) { const me = document.createElement('div'); me.className = 'xano-empty-message'; me.textContent = em; container.appendChild(me); } }
 }
 
-// Dans la fonction renderPhotoItems(dataArray, listContainerElement)
-
-function renderPhotoItems(dataArray, listContainerElement) { // listContainerElement est #room-photos-display
+// MODIFIÉ v8 -> v8.3: renderPhotoItems utilise les IDs et la nouvelle structure de données
+function renderPhotoItems(dataArray, listContainerElement) {
+    // dataArray = liste des enregistrements complets de property_photos
     dataArray = Array.isArray(dataArray) ? dataArray : [];
-    console.log(`renderPhotoItems: Rendu de ${dataArray.length} photos (v Structure Confirmée).`);
+    console.log(`renderPhotoItems: Rendu de ${dataArray.length} photos (v8.3).`);
 
-    // 1. Récupérer les sélecteurs depuis l'élément parent (#room-photos-display)
-    const templateSelector = listContainerElement.getAttribute('data-xano-list'); // Doit être ".photo-item-template"
-    const photoListContainerSelector = listContainerElement.getAttribute('data-xano-list-container'); // Doit être "#photo-list-container"
+    const emptyStatePlaceholder = document.getElementById('photo-empty-state-placeholder');
+    const templateSelector = listContainerElement.getAttribute('data-xano-list');
+    if (!templateSelector) { console.error("renderPhotoItems: data-xano-list manquant.", listContainerElement); return; }
+    const templateElement = document.querySelector(templateSelector);
+    if (!templateElement) { console.error(`renderPhotoItems: Template "${templateSelector}" introuvable.`); return; }
+    const container = listContainerElement.querySelector('[data-xano-list-container]') || listContainerElement;
 
-    // 2. Trouver les conteneurs réels en utilisant les sélecteurs
-    //    Utilisation de document.querySelector car photoListContainerSelector est un ID (#...)
-    const photoListContainer = photoListContainerSelector ? document.querySelector(photoListContainerSelector) : null;
-    const emptyStatePlaceholder = document.getElementById('photo-empty-state-placeholder'); // Recherche par ID direct
+    // Vider conteneur (logique v8)
+    const existingEmptyMessage = container.querySelector('.xano-empty-message');
+    if (existingEmptyMessage) container.removeChild(existingEmptyMessage);
+    let currentChild = container.firstChild;
+    while (currentChild) { const nextChild = currentChild.nextSibling; if (currentChild.nodeType === Node.ELEMENT_NODE && currentChild.hasAttribute('data-xano-list-item')) container.removeChild(currentChild); currentChild = nextChild; }
+    if (templateElement.tagName !== 'TEMPLATE' && templateElement.style.display !== 'none') { templateElement.style.display = 'none'; templateElement.setAttribute('aria-hidden', 'true'); }
 
-    // --- Vérifications essentielles ---
-    if (!photoListContainer) {
-        console.error(`renderPhotoItems: ERREUR CRITIQUE - Conteneur photo introuvable via sélecteur: "${photoListContainerSelector}". Vérifiez l'attribut 'data-xano-list-container' sur #${listContainerElement.id} et l'ID de la cible.`);
-        return; // Arrêter si le conteneur principal manque
-    }
-    if (!emptyStatePlaceholder) {
-         // Pas bloquant, mais le signale si l'état vide ne peut pas être affiché.
-         console.warn("renderPhotoItems: Placeholder état vide #photo-empty-state-placeholder introuvable.");
-    }
-    if (!templateSelector) {
-        console.error("renderPhotoItems: ERREUR CRITIQUE - Attribut 'data-xano-list' manquant sur", listContainerElement.id);
-        return;
-    }
-
-    // 3. Trouver le template *à l'intérieur* du conteneur photo trouvé (#photo-list-container)
-    const templateElement = photoListContainer.querySelector(templateSelector);
-    if (!templateElement) {
-        console.error(`renderPhotoItems: ERREUR CRITIQUE - Template "${templateSelector}" introuvable DANS "${photoListContainerSelector}". Vérifiez la structure HTML et le sélecteur dans 'data-xano-list'.`);
-        // On pourrait afficher un message d'erreur dans l'UI ici
-        const errorDisplay = listContainerElement.querySelector('[data-xano-error]');
-        if (errorDisplay) {
-             errorDisplay.textContent = `Erreur: Template photo '${templateSelector}' non trouvé.`;
-             errorDisplay.style.display = 'block';
-        }
-        return; // Arrêter si le template manque
-    }
-    // S'assurer que le template (qui est une div ici) est bien caché
-    if (templateElement.style.display !== 'none') {
-        templateElement.style.display = 'none';
-        templateElement.setAttribute('aria-hidden', 'true');
-    }
-
-    // --- 4. Nettoyer les anciens éléments ajoutés dynamiquement ---
-    //    Sélectionne uniquement les éléments marqués comme items de liste générés
-    const itemsToRemove = photoListContainer.querySelectorAll('[data-xano-list-item]');
-    itemsToRemove.forEach(item => photoListContainer.removeChild(item));
-    //    Nettoie aussi un éventuel message d'erreur précédent dans le conteneur
-    const existingEmptyMessage = photoListContainer.querySelector('.xano-empty-message');
-    if (existingEmptyMessage) photoListContainer.removeChild(existingEmptyMessage);
-
-
-    // --- 5. Affichage conditionnel ---
     if (dataArray.length > 0) {
-        // CAS: Il y a des photos à afficher
-        if (emptyStatePlaceholder) emptyStatePlaceholder.style.display = 'none'; // CACHER l'état vide
-        photoListContainer.style.display = 'grid'; // MONTRER le conteneur de la liste (style="display: grid;" vu dans le screenshot)
+        if (emptyStatePlaceholder) emptyStatePlaceholder.style.display = 'none';
+        else console.warn("renderPhotoItems: Placeholder #photo-empty-state-placeholder non trouvé.");
 
-        // Boucle pour cloner, remplir et ajouter chaque photo
-        dataArray.forEach((item, index) => {
-            const clone = templateElement.cloneNode(true); // Cloner la div template
-
-            // Rendre le clone visible et le préparer
-            clone.style.display = ''; // Enlève le display:none hérité
-            clone.classList.remove('photo-item-template'); // Important pour ne pas le resélectionner comme template
-            clone.setAttribute('data-xano-list-item', ''); // Marqueur pour le nettoyage futur
+        dataArray.forEach((item, index) => { // item = enregistrement property_photos
+            const clone = templateElement.tagName === 'TEMPLATE' ? templateElement.content.cloneNode(true).firstElementChild : templateElement.cloneNode(true);
+            if (!clone) return;
+            clone.style.display = 'block'; // OU 'grid', ou 'flex' selon ce que doit être un item photo individuel
             clone.removeAttribute('aria-hidden');
-            // clone.setAttribute('data-xano-item-index', index.toString()); // Si besoin de l'index
+            clone.setAttribute('data-xano-list-item', ''); clone.setAttribute('data-xano-item-index', index.toString());
 
-            // --- Logique pour remplir le clone (liaison des données) ---
-            // A. Définir l'ID de la photo sur le clone (pour la sélection/suppression)
+            // --- ID (Essentiel pour v8.3) ---
             if (item && item.id) {
-                clone.setAttribute('data-photo-id', item.id);
+                clone.setAttribute('data-photo-id', item.id); // Utilise l'ID de l'enregistrement
             } else {
-                console.error("renderPhotoItems: ID photo MANQUANT dans les données:", item);
-                clone.classList.add('photo-item-error-no-id'); // Style d'erreur visuel ?
+                console.error("renderPhotoItems: ID photo MANQUANT dans l'enregistrement:", item);
+                clone.classList.add('photo-item-error-no-id');
             }
 
-            // B. Trouver l'URL de l'image (adaptez si la structure des données change)
-            const metadataField = 'images'; // Nom du champ contenant les métadonnées de l'image
+            // --- Path (Utile pour la modale et fallback src) ---
+            // !! Adaptez 'images' au nom exact de votre champ tableau !!
+            const metadataField = 'images'; // <--- VÉRIFIEZ CE NOM
             const metadataArray = item ? item[metadataField] : null;
             const imageMetadata = (Array.isArray(metadataArray) && metadataArray.length > 0) ? metadataArray[0] : null;
-            let imagePathOrUrl = imageMetadata ? (imageMetadata.url || imageMetadata.path) : null; // Prend l'URL ou le chemin
+            let imagePathOrUrl = null;
+            if (imageMetadata) { imagePathOrUrl = imageMetadata.url || imageMetadata.path; }
+            if (imagePathOrUrl) { clone.setAttribute('data-photo-path', imagePathOrUrl); }
+            else { console.warn(`renderPhotoItems: Path/URL introuvable pour ID ${item?.id}:`, item); clone.setAttribute('data-photo-path', ''); }
 
-            // C. Définir l'attribut 'data-photo-path' (utilisé ailleurs ?)
-            clone.setAttribute('data-photo-path', imagePathOrUrl || '');
+            // --- Lier les données (pour la src de l'image via data-xano-bind) ---
+            const boundElements = clone.querySelectorAll('[data-xano-bind]');
+            boundElements.forEach(boundElement => bindDataToElement(boundElement, item));
+            if (clone.hasAttribute('data-xano-bind')) bindDataToElement(clone, item);
 
-            // D. Trouver la balise <img> à l'intérieur du clone
-            const imgElement = clone.querySelector('img');
-            if (imgElement) {
-                // Utiliser bindDataToElement pour définir la source et autres attributs si elle fonctionne correctement
-                 if (typeof bindDataToElement === 'function') {
-                    bindDataToElement(imgElement, item); // Laisser bindDataToElement gérer la src
-                 } else {
-                     // Fallback: définir la source manuellement si bindDataToElement pose problème
-                     imgElement.src = imagePathOrUrl || '';
-                     console.warn("renderPhotoItems: bindDataToElement non trouvée ou désactivée, src définie manuellement.");
-                 }
+            // --- Fade-in (Logique v8) ---
+            const imgElement = clone.querySelector('.photo-item-image');
+            if (imgElement) { imgElement.classList.add('photo-item-loading'); }
+            else { console.warn("renderPhotoItems: Image (.photo-item-image) non trouvée pour fade-in."); }
 
-                // Effet de fondu (optionnel)
-                imgElement.classList.add('photo-item-loading'); // Ajouter classe CSS pour l'opacité initiale
-                requestAnimationFrame(() => { // Attendre le prochain frame
-                    requestAnimationFrame(() => { // Attendre un autre frame (plus sûr)
-                        imgElement.classList.remove('photo-item-loading'); // Retirer la classe pour transition CSS
-                    });
-                });
-            } else {
-                console.warn("renderPhotoItems: Balise <img> introuvable dans le template cloné.");
-            }
-            // --- Fin liaison données ---
+            container.appendChild(clone);
 
-            // Ajouter le clone rempli au conteneur
-            photoListContainer.appendChild(clone);
+            if (imgElement) { requestAnimationFrame(() => { requestAnimationFrame(() => { imgElement.classList.remove('photo-item-loading'); }); }); }
         });
-
-    } else {
-        // CAS: Aucune photo (dataArray est vide)
-        photoListContainer.style.display = 'none'; // CACHER le conteneur de la liste
-        if (emptyStatePlaceholder) {
-            emptyStatePlaceholder.style.display = 'flex'; // MONTRER l'état vide (ou 'block')
-        } else {
-            // Que faire si le placeholder manque ? Afficher un message texte simple ?
-            console.warn("Placeholder état vide introuvable (#photo-empty-state-placeholder).");
-            // On pourrait ajouter un message dans photoListContainer (mais il est caché)
-            const emptyMessageText = listContainerElement.getAttribute('data-xano-empty-message') || "Aucune photo à afficher.";
-            if (!photoListContainer.querySelector('.xano-empty-message')) {
-                const messageElement = document.createElement('div');
-                messageElement.className = 'xano-empty-message';
-                messageElement.textContent = emptyMessageText;
-                photoListContainer.appendChild(messageElement); // Ajouté au conteneur caché
-            }
+    } else { // Aucune photo
+        if (emptyStatePlaceholder) emptyStatePlaceholder.style.display = 'flex'; // Ou 'block'
+        else {
+             const emptyMessageText = listContainerElement.getAttribute('data-xano-empty-message') || "Aucune photo pour le moment.";
+             if (!container.querySelector('.xano-empty-message')) {
+                 const messageElement = document.createElement('div');
+                 messageElement.className = 'xano-empty-message';
+                 messageElement.textContent = emptyMessageText;
+                 container.appendChild(messageElement);
+             }
         }
     }
 }
