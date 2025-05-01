@@ -963,36 +963,41 @@ async function handleSortEnd(event) {
          await fetchXanoData(client, photoEndpoint, 'GET', null, photoDisplayContainer, photoLoadingIndicator);
          console.log(`refreshCurrentRoomPhotos: Rafraîchissement photos terminé.`);
          const photoList = document.getElementById('photo-list-container');
-        
-       if (photoList && photoList.children.length > 0) {
-             console.log("refreshCurrentRoomPhotos: Tentative ré-initialisation SortableJS...");
+
+         if (photoList && photoList.children.length > 0) {
+             console.log("refreshCurrentRoomPhotos: Tentative ré-initialisation SortableJS avec options mobile..."); // Log modifié
              if (typeof Sortable !== 'undefined') {
-               
-                 currentSortableInstance = new Sortable(photoList, { // Début des options
-               // === OPTION À GARDER ===
-               animation: 150,
 
-               // === OPTIONS À METTRE EN COMMENTAIRE (AJOUTEZ // DEVANT) ===
-                ghostClass: 'sortable-ghost', 
+                 // Détruire l'instance précédente si elle existe (déjà fait avant le fetch)
+                 // if (currentSortableInstance) { currentSortableInstance.destroy(); }
 
-               // onStart: function(evt) { // Ligne commentée
-               //     console.log("DEBUG: SortableJS onStart"); // Ligne commentée
-               //     const btn = document.getElementById('bouton-supprimer-selection'); // Ligne commentée
-               //     if (modeSelectionActif && btn) btn.disabled = true; // Ligne commentée
-               // }, // Ligne commentée
+                 // Créer la nouvelle instance avec les options pour mobile
+                 currentSortableInstance = new Sortable(photoList, {
+                     // --- Options existantes ---
+                     animation: 150,
+                     // ghostClass: 'sortable-ghost', // Vous pouvez décommenter si besoin
 
-                onEnd: function(evt) { 
-                   console.log("DEBUG: SortableJS onEnd"); 
-                   handleSortEnd(evt);
-               } 
-               // ============================================================
+                     // --- Options ajoutées pour le mobile ---
+                     delay: 350, // Délai en millisecondes (ajustez entre 200 et 500 selon vos tests)
+                     delayOnTouchOnly: true, // Appliquer le délai uniquement pour le toucher
 
-           }); // Fin des options
-               
-                 console.log("refreshCurrentRoomPhotos: SortableJS ré-initialisé (TEST MINIMAL):", currentSortableInstance); // GARDER CE LOG
-             } else { console.error("refreshCurrentRoomPhotos: SortableJS n'est pas défini !"); }
-         } else console.log("refreshCurrentRoomPhotos: Pas de photos à trier.");
-     } catch (error) { console.error(`refreshCurrentRoomPhotos: Erreur refresh:`, error); if (errorElement) { errorElement.textContent = "Erreur refresh photos."; errorElement.style.display = 'block'; } }
+                     // --- Gestionnaire d'événement existant ---
+                     onEnd: function(evt) {
+                         console.log("DEBUG: SortableJS onEnd");
+                         handleSortEnd(evt); // Votre fonction qui sauvegarde le nouvel ordre
+                     }
+                     // ------------------------------------
+                 });
+
+                 console.log("refreshCurrentRoomPhotos: SortableJS ré-initialisé (Options Mobile):", currentSortableInstance.options); // Log pour vérifier les options appliquées
+
+             } else {
+                 console.error("refreshCurrentRoomPhotos: SortableJS n'est pas défini ! Assurez-vous que la bibliothèque est chargée.");
+             }
+         } else {
+             console.log("refreshCurrentRoomPhotos: Pas de photos à trier, SortableJS non initialisé.");
+         }
+     }  catch (error) { console.error(`refreshCurrentRoomPhotos: Erreur refresh:`, error); if (errorElement) { errorElement.textContent = "Erreur refresh photos."; errorElement.style.display = 'block'; } }
      finally { if (photoLoadingIndicator) photoLoadingIndicator.style.display = 'none'; }
 }
 
