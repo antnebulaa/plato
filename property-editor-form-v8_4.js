@@ -323,32 +323,68 @@ async function fetchXanoData(client, endpoint, method, params, targetElement, lo
 }
 
 // Dans renderData (gardez votre version actuelle de renderPhotoItems pour l'instant)
+// Fonction renderData restaurée (basée sur v8.3) avec logs ciblés
 function renderData(data, element) {
-    console.log(`--- renderData (TEST SIMPLIFIÉ) pour element:`, element);
+    console.log(`--- renderData: Entrée pour element:`, element ? element.id || element.tagName : 'ELEMENT INTROUVABLE'); // Log 1
 
-    // Se concentre UNIQUEMENT sur le rendu de la liste des rooms
-    if (element && element.classList.contains('display-room-container') && element.getAttribute('data-xano-endpoint') === 'property_photos_rooms/get_one') {
-         console.log("renderData (TEST SIMPLIFIÉ): Appel renderListData pour .display-room-container");
-
-         // Extraction simplifiée des données des rooms (vérifiez la structure réelle de 'data')
-         let listData = null;
-         if (Array.isArray(data)) { listData = data; }
-         else if (data && Array.isArray(data.items)) { listData = data.items; } // Ajustez si nécessaire (ex: data.body.items)
-         else { console.warn("renderData (TEST SIMPLIFIÉ): Structure de données des rooms non reconnue:", data); listData = []; }
-
-         if (typeof renderListData === 'function') {
-             renderListData(listData, element); // Appel de la fonction originale qui affiche les rooms
-         } else {
-              console.error("renderData (TEST SIMPLIFIÉ): La fonction renderListData n'existe pas!");
-         }
-    } else if (element && element.id === 'room-photos-display') {
-         console.log("renderData (TEST SIMPLIFIÉ): Ignoré - Affichage photos non traité dans ce test.");
-         // N'appelle PAS renderPhotoItems pour ce test
-    } else {
-         console.log(`renderData (TEST SIMPLIFIÉ): Élément non traité:`, element);
-         // Ne fait rien pour les autres cas pour l'instant
+    if (!element) {
+        console.error("renderData: ERREUR CRITIQUE, element est null ou undefined !");
+        return;
     }
-    console.log(`--- renderData (TEST SIMPLIFIÉ): Sortie`);
+
+    // ===== Condition pour l'affichage des PHOTOS =====
+    if (element.id === 'room-photos-display' && element.hasAttribute('data-xano-list')) {
+         console.log("renderData: Condition OK -> Déclenchement affichage photos pour #room-photos-display"); // Log 2
+
+         // Extraction des données photos (attend un tableau directement)
+         let listData = Array.isArray(data) ? data : [];
+         if (!Array.isArray(data)) {
+             console.warn("renderData: Données photos reçues non-tableau:", data, "(Attendu tableau d'objets photo)");
+             // Si votre API renvoie les photos dans une propriété, adaptez ici :
+             // Exemple: if (data && Array.isArray(data.photos)) listData = data.photos; else listData = [];
+         }
+
+         console.log(`renderData: Prêt à appeler renderPhotoItems avec ${listData.length} photo(s).`); // Log 3 (AVANT l'appel)
+         if (typeof renderPhotoItems === 'function') {
+            // ====> APPEL DE LA FONCTION QUI AFFICHE LES PHOTOS <====
+            renderPhotoItems(listData, element);
+            // =======================================================
+            console.log("renderData: Appel renderPhotoItems TERMINÉ."); // Log 4 (APRÈS l'appel)
+         } else {
+             console.error("renderData: ERREUR - La fonction renderPhotoItems n'est pas définie!");
+         }
+
+    // ===== Condition pour les LISTES GÉNÉRIQUES (comme les rooms) =====
+    } else if (element.hasAttribute('data-xano-list')) {
+         console.log("renderData: Condition OK -> Appel renderListData (générique) pour:", element.id || element.tagName); // Log 5
+
+         // Logique originale (v8_3) pour extraire la liste
+         let listData = null;
+         const potentialDataSources = [ data, data?.body, data?.items, data?.body?.items ]; // Cherche la liste dans différentes structures possibles
+         for (const source of potentialDataSources) { if (Array.isArray(source)) { listData = source; break; } if (source && typeof source === 'object') { for (const key in source) { if (Array.isArray(source[key])) { listData = source[key]; break; } } } if (listData) break; }
+
+         if (!listData) { console.warn("renderData: Aucune liste trouvée pour", element, "dans", data); listData = []; }
+
+         // Appel de la fonction qui affiche la liste (ex: les rooms)
+         if (typeof renderListData === 'function') {
+             renderListData(listData, element);
+         } else {
+             console.error("renderData: ERREUR - La fonction renderListData n'est pas définie!");
+         }
+
+    // ===== Condition pour les ÉLÉMENTS UNIQUES =====
+    } else {
+        console.log("renderData: Condition OK -> Affichage élément unique pour:", element.id || element.tagName); // Log 6
+        // Logique originale (v8_3) pour éléments uniques
+        const sourceData = data?.body ? data.body : data;
+         if (sourceData && typeof sourceData === 'object') {
+             const boundElements = element.querySelectorAll('[data-xano-bind]');
+             // ... (liaison des données pour élément unique via bindDataToElement) ...
+             if (boundElements.length > 0) { boundElements.forEach(be => { if (!be.closest('[data-xano-list-item]')) bindDataToElement(be, sourceData); }); }
+             else if (element.hasAttribute('data-xano-bind')) bindDataToElement(element, sourceData);
+         } else console.warn("renderData: Données élément unique non objet:", sourceData);
+    }
+     console.log(`--- renderData: Sortie pour element:`, element.id || element.tagName); // Log 7
 }
 
 // renderListData (Identique v8.1)
