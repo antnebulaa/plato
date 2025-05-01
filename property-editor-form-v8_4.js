@@ -444,114 +444,110 @@ function renderListData(dataArray, listContainerElement) {
     } else { const em = listContainerElement.getAttribute('data-xano-empty-message') || "Aucune donnée."; if (!container.querySelector('.xano-empty-message')) { const me = document.createElement('div'); me.className = 'xano-empty-message'; me.textContent = em; container.appendChild(me); } }
 }
 
-// REMPLACEZ votre fonction renderPhotoItems actuelle par celle-ci
+// REMPLACEZ ENCORE une fois votre fonction renderPhotoItems par celle-ci
 function renderPhotoItems(dataArray, listContainerElement) { // listContainerElement est #room-photos-display
     dataArray = Array.isArray(dataArray) ? dataArray : [];
-    console.log(`renderPhotoItems (v_corrigée): Rendu demandé pour ${dataArray.length} photos.`);
+    console.log(`renderPhotoItems (v_vidage_FINAL): Rendu demandé pour ${dataArray.length} photos.`);
 
     const emptyStatePlaceholder = document.getElementById('photo-empty-state-placeholder');
-    // Utilisons l'ID spécifique si c'est bien le conteneur des items photos
+    // Le conteneur où les items photos sont ajoutés ET qui contient aussi le template
     const container = document.getElementById('photo-list-container');
-    // const container = listContainerElement.querySelector('[data-xano-list-container]') || listContainerElement; // Votre ancienne méthode, gardez-la si #photo-list-container n'est pas le bon
-
-    const templateSelector = listContainerElement.getAttribute('data-xano-list'); // Devrait être '.photo-item-template'
+    const templateSelector = listContainerElement.getAttribute('data-xano-list'); // '.photo-item-template'
 
     // --- Vérifications initiales ---
-    if (!container) { console.error("renderPhotoItems: Conteneur de liste (#photo-list-container ou via attribut) introuvable."); return; }
+    if (!container) { console.error("renderPhotoItems: Conteneur #photo-list-container introuvable."); return; }
     if (!emptyStatePlaceholder) { console.warn("renderPhotoItems: Placeholder #photo-empty-state-placeholder non trouvé."); }
     if (!templateSelector) { console.error("renderPhotoItems: data-xano-list manquant.", listContainerElement); return; }
-    const templateElement = document.querySelector(templateSelector);
-    if (!templateElement) { console.error(`renderPhotoItems: Template "${templateSelector}" introuvable.`); return; }
     // --------------------------------
 
     // --- !! 1. RÉINITIALISATION SYSTÉMATIQUE !! ---
-    console.log("renderPhotoItems: Réinitialisation affichage (cache les deux).");
-    container.style.display = 'none';        // Cacher le conteneur de liste
-    if (emptyStatePlaceholder) emptyStatePlaceholder.style.display = 'none'; // Cacher l'état vide
+    console.log("renderPhotoItems: Réinitialisation affichage.");
+    container.style.display = 'none'; // On cache tout le conteneur d'abord
+    if (emptyStatePlaceholder) emptyStatePlaceholder.style.display = 'none';
     // --------------------------------------------
 
-    // --- Vider le conteneur des anciens items ---
-    // (Utilise votre logique existante qui cible [data-xano-list-item])
-    let currentChild = container.firstChild;
-    while (currentChild) {
-        const nextChild = currentChild.nextSibling;
-        if (currentChild.nodeType === Node.ELEMENT_NODE && currentChild.hasAttribute('data-xano-list-item')) { // Votre code utilise cet attribut
-            container.removeChild(currentChild);
-        }
-        currentChild = nextChild;
+    // --- !! VIDAGE SÉCURISÉ DU CONTENEUR !! ---
+    // Cible UNIQUEMENT les éléments ayant l'attribut ajouté aux clones
+    // et les supprime. NE TOUCHE PAS au template original.
+    console.log("renderPhotoItems: Vidage sécurisé du conteneur:", container);
+    container.querySelectorAll('[data-xano-list-item]').forEach(item => {
+        // console.log("Suppression de l'item clone:", item);
+        item.remove();
+    });
+    // --- Fin Vidage Sécurisé ---
+
+    // --- !! RÉCUPÉRATION DU TEMPLATE (Maintenant qu'on est sûr qu'il n'a pas été supprimé) !! ---
+    console.log("renderPhotoItems: Recherche template avec sélecteur:", templateSelector);
+    const templateElement = document.querySelector(templateSelector); // Recherche dans tout le document
+
+    if (!templateElement) {
+         console.error(`renderPhotoItems: ERREUR FATALE - Template "${templateSelector}" INTROUVABLE.`);
+         if (emptyStatePlaceholder) emptyStatePlaceholder.style.display = 'flex'; // Afficher état vide en cas d'erreur majeure
+         return; // Arrêter
+    } else {
+         console.log("renderPhotoItems: Template trouvé:", templateElement);
+         // Cacher le template original (important s'il n'est pas <template>)
+         if (templateElement.tagName !== 'TEMPLATE') {
+              templateElement.style.display = 'none';
+              templateElement.setAttribute('aria-hidden', 'true');
+         }
+          // Vérification : le template original ne DOIT PAS avoir data-xano-list-item
+         if (templateElement.hasAttribute('data-xano-list-item')){
+              console.error("ERREUR CONFIG: Le template original ne doit PAS avoir l'attribut 'data-xano-list-item' ! Vérifiez dans Webflow.");
+              // On pourrait choisir d'arrêter ici pour éviter des bugs
+              // return;
+         }
     }
-    // Cacher le template original
-    if (templateElement.tagName !== 'TEMPLATE' && templateElement.style.display !== 'none') {
-        templateElement.style.display = 'none';
-        templateElement.setAttribute('aria-hidden', 'true');
-    }
-    // --- Fin Vider ---
+    // --- Fin Récupération Template ---
 
 
     // --- 2. DÉCISION D'AFFICHAGE ---
     if (dataArray.length > 0) {
         // CAS 1: Il y a des photos
         console.log("renderPhotoItems: Photos détectées. Affichage conteneur liste.");
-        if (emptyStatePlaceholder) emptyStatePlaceholder.style.display = 'none'; // Assurer état vide caché
-        // !! AFFICHER EXPLICITEMENT LE CONTENEUR DE LISTE !!
-        // Mettez la bonne valeur : 'grid', 'flex', 'block', ou '' si display par défaut est ok
-        container.style.display = 'grid'; // <<<--- Exemple: Afficher en grille (Adaptez !)
+        if (emptyStatePlaceholder) emptyStatePlaceholder.style.display = 'none';
+        container.style.display = 'grid'; // <<<--- Adaptez (grid, flex, block, '')
 
-        dataArray.forEach((item, index) => { // item = { photo_order: ..., images: [ { url: ... } ], id: ... } (si id ajouté)
-            const clone = templateElement.tagName === 'TEMPLATE' ? templateElement.content.cloneNode(true).firstElementChild : templateElement.cloneNode(true);
-            if (!clone) return;
+        dataArray.forEach((item, index) => {
+             const clone = templateElement.tagName === 'TEMPLATE' ? templateElement.content.cloneNode(true).firstElementChild : templateElement.cloneNode(true);
+             if (!clone) return;
 
-            // Appliquer les styles et attributs comme dans votre code original
-            clone.style.display = 'block'; // Votre code original met 'block' ici
-            clone.removeAttribute('aria-hidden');
-            clone.setAttribute('data-xano-list-item', ''); // Important pour le vidage
-            clone.setAttribute('data-xano-item-index', index.toString());
+             // --- Configuration du Clone ---
+             clone.style.display = 'block'; // Ou autre style d'item
+             clone.removeAttribute('aria-hidden');
+             // !! MARQUEUR ESSENTIEL pour que le vidage fonctionne !!
+             clone.setAttribute('data-xano-list-item', '');
+             clone.setAttribute('data-xano-item-index', index.toString());
+             // Ajoutez l'ID de la photo si vous l'avez dans 'item' et en avez besoin
+             if (item && item.id) { clone.setAttribute('data-photo-id', item.id); }
 
-            // --- ID Photo ---
-            // Décommentez et assurez-vous que l'ID est dans la réponse Xano si vous en avez besoin
-             if (item && item.id) {
-                 clone.setAttribute('data-photo-id', item.id);
+             // --- Affichage Image ---
+             const imgElement = clone.querySelector('.photo-item-image'); // Adaptez sélecteur
+             const imageUrl = item?.images?.[0]?.url; // Structure Xano API
+             if (imgElement && imageUrl) {
+                 imgElement.src = imageUrl;
+                 imgElement.alt = item.photo_desc || `Photo ${item.photo_order || index + 1}`;
+                 clone.setAttribute('data-photo-path', imageUrl); // Pour la modale suppression
+                 imgElement.classList.add('photo-item-loading');
+                 imgElement.onload = () => imgElement.classList.remove('photo-item-loading');
+                 imgElement.onerror = () => imgElement.classList.add('photo-item-error');
+             } else if (imgElement) {
+                 imgElement.alt = "Image non disponible";
+                 clone.setAttribute('data-photo-path', '');
              }
 
-            // --- Image SRC ---
-            // (Votre code original utilisait bindDataToElement, mais c'est plus sûr directement)
-            const imgElement = clone.querySelector('.photo-item-image'); // Votre sélecteur pour l'image
-            const imageUrl = item?.images?.[0]?.url;
-            if (imgElement && imageUrl) {
-                imgElement.src = imageUrl;
-                imgElement.alt = item.photo_desc || `Photo ${item.photo_order || index + 1}`;
-                // Gestion classe loading (votre code)
-                imgElement.classList.add('photo-item-loading');
-                imgElement.onload = () => imgElement.classList.remove('photo-item-loading');
-                imgElement.onerror = () => imgElement.classList.add('photo-item-error');
-                 // Stocker le path/url pour la modale de suppression (votre code)
-                 clone.setAttribute('data-photo-path', imageUrl);
-            } else if (imgElement) {
-                console.warn(`renderPhotoItems: Image (.photo-item-image) ou URL introuvable pour item:`, item);
-                imgElement.alt = "Image non disponible";
-                clone.setAttribute('data-photo-path', ''); // Mettre path vide
-            }
-
-            // --- bindDataToElement ---
-            // Si vous n'avez PAS besoin de lier d'autres champs complexes du template
-            // via data-xano-bind, commentez/supprimez ces lignes :
-            // const boundElements = clone.querySelectorAll('[data-xano-bind]');
-            // boundElements.forEach(boundElement => bindDataToElement(boundElement, item));
-            // if (clone.hasAttribute('data-xano-bind')) bindDataToElement(clone, item);
-
-            container.appendChild(clone);
+             // Ajout au DOM
+             container.appendChild(clone);
         });
+
     } else {
         // CAS 2: Aucune photo
         console.log("renderPhotoItems: Aucune photo. Affichage état vide.");
-        // !! CACHER EXPLICITEMENT LE CONTENEUR DE LISTE !!
-        container.style.display = 'none';
+        container.style.display = 'none'; // Cacher la liste
         if (emptyStatePlaceholder) {
-             // AFFICHER L'ÉTAT VIDE
-            emptyStatePlaceholder.style.display = 'flex'; // Votre code utilisait 'flex'
+            emptyStatePlaceholder.style.display = 'flex'; // Afficher état vide (votre style)
         } else {
-            // On ne crée plus le message .xano-empty-message manuellement
-            console.error("renderPhotoItems: #photo-empty-state-placeholder NON trouvé ET aucune photo !");
+             console.error("renderPhotoItems: #photo-empty-state-placeholder NON trouvé ET aucune photo !");
         }
     }
     console.log("renderPhotoItems: Fin du rendu. Affichage final -> Liste:", container.style.display, "Placeholder:", emptyStatePlaceholder ? emptyStatePlaceholder.style.display : "Non trouvé");
