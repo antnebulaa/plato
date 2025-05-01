@@ -324,41 +324,31 @@ async function fetchXanoData(client, endpoint, method, params, targetElement, lo
 
 // Dans renderData (gardez votre version actuelle de renderPhotoItems pour l'instant)
 function renderData(data, element) {
-    console.log(`--- renderData: Entrée pour element:`, element ? element.id || element.tagName : 'ELEMENT INTROUVABLE', 'avec data:', data); // Log 5: Début renderData
+    console.log(`--- renderData (TEST SIMPLIFIÉ) pour element:`, element);
 
-    if (!element) {
-        console.error("renderData: ERREUR CRITIQUE, element est null ou undefined !");
-        return;
-    }
+    // Se concentre UNIQUEMENT sur le rendu de la liste des rooms
+    if (element && element.classList.contains('display-room-container') && element.getAttribute('data-xano-endpoint') === 'property_photos_rooms/get_one') {
+         console.log("renderData (TEST SIMPLIFIÉ): Appel renderListData pour .display-room-container");
 
-    // Logique de distinction (photos vs autres listes vs élément unique)
-    if (element.id === 'room-photos-display' && element.hasAttribute('data-xano-list')) {
-        console.log("renderData: Condition OK -> Appel renderPhotoItems pour #room-photos-display (v8.3)"); // Log 6
-        let listData = Array.isArray(data) ? data : [];
-        if (!Array.isArray(data)) {
-            console.warn("renderData: Données photos reçues non-tableau:", data, "(Attendu tableau d'objets photo)");
-            // Essayer d'extraire d'une propriété si l'API a changé ? Exemple: data.photos ou data.items
-            // listData = (data && Array.isArray(data.photos)) ? data.photos : [];
-        }
-        renderPhotoItems(listData, element); // Appel à votre fonction actuelle
-        console.log("renderData: Appel renderPhotoItems TERMINÉ."); // Log 7
+         // Extraction simplifiée des données des rooms (vérifiez la structure réelle de 'data')
+         let listData = null;
+         if (Array.isArray(data)) { listData = data; }
+         else if (data && Array.isArray(data.items)) { listData = data.items; } // Ajustez si nécessaire (ex: data.body.items)
+         else { console.warn("renderData (TEST SIMPLIFIÉ): Structure de données des rooms non reconnue:", data); listData = []; }
 
-    } else if (element.hasAttribute('data-xano-list')) {
-        console.log("renderData: Condition OK -> Appel renderListData (générique) pour:", element.id || element.tagName); // Log 8
-        // ... (logique existante pour renderListData) ...
-        let listData = null; /* ... extraire listData ... */
-        renderListData(listData, element); // Assurez-vous que renderListData existe
-        console.log("renderData: Appel renderListData TERMINÉ."); // Log 9
-
+         if (typeof renderListData === 'function') {
+             renderListData(listData, element); // Appel de la fonction originale qui affiche les rooms
+         } else {
+              console.error("renderData (TEST SIMPLIFIÉ): La fonction renderListData n'existe pas!");
+         }
+    } else if (element && element.id === 'room-photos-display') {
+         console.log("renderData (TEST SIMPLIFIÉ): Ignoré - Affichage photos non traité dans ce test.");
+         // N'appelle PAS renderPhotoItems pour ce test
     } else {
-        console.log("renderData: Condition OK -> Affichage élément unique pour:", element.id || element.tagName); // Log 10
-        // ... (logique existante pour élément unique) ...
-         const sourceData = data?.body ? data.body : data;
-         if (sourceData && typeof sourceData === 'object') { /* ... bindDataToElement ... */ }
-         else { console.warn("renderData: Données élément unique non objet:", sourceData); }
-         console.log("renderData: Affichage élément unique TERMINÉ."); // Log 11
+         console.log(`renderData (TEST SIMPLIFIÉ): Élément non traité:`, element);
+         // Ne fait rien pour les autres cas pour l'instant
     }
-     console.log(`--- renderData: Sortie pour element:`, element.id || element.tagName); // Log 12
+    console.log(`--- renderData (TEST SIMPLIFIÉ): Sortie`);
 }
 
 // renderListData (Identique v8.1)
