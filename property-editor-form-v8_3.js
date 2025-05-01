@@ -8,6 +8,7 @@
 // 2. Endpoint Xano GET /property_photos/photos/{room_id} retourne liste enregistrements complets, triés.
 // 3. Endpoints Xano batch_delete_by_ids et batch_reorder existent et fonctionnent avec les IDs.
 
+
 let xanoClient;
 let currentSortableInstance = null;
 let modeSelectionActif = false;
