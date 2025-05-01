@@ -978,7 +978,7 @@ async function handleSortEnd(event) {
                      // ghostClass: 'sortable-ghost', // Vous pouvez décommenter si besoin
 
                      // --- Options ajoutées pour le mobile ---
-                     delay: 250, // Délai en millisecondes (ajustez entre 200 et 500 selon vos tests)
+                     delay: 200, // Délai en millisecondes (ajustez entre 200 et 500 selon vos tests)
                      delayOnTouchOnly: true, // Appliquer le délai uniquement pour le toucher
 
                      // --- Gestionnaire d'événement existant ---
