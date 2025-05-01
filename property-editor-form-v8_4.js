@@ -972,24 +972,27 @@ async function handleSortEnd(event) {
                  // if (currentSortableInstance) { currentSortableInstance.destroy(); }
 
                  // Créer la nouvelle instance avec les options pour mobile
-                 currentSortableInstance = new Sortable(photoList, {
+                console.log("refreshCurrentRoomPhotos: Initialisation SortableJS avec options mobile...");
+                 currentSortableInstance = new Sortable(photoList, { // { Ouvre l'objet des options
                      // --- Options existantes ---
-                     animation: 150,
-                     // ghostClass: 'sortable-ghost', // Vous pouvez décommenter si besoin
+                     animation: 150, // <<< Virgule ajoutée
+
+                     // ghostClass: 'sortable-ghost', // Laisser commenté ou ajouter une virgule si décommenté
 
                      // --- Options ajoutées pour le mobile ---
-                     delay: 350, // Délai en millisecondes (ajustez entre 200 et 500 selon vos tests)
-                     delayOnTouchOnly: true, // Appliquer le délai uniquement pour le toucher
+                     delay: 350, // <<< Virgule ajoutée
+                     delayOnTouchOnly: true, // <<< Virgule ajoutée
 
                      // --- Gestionnaire d'événement existant ---
+                     // (Pas de virgule après la dernière option)
                      onEnd: function(evt) {
                          console.log("DEBUG: SortableJS onEnd");
                          handleSortEnd(evt); // Votre fonction qui sauvegarde le nouvel ordre
                      }
-                     // ------------------------------------
-                 });
 
-                 console.log("refreshCurrentRoomPhotos: SortableJS ré-initialisé (Options Mobile):", currentSortableInstance.options); // Log pour vérifier les options appliquées
+                 }); // } Ferme l'objet des options, ) Ferme l'appel new Sortable()
+
+                 console.log("refreshCurrentRoomPhotos: SortableJS ré-initialisé (Options Mobile):", currentSortableInstance.options); // Log pour vérifier
 
              } else {
                  console.error("refreshCurrentRoomPhotos: SortableJS n'est pas défini ! Assurez-vous que la bibliothèque est chargée.");
