@@ -382,40 +382,50 @@ function renderListData(dataArray, listContainerElement) {
             // --- NOUVEAU CODE POUR L'IMAGE DE FOND ---
             // Trouvez la div spécifique dans le clone qui représente la room
             // Ajustez le sélecteur si nécessaire. S'il n'y a qu'une seule div avec ces attributs par item, ceci devrait fonctionner.
-            // --- NOUVEAU CODE POUR L'IMAGE DE FOND (version photo_order == 1) ---
+            // --- NOUVEAU CODE POUR L'IMAGE DE FOND (avec logs) ---
+            console.log('Traitement de la room :', item); // Voir les données de la room
             const roomDiv = clone.querySelector(`[data-action="select-created-room"][data-room-id]`);
+            console.log('Div cible (roomDiv) trouvée :', roomDiv); // Vérifier si la div est trouvée
 
-            // Vérifiez si la div a été trouvée et si les données de l'item (room) contiennent un tableau 'images'
-            // Remplacez 'images' par le nom réel du tableau si différent
             if (roomDiv && item.images && Array.isArray(item.images)) {
+                console.log('Tableau images trouvé :', item.images); // Voir le contenu du tableau
 
-                // Trouver la photo avec photo_order === 1
-                // Remplacez 'photo_order' par le nom exact du champ dans vos données Xano si différent
-                const targetPhoto = item.images.find(photo => photo.photo_order === 1);
+                const targetPhoto = item.images.find(photo => photo.photo_order === 1); // Assurez-vous que 1 est le bon type (nombre ou string)
+                console.log('Photo avec order=1 trouvée (targetPhoto) :', targetPhoto); // Voir si la photo est trouvée
 
-                // Vérifier si une photo avec photo_order === 1 a été trouvée et si elle a une URL
-                // Remplacez 'url' par le nom exact du champ URL si différent
+                let photoUrl = null; // Initialiser photoUrl
+
                 if (targetPhoto && targetPhoto.url) {
-                    const photoUrl = targetPhoto.url;
-                    roomDiv.style.backgroundImage = `url('${photoUrl}')`;
-                    // Optionnel : Styles pour l'affichage du fond
-                    // roomDiv.style.backgroundSize = 'cover';
-                    // roomDiv.style.backgroundPosition = 'center';
-                    // roomDiv.style.backgroundRepeat = 'no-repeat';
+                    photoUrl = targetPhoto.url;
+                    console.log('URL trouvée (order=1) :', photoUrl);
                 } else {
-                    // Optionnel : Si aucune photo avec order=1 n'est trouvée, utiliser la première photo comme fallback ?
-                    // Ou définir un fond par défaut.
+                     console.warn(`Photo avec order=1 non trouvée ou sans URL pour room ID ${item.id}.`);
+                    // Fallback éventuel
                     if (item.images.length > 0 && item.images[0].url) {
-                        console.warn(`Photo avec order=1 non trouvée pour room ID ${item.id}. Utilisation de la première photo.`);
-                        roomDiv.style.backgroundImage = `url('${item.images[0].url}')`;
+                        console.log('Utilisation de la première photo comme fallback.');
+                        photoUrl = item.images[0].url;
                     } else {
-                        console.warn(`Aucune photo valide (ni order=1, ni la première) trouvée pour room ID ${item.id}.`);
-                        // roomDiv.style.backgroundColor = '#f0f0f0'; // Fond par défaut
+                        console.warn(`Aucune photo valide trouvée pour room ID ${item.id}.`);
                     }
                 }
+
+                // Appliquer le style seulement si on a une URL valide
+                if (photoUrl) {
+                     console.log(`Application de l'image de fond (${photoUrl}) sur :`, roomDiv);
+                     roomDiv.style.backgroundImage = `url('${photoUrl}')`;
+                     // Ajoutez aussi les autres styles ici si vous ne les avez pas en CSS
+                     // roomDiv.style.backgroundSize = 'cover';
+                     // roomDiv.style.backgroundPosition = 'center';
+                     // roomDiv.style.backgroundRepeat = 'no-repeat';
+                     // roomDiv.style.minHeight = '200px'; // **Très important pour la visibilité**
+                } else {
+                    console.log('Aucune URL de photo à appliquer pour room ID:', item.id);
+                }
+
             } else if (roomDiv) {
                  console.warn("Tableau 'images' non trouvé ou invalide pour room ID:", item.id);
-                 // roomDiv.style.backgroundColor = '#f0f0f0'; // Fond par défaut
+            } else {
+                 console.error("La div cible [data-action='select-created-room'] n'a pas été trouvée dans le clone !");
             }
             // --- FIN DU NOUVEAU CODE ---
           
