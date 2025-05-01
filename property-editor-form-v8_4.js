@@ -155,9 +155,26 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log("   Vérification de xanoClient:", xanoClient);
     if (typeof setupCreatedRoomSelection !== 'function') { console.error("ERREUR CRITIQUE: setupCreatedRoomSelection n'est pas une fonction !"); return; }
     if (!xanoClient) { console.error("ERREUR CRITIQUE: xanoClient est undefined/null !"); return; }
-    setupCreatedRoomSelection(xanoClient); console.log("8. Appel setupCreatedRoomSelection TERMINÉ.");
+    setupCreatedRoomSelection(xanoClient); 
+    console.log("8. Appel setupCreatedRoomSelection TERMINÉ.");
     setupPhotoSelectionMode(); console.log("9. setupPhotoSelectionMode appelé."); // Initialise sélection/suppression photo
     console.log("10. Initialisation UNIFIÉE terminée.");
+
+ // +++ AJOUTEZ CE TEST +++
+    try {
+        console.log("--- TEST POST-INIT ---");
+        const testTemplateElement = document.querySelector('.photo-item-template');
+        if (testTemplateElement) {
+            console.log("TEST POST-INIT: Template '.photo-item-template' TROUVÉ :", testTemplateElement);
+        } else {
+            console.error("TEST POST-INIT: Template '.photo-item-template' INTROUVABLE ! Vérifiez le nom de classe et l'existence dans le HTML final.");
+        }
+        console.log("--- FIN TEST POST-INIT ---");
+    } catch(e) {
+        console.error("Erreur durant TEST POST-INIT:", e);
+    }
+    // ++++++++++++++++++++++
+    
   } catch (initError) { console.error("ERREUR GLOBALE DANS DOMContentLoaded:", initError); }
 });
 
