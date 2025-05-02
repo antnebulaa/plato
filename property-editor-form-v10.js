@@ -184,6 +184,39 @@ document.addEventListener('DOMContentLoaded', function() {
   } catch (initError) { console.error("ERREUR GLOBALE DANS DOMContentLoaded:", initError); }
 });
 
+
+// À placer dans votre fonction d'initialisation (après DOMContentLoaded)
+function setupSectionNavigation() {
+    const menuContainer = document.querySelector('#your-side-menu-container'); // Adaptez le sélecteur
+    if (!menuContainer) return;
+
+    menuContainer.addEventListener('click', function(event) {
+        const menuItem = event.target.closest('[data-section]'); // Trouve l'élément cliquable avec data-section
+        if (menuItem) {
+            event.preventDefault(); // Empêche le comportement par défaut du lien
+            const sectionId = menuItem.getAttribute('data-section');
+            loadAndDisplaySection(sectionId, true); // true pour mettre à jour l'URL
+        }
+    });
+}
+
+// Appelez setupSectionNavigation() dans votre DOMContentLoaded
+document.addEventListener('DOMContentLoaded', function() {
+    // ... votre code existant ...
+    try {
+        // ... init xanoClient, forms, etc. ...
+        setupSectionNavigation(); // Ajoutez cet appel
+
+        // Gérer le chargement initial basé sur l'URL
+        const initialSection = getQueryParam('section') || 'details'; // 'details' est un exemple de section par défaut
+        loadAndDisplaySection(initialSection, false); // false pour ne pas réécrire l'URL si elle est déjà correcte
+
+        console.log("Initialisation avec navigation par section terminée.");
+    } catch (initError) { /* ... */ }
+});
+
+
+
 // --- Classe XanoClient (Modifiée v8.3 pour DELETE avec body) ---
 class XanoClient {
     constructor(config) { this.apiGroupBaseUrl = config.apiGroupBaseUrl; this.authToken = null; }
@@ -579,6 +612,105 @@ function renderPhotoItems(dataArray, listContainerElement) { // listContainerEle
         }
     }
 }
+
+
+// Map des sections vers les endpoints Xano (exemple)
+const sectionEndpoints = {
+    'details': 'property_details', // Endpoint pour les détails généraux
+    'pricing': 'property_pricing', // Endpoint pour les tarifs
+    'photos': `property_photos/photos/${currentSelectedRoomId}`, // Votre logique photo existante peut être intégrée ici ou appelée séparément
+    'amenities': 'property_amenities'
+    // Ajoutez toutes vos sections
+};
+
+async function loadAndDisplaySection(sectionId, updateUrl = false) {
+    console.log(`Affichage section: ${sectionId}`);
+    const propertyId = getQueryParam('property_id'); // Vous avez déjà getQueryParam
+    if (!propertyId) {
+        console.error("ID Propriété manquant dans l'URL !");
+        return;
+    }
+
+    // --- 1. Gérer l'affichage visuel ---
+    // Mettre à jour l'état actif du menu
+    document.querySelectorAll('#your-side-menu-container [data-section]').forEach(el => {
+        el.classList.toggle('is-selected', el.getAttribute('data-section') === sectionId);
+    });
+
+    // Masquer toutes les sections, puis afficher la bonne
+    document.querySelectorAll('.section-container').forEach(container => {
+        container.style.display = 'none';
+    });
+    const targetContainer = document.getElementById(`section-content-${sectionId}`);
+    if (targetContainer) {
+        targetContainer.style.display = 'block'; // Ou 'flex', 'grid' selon votre layout
+    } else {
+        console.error(`Conteneur pour la section "${sectionId}" non trouvé !`);
+        return;
+    }
+
+    // --- 2. Charger les données depuis Xano (si nécessaire) ---
+    // Optionnel : Vérifier si les données ont déjà été chargées pour éviter les appels répétés
+    // Exemple simple : if (!targetContainer.dataset.loaded) { ... }
+
+    const endpoint = sectionEndpoints[sectionId];
+    const loadingIndicator = targetContainer.querySelector('[data-xano-loading]'); // Chaque section peut avoir son indicateur
+    const errorElement = targetContainer.querySelector('[data-xano-error]');
+
+    if (endpoint) {
+        try {
+            // Adapter les paramètres si nécessaire pour chaque section
+            let params = { property_id: propertyId }; // Paramètre de base
+            // Si section photos, vous pourriez avoir besoin de currentSelectedRoomId etc. Adaptez !
+            if (sectionId === 'photos' && currentSelectedRoomId) {
+               // Votre fonction refreshCurrentRoomPhotos fait déjà le travail, appelez-la peut-être ici ?
+               console.log("Appel spécifique pour rafraîchir les photos...");
+               await refreshCurrentRoomPhotos(xanoClient); // Assurez-vous que xanoClient est accessible
+            } else if (sectionId !== 'photos') { // Pour les autres sections standard
+               console.log(`Workspaceing data for section ${sectionId} from endpoint ${endpoint}`);
+               // Utilisez votre fetchXanoData existant, en le rendant peut-être plus générique
+               // ou créez des fonctions spécifiques fetchDetails, fetchPricing...
+               // Ici, on utilise fetchXanoData en passant le conteneur cible pour le rendu
+               await fetchXanoData(xanoClient, endpoint, 'GET', params, targetContainer, loadingIndicator);
+            }
+            // targetContainer.dataset.loaded = 'true'; // Marquer comme chargé
+        } catch (error) {
+            console.error(`Erreur chargement section ${sectionId}:`, error);
+            if (errorElement) { /* Affichez l'erreur */ }
+        }
+    } else if (sectionId !== 'photos') { // Ne pas afficher d'erreur si c'est la section photos gérée séparément
+         console.warn(`Aucun endpoint défini pour la section: ${sectionId}`);
+    }
+
+
+    // --- 3. Mettre à jour l'URL ---
+    if (updateUrl && history.pushState) {
+        const newUrl = `<span class="math-inline">\{window\.location\.pathname\}?property\_id\=</span>{propertyId}&section=${sectionId}`;
+        // L'objet state peut contenir des infos utiles si besoin pour le popstate
+        history.pushState({ section: sectionId, propertyId: propertyId }, '', newUrl);
+        console.log(`URL mise à jour : ${newUrl}`);
+    }
+}
+
+
+window.addEventListener('popstate', function(event) {
+    // event.state contient l'objet que vous avez passé à pushState
+    const previousState = event.state;
+    let sectionToLoad = 'details'; // Section par défaut si pas d'état
+
+    if (previousState && previousState.section) {
+        sectionToLoad = previousState.section;
+    } else {
+        // Fallback si pas d'état, lire depuis l'URL actuelle
+        sectionToLoad = getQueryParam('section') || 'details';
+    }
+
+    console.log(`Popstate détecté - Affichage section: ${sectionToLoad}`);
+    // Important: Ne pas mettre à jour l'URL ici (updateUrl = false)
+    // car l'URL a déjà été changée par le navigateur
+    loadAndDisplaySection(sectionToLoad, false);
+});
+
 
 // MODIFIÉ v8 -> v8.3: bindDataToElement gère l'accès au tableau metadata
 function bindDataToElement(element, data) {
