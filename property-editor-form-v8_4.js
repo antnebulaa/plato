@@ -157,6 +157,28 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!xanoClient) { console.error("ERREUR CRITIQUE: xanoClient est undefined/null !"); return; }
     setupCreatedRoomSelection(xanoClient); console.log("8. Appel setupCreatedRoomSelection TERMINÉ.");
     setupPhotoSelectionMode(); console.log("9. setupPhotoSelectionMode appelé."); // Initialise sélection/suppression photo
+
+  // --- AJOUT : Empêcher le menu contextuel sur les photos déplaçables ---
+    const photoListContainerForContextMenu = document.getElementById('photo-list-container'); // <<< Vérifiez que l'ID est correct
+    if (photoListContainerForContextMenu) {
+        photoListContainerForContextMenu.addEventListener('contextmenu', function(event) {
+            // Vérifier si l'élément source de l'événement (ou un parent proche)
+            // est bien une photo que nous rendons déplaçable (on utilise data-photo-id comme indicateur)
+            const photoItem = event.target.closest('[data-photo-id]');
+            if (photoItem) {
+                // Oui, c'est une de nos photos, on empêche le menu par défaut
+                console.log("Menu contextuel (long press mobile) empêché sur l'item photo.");
+                event.preventDefault();
+            }
+            // Si ce n'est pas une photo (ex: clic dans le vide), on ne fait rien, le navigateur fait son action normale.
+        });
+        console.log("DOMContentLoaded: Écouteur 'contextmenu' attaché à #photo-list-container.");
+    } else {
+        // Si le conteneur n'est pas trouvé au chargement, ce n'est pas normal.
+        console.error("DOMContentLoaded: Le conteneur #photo-list-container est introuvable pour attacher l'écouteur 'contextmenu'.");
+    }
+    // --- FIN AJOUT ---
+   
     console.log("10. Initialisation UNIFIÉE terminée.");
   } catch (initError) { console.error("ERREUR GLOBALE DANS DOMContentLoaded:", initError); }
 });
