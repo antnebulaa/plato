@@ -187,7 +187,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // À placer dans votre fonction d'initialisation (après DOMContentLoaded)
 function setupSectionNavigation() {
-    const menuContainer = document.querySelector('#your-side-menu-container'); // Adaptez le sélecteur
+    const menuContainer = document.querySelector('#side-menu-logement'); // Adaptez le sélecteur
     if (!menuContainer) return;
 
     menuContainer.addEventListener('click', function(event) {
@@ -633,7 +633,7 @@ async function loadAndDisplaySection(sectionId, updateUrl = false) {
 
     // --- 1. Gérer l'affichage visuel ---
     // Mettre à jour l'état actif du menu
-    document.querySelectorAll('#your-side-menu-container [data-section]').forEach(el => {
+    document.querySelectorAll('#side-menu-logement [data-section]').forEach(el => {
         el.classList.toggle('is-selected', el.getAttribute('data-section') === sectionId);
     });
 
