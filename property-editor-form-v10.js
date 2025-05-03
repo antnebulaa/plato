@@ -115,6 +115,26 @@ listContainer.addEventListener('click', async function handleRoomClickFinal(even
         console.log(`Room sélectionnée - ID: ${roomDbId}, Name: ${roomName}`);
 
         // ... (Mise à jour input upload, roomNameDisplayElement...) ...
+     // Mise à jour nom de la pièce (si affiché ailleurs)
+        const roomNameDisplayElement = document.getElementById('current-room-name-display');
+        if (roomNameDisplayElement) roomNameDisplayElement.textContent = roomName;
+
+        // === MODIFICATION : Trouver l'input par son ID à chaque clic ===
+        try {
+            // Recherche directe par ID (plus fiable dans une modale)
+            const roomDbIdInput = document.getElementById('property_photos_rooms_id');
+
+            if (roomDbIdInput) {
+                 roomDbIdInput.value = roomDbId; // Mettre à jour la valeur
+                 console.log(`Input upload (#property_photos_rooms_id) mis à jour (valeur=${roomDbIdInput.value})`);
+            } else {
+                 // Si l'input n'est pas trouvé, c'est un problème
+                 console.error("ERREUR: Impossible de trouver l'input #property_photos_rooms_id dans le DOM au moment du clic ! Vérifiez l'ID et si la modale/le formulaire est bien présent.");
+            }
+        } catch (e) {
+             console.error("Erreur lors de la mise à jour de #property_photos_rooms_id :", e);
+        }
+        // ==============================================================
 
         // ***** NOUVEAU : Déclencher l'ouverture de la modale *****
         const hiddenTrigger = document.getElementById('hidden-room-modal-trigger'); // Utilise l'ID du lien/bouton caché
