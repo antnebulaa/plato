@@ -103,40 +103,60 @@ function setupCreatedRoomSelection(client) {
     const photoLoadingIndicator = photoDisplayContainer.querySelector('[data-xano-loading]');
     console.log("setupCreatedRoomSelection: Vérifications OK.");
 
-    listContainer.addEventListener('click', async function handleRoomClickFinal(event) {
-        console.log("--- CLIC ROOM DÉTECTÉ (v8.9) ---");
-        const selectedElement = event.target.closest('[data-action="select-created-room"][data-room-id]');
-        if (selectedElement) {
-            const roomDbId = selectedElement.getAttribute('data-room-id');
-            const roomName = selectedElement.getAttribute('data-room-name') || `Pièce ID: ${roomDbId}`;
-            currentSelectedRoomId = roomDbId; // Mise à jour ID global
-            console.log(`Room sélectionnée - ID: ${roomDbId}, Name: ${roomName}`);
-            const roomNameDisplayElement = document.getElementById('current-room-name-display');
-            if (roomNameDisplayElement) roomNameDisplayElement.textContent = roomName;
-            else console.warn("Élément #current-room-name-display non trouvé.");
-            try { roomDbIdInput.value = roomDbId; console.log(`Input upload mis à jour (valeur=${roomDbIdInput.value})`); }
-            catch (e) { console.error("Erreur maj input:", e); }
+    // Dans setupCreatedRoomSelection...
+listContainer.addEventListener('click', async function handleRoomClickFinal(event) {
+    console.log("--- CLIC ROOM DÉTECTÉ (v8.9) ---");
+    const selectedElement = event.target.closest('[data-action="select-created-room"][data-room-id]');
 
-            // Destruction SortableJS (gardé pour éviter conflits)
-            if (currentSortableInstance) { console.log("Destruction SortableJS précédente."); currentSortableInstance.destroy(); currentSortableInstance = null; }
+    if (selectedElement) {
+        const roomDbId = selectedElement.getAttribute('data-room-id');
+        const roomName = selectedElement.getAttribute('data-room-name') || `Pièce ID: ${roomDbId}`;
+        currentSelectedRoomId = roomDbId; // Mise à jour ID global
+        console.log(`Room sélectionnée - ID: ${roomDbId}, Name: ${roomName}`);
 
-            // Affichage section photos (logique v8)
-            const photoSectionContainer = document.getElementById('room-photos-display');
-            if (photoSectionContainer) { photoSectionContainer.style.display = 'block'; console.log("Conteneur photos rendu visible (style.display = 'block')."); }
-            else { console.error("Conteneur #room-photos-display non trouvé !"); }
+        // ... (Mise à jour input upload, roomNameDisplayElement...) ...
 
-            // Feedback visuel (logique v8)
-            listContainer.querySelectorAll('[data-action="select-created-room"][data-room-id]').forEach(el => el.classList.remove('is-selected'));
-            selectedElement.classList.add('is-selected');
-            console.log("Feedback visuel appliqué.");
+        // ***** NOUVEAU : Déclencher l'ouverture de la modale *****
+        const hiddenTrigger = document.getElementById('hidden-room-modal-trigger'); // Utilise l'ID du lien/bouton caché
+        if (hiddenTrigger) {
+            console.log("Déclenchement manuel de la modale via le trigger caché...");
+            hiddenTrigger.click(); // Simule le clic pour que Finsweet ouvre la modale
+        } else {
+            console.error("Le déclencheur modal caché '#hidden-room-modal-trigger' est introuvable dans le HTML!");
+        }
+        // *********************************************************
 
-            // Fetch photos
-            console.log("Préparation fetch photos...");
-            if (client) {
-                 await refreshCurrentRoomPhotos(client); // Utilise helper pour fetch et init sortable
-            } else { console.warn("Client Xano manquant pour fetch photos."); }
-        } else { console.log("Clic ignoré (pas sur un élément room valide)."); }
-    });
+        // Destruction SortableJS (inchangé)
+        if (currentSortableInstance) { /* ... destroy ... */ }
+
+        // ATTENTION : Affichage de la section photos ?
+        // Si le conteneur #room-photos-display est MAINTENANT à l'intérieur de la modale,
+        // il ne faut probablement PLUS le rendre visible ici manuellement.
+        // La modale elle-même s'occupera de l'afficher quand elle s'ouvrira.
+        // Commentez ou supprimez ces lignes si c'est le cas :
+        /*
+        const photoSectionContainer = document.getElementById('room-photos-display');
+        if (photoSectionContainer) {
+             photoSectionContainer.style.display = 'block';
+             console.log("Conteneur photos rendu visible (style.display = 'block').");
+        }
+        */
+
+        // Feedback visuel sur la room cliquée (inchangé)
+        listContainer.querySelectorAll('[data-action="select-created-room"][data-room-id]').forEach(el => el.classList.remove('is-selected'));
+        selectedElement.classList.add('is-selected');
+        console.log("Feedback visuel appliqué.");
+
+        // Fetch photos (inchangé - peut se faire avant ou après le .click() selon la vitesse souhaitée)
+        console.log("Préparation fetch photos...");
+        if (client) {
+             await refreshCurrentRoomPhotos(client);
+        } else { console.warn("Client Xano manquant pour fetch photos."); }
+
+    } else {
+        console.log("Clic ignoré (pas sur un élément room valide).");
+    }
+});
     console.log("setupCreatedRoomSelection: Écouteur attaché.");
 }
 
