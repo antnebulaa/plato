@@ -502,115 +502,105 @@ function renderListData(dataArray, listContainerElement) {
 
 // MODIFIÉ v8 -> v8.3: renderPhotoItems utilise les IDs et la nouvelle structure de données
 // Version Corrigée pour v8.3 - Basée sur l'analyse et le bug du template disparu
+// Version Corrigée pour v8.3 - AVEC LOGS DE DÉBOGAGE POUR LE NETTOYAGE
 function renderPhotoItems(dataArray, listContainerElement) { // listContainerElement est #room-photos-display
     dataArray = Array.isArray(dataArray) ? dataArray : [];
-    console.log(`renderPhotoItems (v8.3 corrigé): Rendu de ${dataArray.length} photos.`);
+    console.log(`renderPhotoItems (v8.3 corrigé DEBUG): Rendu demandé pour ${dataArray.length} photos.`); // Log Entrée
 
     const emptyStatePlaceholder = document.getElementById('photo-empty-state-placeholder');
-    const templateSelector = listContainerElement.getAttribute('data-xano-list'); // Ex: ".photo-item-template"
-    // Récupère le sélecteur du conteneur spécifique depuis l'attribut du parent
-    const photoListContainerSelector = listContainerElement.getAttribute('data-xano-list-container'); // Ex: "#photo-list-container"
-    // Trouve le conteneur photo
+    const templateSelector = listContainerElement.getAttribute('data-xano-list');
+    const photoListContainerSelector = listContainerElement.getAttribute('data-xano-list-container');
     const container = photoListContainerSelector ? document.querySelector(photoListContainerSelector) : listContainerElement.querySelector('[data-xano-list-container]');
 
     // --- Vérifications Essentielles ---
-    if (!container) {
-        console.error(`renderPhotoItems: ERREUR CRITIQUE - Conteneur photo "${photoListContainerSelector || '[data-xano-list-container]'}" introuvable. Vérifiez l'attribut et l'ID/classe cible.`);
-        return; // Impossible de continuer
-    }
-    if (!templateSelector) {
-        console.error("renderPhotoItems: ERREUR CRITIQUE - Attribut 'data-xano-list' manquant sur", listContainerElement.id);
-        return;
-    }
+    if (!container) { console.error(`renderPhotoItems: ERREUR CRITIQUE - Conteneur photo "${photoListContainerSelector || '[data-xano-list-container]'}" introuvable.`); return; }
+    if (!templateSelector) { console.error("renderPhotoItems: ERREUR CRITIQUE - Attribut 'data-xano-list' manquant sur", listContainerElement.id); return; }
 
     // --- Trouver le Template DANS le conteneur ---
-    // Important : Chercher DEDANS le container trouvé (#photo-list-container)
     const templateElement = container.querySelector(templateSelector);
-    if (!templateElement) {
-        console.error(`renderPhotoItems: ERREUR CRITIQUE - Template "${templateSelector}" introuvable DANS "${container.id}".`);
-        // Log pour voir si le HTML a été vidé incorrectement
-        console.log(`Contenu actuel de #${container.id}:`, container.innerHTML);
-        return; // Arrêter si le template n'est pas trouvé
-    }
-    // S'assurer que le template original est caché (s'il n'est pas une balise <template>)
-    if (templateElement.tagName !== 'TEMPLATE' && templateElement.style.display !== 'none') {
-        templateElement.style.display = 'none';
-        templateElement.setAttribute('aria-hidden', 'true');
-    }
+    if (!templateElement) { console.error(`renderPhotoItems: ERREUR CRITIQUE - Template "${templateSelector}" introuvable DANS "${container.id}".`); console.log(`Contenu actuel de #${container.id}:`, container.innerHTML); return; }
+    if (templateElement.tagName !== 'TEMPLATE' && templateElement.style.display !== 'none') { templateElement.style.display = 'none'; templateElement.setAttribute('aria-hidden', 'true'); }
 
-    // --- Nettoyage Sécurisé des Anciens Clones ---
-    // 1. Sélectionner UNIQUEMENT les éléments ajoutés dynamiquement (marqués avec data-xano-list-item)
+    // +++ DÉBUT SECTION DEBUG NETTOYAGE +++
+    console.log("renderPhotoItems: --- Début Nettoyage ---");
+    console.log("renderPhotoItems: Container cible du nettoyage:", container);
+    console.log("renderPhotoItems: Container est dans le DOM?", document.body.contains(container));
+
+    // 1. Sélectionner les éléments à supprimer
     const itemsToRemove = container.querySelectorAll('[data-xano-list-item]');
-    // 2. Parcourir et supprimer, en VÉRIFIANT qu'on ne supprime PAS le template
-    itemsToRemove.forEach(item => {
-        if (!item.matches(templateSelector)) { // Ne supprime que si CE N'EST PAS le template
-             container.removeChild(item);
+    console.log(`renderPhotoItems: Trouvé ${itemsToRemove.length} élément(s) avec [data-xano-list-item] à potentiellement supprimer.`);
+
+    // 2. Boucle de suppression
+    let removedCount = 0;
+    itemsToRemove.forEach((item, index) => {
+        console.log(`renderPhotoItems: Vérification item ${index + 1} à supprimer:`, item);
+        if (!item.matches(templateSelector)) {
+             console.log(`renderPhotoItems: -> Suppression de l'élément ${index + 1}...`);
+             try {
+                container.removeChild(item);
+                removedCount++;
+                console.log(`renderPhotoItems: -> Élément ${index + 1} supprimé.`);
+             } catch (e) {
+                 // Si une erreur se produit PENDANT la suppression
+                 console.error(`renderPhotoItems: ERREUR lors de removeChild sur item ${index + 1}:`, e, "Item:", item);
+             }
         } else {
-             // Sécurité : si le template avait l'attribut par erreur, on évite de le supprimer
-             console.warn("Nettoyage: Tentative de suppression du template original évitée (il avait data-xano-list-item?). Vérifiez le HTML.");
+             console.warn(`renderPhotoItems: -> Nettoyage: Tentative de suppression du template original (${templateSelector}) évitée.`);
         }
     });
-    // Nettoyer ancien message vide
+    console.log(`renderPhotoItems: Total éléments supprimés: ${removedCount} / ${itemsToRemove.length}`);
+
+    // 3. Nettoyer message vide
     const existingEmptyMessage = container.querySelector('.xano-empty-message');
-    if (existingEmptyMessage) container.removeChild(existingEmptyMessage);
-    // --- Fin Nettoyage ---
+    if (existingEmptyMessage) {
+        console.log("renderPhotoItems: Suppression message vide précédent.");
+        try {
+            container.removeChild(existingEmptyMessage);
+        } catch (e) {
+            console.error("renderPhotoItems: ERREUR lors de removeChild sur message vide:", e);
+        }
+    }
+    console.log("renderPhotoItems: --- Fin Nettoyage ---");
+    // +++ FIN SECTION DEBUG NETTOYAGE +++
+
 
     // --- Affichage Conditionnel (Photos ou État Vide) ---
     if (dataArray.length > 0) {
         // ***** CAS : Il y a des PHOTOS *****
-        if (emptyStatePlaceholder) emptyStatePlaceholder.style.display = 'none'; // CACHER l'état vide
-        container.style.display = 'grid'; // <<< AFFICHER le conteneur des photos (style grid vu dans le screenshot)
+        console.log("renderPhotoItems: Affichage des photos..."); // Log affichage
+        if (emptyStatePlaceholder) emptyStatePlaceholder.style.display = 'none';
+        container.style.display = 'grid';
 
-        // Boucle pour cloner le template, remplir et ajouter
+        // Boucle pour cloner, remplir et ajouter chaque photo (logique existante)
         dataArray.forEach((item, index) => {
-            const clone = templateElement.cloneNode(true); // Cloner le template (la div .photo-item-template)
-            clone.style.display = 'block'; // Rendre le clone visible (ou 'grid', 'flex' selon design)
-            clone.removeAttribute('aria-hidden');
-            clone.setAttribute('data-xano-list-item', ''); // MARQUER le clone pour le prochain nettoyage
-
-            // --- Liaison des données (logique v8.3) ---
-            // ID
-            if (item && item.id) { clone.setAttribute('data-photo-id', item.id); }
-            else { console.error("renderPhotoItems: ID photo MANQUANT:", item); clone.classList.add('photo-item-error-no-id'); }
-            // Path/URL depuis item.images[0].url/path
-            const metadataField = 'images';
-            const metadataArray = item ? item[metadataField] : null;
-            const imageMetadata = (Array.isArray(metadataArray) && metadataArray.length > 0) ? metadataArray[0] : null;
-            let imagePathOrUrl = imageMetadata ? (imageMetadata.url || imageMetadata.path) : null;
-            clone.setAttribute('data-photo-path', imagePathOrUrl || '');
-            // Autres liaisons via bindDataToElement
-            const boundElements = clone.querySelectorAll('[data-xano-bind]');
-            boundElements.forEach(boundElement => bindDataToElement(boundElement, item));
-            if (clone.hasAttribute('data-xano-bind')) bindDataToElement(clone, item);
-            // Effet fade-in
-            const imgElement = clone.querySelector('.photo-item-image');
-            if (imgElement) { imgElement.classList.add('photo-item-loading'); }
-            // --- Fin Liaison ---
-
-            container.appendChild(clone); // Ajouter le clone au conteneur
-
-            // Finaliser fade-in
-            if (imgElement) { requestAnimationFrame(() => { requestAnimationFrame(() => { imgElement.classList.remove('photo-item-loading'); }); }); }
+             const clone = templateElement.cloneNode(true);
+             clone.style.display = 'block';
+             clone.removeAttribute('aria-hidden');
+             clone.setAttribute('data-xano-list-item', '');
+             // --- Liaison des données ---
+             if (item && item.id) { clone.setAttribute('data-photo-id', item.id); } else { console.error("ID photo MANQUANT"); clone.classList.add('photo-item-error-no-id');}
+             const metadataField='images'; const metadataArray=item?item[metadataField]:null; const imageMetadata=(Array.isArray(metadataArray) && metadataArray.length>0)?metadataArray[0]:null; let imagePathOrUrl=imageMetadata?(imageMetadata.url||imageMetadata.path):null; clone.setAttribute('data-photo-path',imagePathOrUrl||'');
+             const boundElements=clone.querySelectorAll('[data-xano-bind]'); boundElements.forEach(be=>bindDataToElement(be,item)); if(clone.hasAttribute('data-xano-bind'))bindDataToElement(clone,item);
+             const imgElement=clone.querySelector('.photo-item-image'); if(imgElement){imgElement.classList.add('photo-item-loading');}
+             // --- Fin Liaison ---
+             container.appendChild(clone);
+             if(imgElement){requestAnimationFrame(()=>{requestAnimationFrame(()=>{imgElement.classList.remove('photo-item-loading');});});}
         });
+         console.log(`renderPhotoItems: ${dataArray.length} photos ajoutées.`);
 
     } else {
         // ***** CAS : PAS de PHOTOS *****
-        container.style.display = 'none'; // <<< CACHER le conteneur des photos (#photo-list-container)
+        console.log("renderPhotoItems: Affichage état vide..."); // Log état vide
+        container.style.display = 'none';
         if (emptyStatePlaceholder) {
-            emptyStatePlaceholder.style.display = 'flex'; // AFFICHER l'état vide (upload form)
+            emptyStatePlaceholder.style.display = 'flex';
         } else {
-             // Si même le placeholder manque
-             console.warn("renderPhotoItems: Placeholder #photo-empty-state-placeholder non trouvé.");
-             // Ajouter un message texte dans le conteneur caché
-             const emptyMessageText = listContainerElement.getAttribute('data-xano-empty-message') || "Aucune photo pour le moment.";
-             if (!container.querySelector('.xano-empty-message')) { // Eviter doublons
-                 const messageElement = document.createElement('div');
-                 messageElement.className = 'xano-empty-message';
-                 messageElement.textContent = emptyMessageText;
-                 container.appendChild(messageElement);
-             }
+             console.warn("Placeholder état vide introuvable.");
+             const emptyMessageText = listContainerElement.getAttribute('data-xano-empty-message') || "Aucune photo.";
+             if(!container.querySelector('.xano-empty-message')){const me=document.createElement('div'); me.className='xano-empty-message'; me.textContent=emptyMessageText; container.appendChild(me);}
         }
     }
+     console.log("renderPhotoItems: --- Fin Rendu ---"); // Log Fin
 }
 
 
