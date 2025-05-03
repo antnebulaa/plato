@@ -115,7 +115,7 @@ listContainer.addEventListener('click', async function handleRoomClickFinal(even
         console.log(`Room sélectionnée - ID: ${roomDbId}, Name: ${roomName}`);
 
         // ... (Mise à jour input upload, roomNameDisplayElement...) ...
-     // Mise à jour nom de la pièce (si affiché ailleurs)
+        // Mise à jour nom de la pièce (si affiché ailleurs)
         const roomNameDisplayElement = document.getElementById('current-room-name-display');
         if (roomNameDisplayElement) roomNameDisplayElement.textContent = roomName;
 
