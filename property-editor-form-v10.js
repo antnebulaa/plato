@@ -220,7 +220,29 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     // --- FIN AJOUT ---
 
-// À placer dans DOMContentLoaded
+   
+      // --- Section Navigation Setup ---
+    setupSectionNavigation();
+    const initialSection = getQueryParam('section') || 'details'; // Ou votre section par défaut
+    loadAndDisplaySection(initialSection, false); // Charger la vue initiale sans pushState
+
+    window.addEventListener('popstate', function(event) {
+        const previousState = event.state;
+        let sectionToLoad = getQueryParam('section') || 'details'; // Lire depuis l'URL après pop
+        if (previousState && previousState.section) { // Utiliser l'état si disponible (plus fiable)
+             sectionToLoad = previousState.section;
+        }
+        console.log(`Popstate détecté - Affichage section: ${sectionToLoad}`);
+        loadAndDisplaySection(sectionToLoad, false); // Afficher sans repousser dans l'historique
+    });
+
+    setupMobileBackButton();
+    // --- Fin Section Navigation Setup ---
+
+    console.log("Initialisation terminée (Phase 1 Navigation).");
+   
+
+
 function setupMobileBackButton() {
     const backButton = document.getElementById('mobile-back-button'); // Assurez-vous que l'ID est correct
 
@@ -646,72 +668,84 @@ function renderPhotoItems(dataArray, listContainerElement) {
 }
 
 
-// Map des sections vers les endpoints Xano (exemple)
+// Map des sections vers les endpoints Xano (Adaptez avec VOS sections et endpoints)
 const sectionEndpoints = {
-    'details': 'property_details', // Endpoint pour les détails généraux
-    'pricing': 'property_pricing', // Endpoint pour les tarifs
-    'photos': `property_photos/photos/${currentSelectedRoomId}`, // Votre logique photo existante peut être intégrée ici ou appelée séparément
-    'amenities': 'property_amenities'
-    // Ajoutez toutes vos sections
+    'general': 'property', // Exemple
+    'photos': null // Géré différemment, peut-être pas d'endpoint direct ici
+    // ... ajoutez toutes vos sections ici
 };
 
-async function loadAndDisplaySection(sectionId, updateUrl = false) {
-    console.log(`Affichage section: ${sectionId}`);
-    const propertyId = getQueryParam('property_id');
-    if (!propertyId) {
-        console.error("ID Propriété manquant dans l'URL !");
-        return;
-    }
+// --- DÉFINITIONS DES FONCTIONS ---
 
-    // --- 1. Gérer l'état visuel du menu (INCHANGÉ) ---
-    // Mettre à jour l'état actif du menu
-    document.querySelectorAll('#side-menu-container [data-section]').forEach(el => { // Adaptez '#side-menu-container' si besoin
+async function loadAndDisplaySection(sectionId, updateUrl = false) {
+    console.log(`Phase 1 - Affichage section: ${sectionId}`);
+    const propertyId = getQueryParam('property_id'); // Assurez-vous que getQueryParam est défini avant
+
+    // --- 1. Gérer l'état visuel du menu ---
+    document.querySelectorAll('#side-menu-container [data-section]').forEach(el => { // Adaptez '#side-menu-container'
         el.classList.toggle('is-selected', el.getAttribute('data-section') === sectionId);
     });
 
-    // --- 2. Afficher le bon conteneur de section (INCHANGÉ ET ESSENTIEL) ---
-    // Masquer tous les conteneurs de section
-    document.querySelectorAll('.section-container').forEach(container => { // Assurez-vous que vos conteneurs ont cette classe
+    // --- 2. Afficher le bon conteneur de section ---
+    document.querySelectorAll('.section-container').forEach(container => { // Assurez-vous d'avoir cette classe
         container.style.display = 'none';
     });
-    // Afficher le conteneur cible
     const targetContainer = document.getElementById(`section-content-${sectionId}`);
     if (targetContainer) {
-        targetContainer.style.display = 'block'; // Ou 'flex', 'grid'... ce qui correspond à votre design
+        targetContainer.style.display = 'block';
     } else {
         console.error(`Conteneur pour la section "${sectionId}" non trouvé !`);
-        return;
+        return; // Important d'arrêter si le conteneur n'existe pas
     }
 
-    // --- 3. Charger les données depuis Xano (INCHANGÉ) ---
-    // (Votre logique existante ou à adapter pour charger les données
-    // via fetchXanoData ou une fonction similaire, en ciblant targetContainer)
-    // Exemple simplifié :
-    const endpoint = sectionEndpoints[sectionId]; // Assurez-vous que sectionEndpoints est défini
-    const loadingIndicator = targetContainer.querySelector('[data-xano-loading]');
-    const errorElement = targetContainer.querySelector('[data-xano-error]');
+    // --- 3. CHARGEMENT DES DONNÉES (IGNORÉ POUR LA PHASE 1) ---
+    console.log(`Phase 1 - Données pour "${sectionId}" non chargées (normal).`);
+    // PAS d'appel fetchXanoData ici pour le moment
 
-    if (endpoint /* && !targetContainer.dataset.loaded */) { // Décommentez la partie chargée si vous implémentez le cache simple
-        try {
-            let params = { property_id: propertyId };
-            if (sectionId === 'photos' && currentSelectedRoomId) {
-                await refreshCurrentRoomPhotos(xanoClient); // Appel spécifique photos
-            } else if (sectionId !== 'photos') {
-                await fetchXanoData(xanoClient, endpoint, 'GET', params, targetContainer, loadingIndicator);
-            }
-            // targetContainer.dataset.loaded = 'true'; // Marquer comme chargé
-        } catch (error) { /* ... gestion erreur ...*/ }
-    }
-    // ... (suite si nécessaire) ...
-
-
-    // --- 4. Mettre à jour l'URL (INCHANGÉ) ---
-    if (updateUrl && history.pushState) {
-        const newUrl = `${window.location.pathname}?property_id=${propertyId}&section=${sectionId}`;
+    // --- 4. Mettre à jour l'URL ---
+    if (updateUrl && history.pushState && propertyId) { // Vérifier aussi propertyId
+        const newUrl = `<span class="math-inline">\{window\.location\.pathname\}?property\_id\=</span>{propertyId}&section=${sectionId}`;
         history.pushState({ section: sectionId, propertyId: propertyId }, '', newUrl);
-        console.log(`URL mise à jour : ${newUrl}`);
+        console.log(`Phase 1 - URL mise à jour : ${newUrl}`);
+    } else if (updateUrl && !propertyId) {
+         console.warn("Impossible de mettre à jour l'URL car propertyId manque.");
     }
 }
+
+function setupSectionNavigation() {
+    const menuContainer = document.querySelector('#side-menu-container'); // Adaptez le sélecteur
+    if (!menuContainer) {
+         console.error("Conteneur du menu latéral non trouvé !");
+         return;
+    }
+    menuContainer.addEventListener('click', function(event) {
+        const menuItem = event.target.closest('[data-section]');
+        if (menuItem) {
+            event.preventDefault();
+            const sectionId = menuItem.getAttribute('data-section');
+            loadAndDisplaySection(sectionId, true); // true pour mettre à jour l'URL
+        }
+    });
+     console.log("setupSectionNavigation: Écouteur ajouté au menu.");
+}
+
+function setupMobileBackButton() {
+    const backButton = document.getElementById('mobile-back-button'); // Adaptez l'ID
+    if (backButton) {
+        backButton.addEventListener('click', function() {
+            console.log("Clic bouton Retour Mobile");
+            // Cache toutes les sections de contenu
+            document.querySelectorAll('.section-container').forEach(container => {
+                container.style.display = 'none';
+            });
+            // Webflow gère la réapparition du menu / disparition du bouton retour
+        });
+        console.log("Écouteur pour bouton retour mobile ajouté.");
+    } else {
+        console.warn("Bouton retour mobile non trouvé.");
+    }
+}
+// --- FIN DÉFINITIONS ---
 
 
 window.addEventListener('popstate', function(event) {
