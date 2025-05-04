@@ -219,6 +219,35 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error("DOMContentLoaded: Le conteneur #photo-list-container est introuvable pour attacher l'écouteur 'contextmenu'.");
     }
     // --- FIN AJOUT ---
+
+// À placer dans DOMContentLoaded
+function setupMobileBackButton() {
+    const backButton = document.getElementById('mobile-back-button'); // Assurez-vous que l'ID est correct
+
+    if (backButton) {
+        backButton.addEventListener('click', function() {
+            console.log("Clic bouton Retour Mobile");
+
+            // Cache toutes les sections de contenu --- ESSENTIEL
+            document.querySelectorAll('.section-container').forEach(container => {
+                container.style.display = 'none';
+            });
+
+            // Note: On ne touche plus à l'affichage du menu ou du bouton retour ici.
+            // On fait confiance à Webflow pour afficher le menu et masquer le bouton
+            // via les réglages responsives une fois qu'aucune section n'est affichée.
+
+            // Optionnel : Si jamais masquer les sections ne suffisait pas pour faire
+            // réapparaître le menu sur mobile, on pourrait décommenter la ligne suivante :
+            // document.getElementById('side-menu-container').style.display = 'block'; // Ou 'flex'...
+        });
+        console.log("Écouteur pour bouton retour mobile ajouté (version simplifiée).");
+    } else {
+         console.warn("Bouton retour mobile #mobile-back-button non trouvé.");
+    }
+}
+
+// N'oubliez pas d'appeler setupMobileBackButton(); dans votre DOMContentLoaded
    
     console.log("10. Initialisation UNIFIÉE terminée.");
   } catch (initError) { console.error("ERREUR GLOBALE DANS DOMContentLoaded:", initError); }
@@ -628,68 +657,57 @@ const sectionEndpoints = {
 
 async function loadAndDisplaySection(sectionId, updateUrl = false) {
     console.log(`Affichage section: ${sectionId}`);
-    const propertyId = getQueryParam('property_id'); // Vous avez déjà getQueryParam
+    const propertyId = getQueryParam('property_id');
     if (!propertyId) {
         console.error("ID Propriété manquant dans l'URL !");
         return;
     }
 
-    // --- 1. Gérer l'affichage visuel ---
+    // --- 1. Gérer l'état visuel du menu (INCHANGÉ) ---
     // Mettre à jour l'état actif du menu
-    document.querySelectorAll('#side-menu-logement [data-section]').forEach(el => {
+    document.querySelectorAll('#side-menu-container [data-section]').forEach(el => { // Adaptez '#side-menu-container' si besoin
         el.classList.toggle('is-selected', el.getAttribute('data-section') === sectionId);
     });
 
-    // Masquer toutes les sections, puis afficher la bonne
-    document.querySelectorAll('.section-container').forEach(container => {
+    // --- 2. Afficher le bon conteneur de section (INCHANGÉ ET ESSENTIEL) ---
+    // Masquer tous les conteneurs de section
+    document.querySelectorAll('.section-container').forEach(container => { // Assurez-vous que vos conteneurs ont cette classe
         container.style.display = 'none';
     });
+    // Afficher le conteneur cible
     const targetContainer = document.getElementById(`section-content-${sectionId}`);
     if (targetContainer) {
-        targetContainer.style.display = 'block'; // Ou 'flex', 'grid' selon votre layout
+        targetContainer.style.display = 'block'; // Ou 'flex', 'grid'... ce qui correspond à votre design
     } else {
         console.error(`Conteneur pour la section "${sectionId}" non trouvé !`);
         return;
     }
 
-    // --- 2. Charger les données depuis Xano (si nécessaire) ---
-    // Optionnel : Vérifier si les données ont déjà été chargées pour éviter les appels répétés
-    // Exemple simple : if (!targetContainer.dataset.loaded) { ... }
-
-    const endpoint = sectionEndpoints[sectionId];
-    const loadingIndicator = targetContainer.querySelector('[data-xano-loading]'); // Chaque section peut avoir son indicateur
+    // --- 3. Charger les données depuis Xano (INCHANGÉ) ---
+    // (Votre logique existante ou à adapter pour charger les données
+    // via fetchXanoData ou une fonction similaire, en ciblant targetContainer)
+    // Exemple simplifié :
+    const endpoint = sectionEndpoints[sectionId]; // Assurez-vous que sectionEndpoints est défini
+    const loadingIndicator = targetContainer.querySelector('[data-xano-loading]');
     const errorElement = targetContainer.querySelector('[data-xano-error]');
 
-    if (endpoint) {
+    if (endpoint /* && !targetContainer.dataset.loaded */) { // Décommentez la partie chargée si vous implémentez le cache simple
         try {
-            // Adapter les paramètres si nécessaire pour chaque section
-            let params = { property_id: propertyId }; // Paramètre de base
-            // Si section photos, vous pourriez avoir besoin de currentSelectedRoomId etc. Adaptez !
+            let params = { property_id: propertyId };
             if (sectionId === 'photos' && currentSelectedRoomId) {
-               // Votre fonction refreshCurrentRoomPhotos fait déjà le travail, appelez-la peut-être ici ?
-               console.log("Appel spécifique pour rafraîchir les photos...");
-               await refreshCurrentRoomPhotos(xanoClient); // Assurez-vous que xanoClient est accessible
-            } else if (sectionId !== 'photos') { // Pour les autres sections standard
-               console.log(`Workspaceing data for section ${sectionId} from endpoint ${endpoint}`);
-               // Utilisez votre fetchXanoData existant, en le rendant peut-être plus générique
-               // ou créez des fonctions spécifiques fetchDetails, fetchPricing...
-               // Ici, on utilise fetchXanoData en passant le conteneur cible pour le rendu
-               await fetchXanoData(xanoClient, endpoint, 'GET', params, targetContainer, loadingIndicator);
+                await refreshCurrentRoomPhotos(xanoClient); // Appel spécifique photos
+            } else if (sectionId !== 'photos') {
+                await fetchXanoData(xanoClient, endpoint, 'GET', params, targetContainer, loadingIndicator);
             }
             // targetContainer.dataset.loaded = 'true'; // Marquer comme chargé
-        } catch (error) {
-            console.error(`Erreur chargement section ${sectionId}:`, error);
-            if (errorElement) { /* Affichez l'erreur */ }
-        }
-    } else if (sectionId !== 'photos') { // Ne pas afficher d'erreur si c'est la section photos gérée séparément
-         console.warn(`Aucun endpoint défini pour la section: ${sectionId}`);
+        } catch (error) { /* ... gestion erreur ...*/ }
     }
+    // ... (suite si nécessaire) ...
 
 
-    // --- 3. Mettre à jour l'URL ---
+    // --- 4. Mettre à jour l'URL (INCHANGÉ) ---
     if (updateUrl && history.pushState) {
-        const newUrl = `<span class="math-inline">\{window\.location\.pathname\}?property\_id\=</span>{propertyId}&section=${sectionId}`;
-        // L'objet state peut contenir des infos utiles si besoin pour le popstate
+        const newUrl = `${window.location.pathname}?property_id=${propertyId}&section=${sectionId}`;
         history.pushState({ section: sectionId, propertyId: propertyId }, '', newUrl);
         console.log(`URL mise à jour : ${newUrl}`);
     }
