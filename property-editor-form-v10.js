@@ -223,12 +223,12 @@ document.addEventListener('DOMContentLoaded', function() {
    
       // --- Section Navigation Setup ---
     setupSectionNavigation();
-    const initialSection = getQueryParam('section') || 'details'; // Ou votre section par défaut
+    const initialSection = getQueryParam('section') || 'general'; // Ou votre section par défaut
     loadAndDisplaySection(initialSection, false); // Charger la vue initiale sans pushState
 
     window.addEventListener('popstate', function(event) {
         const previousState = event.state;
-        let sectionToLoad = getQueryParam('section') || 'details'; // Lire depuis l'URL après pop
+        let sectionToLoad = getQueryParam('section') || 'general'; // Lire depuis l'URL après pop
         if (previousState && previousState.section) { // Utiliser l'état si disponible (plus fiable)
              sectionToLoad = previousState.section;
         }
@@ -299,7 +299,7 @@ document.addEventListener('DOMContentLoaded', function() {
         setupSectionNavigation(); // Ajoutez cet appel
 
         // Gérer le chargement initial basé sur l'URL
-        const initialSection = getQueryParam('section') || 'details'; // 'details' est un exemple de section par défaut
+        const initialSection = getQueryParam('section') || 'general'; // 'general' est un exemple de section par défaut
         loadAndDisplaySection(initialSection, false); // false pour ne pas réécrire l'URL si elle est déjà correcte
 
         console.log("Initialisation avec navigation par section terminée.");
@@ -751,13 +751,13 @@ function setupMobileBackButton() {
 window.addEventListener('popstate', function(event) {
     // event.state contient l'objet que vous avez passé à pushState
     const previousState = event.state;
-    let sectionToLoad = 'details'; // Section par défaut si pas d'état
+    let sectionToLoad = 'general'; // Section par défaut si pas d'état
 
     if (previousState && previousState.section) {
         sectionToLoad = previousState.section;
     } else {
         // Fallback si pas d'état, lire depuis l'URL actuelle
-        sectionToLoad = getQueryParam('section') || 'details';
+        sectionToLoad = getQueryParam('section') || 'general';
     }
 
     console.log(`Popstate détecté - Affichage section: ${sectionToLoad}`);
