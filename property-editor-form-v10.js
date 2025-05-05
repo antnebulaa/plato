@@ -136,16 +136,7 @@ listContainer.addEventListener('click', async function handleRoomClickFinal(even
         }
         // ==============================================================
 
-        // ***** NOUVEAU : Déclencher l'ouverture de la modale *****
-        const hiddenTrigger = document.getElementById('hidden-room-modal-trigger'); // Utilise l'ID du lien/bouton caché
-        if (hiddenTrigger) {
-            console.log("Déclenchement manuel de la modale via le trigger caché...");
-            hiddenTrigger.click(); // Simule le clic pour que Finsweet ouvre la modale
-        } else {
-            console.error("Le déclencheur modal caché '#hidden-room-modal-trigger' est introuvable dans le HTML!");
-        }
-        // *********************************************************
-
+       
         // Destruction SortableJS (inchangé)
         if (currentSortableInstance) { /* ... destroy ... */ }
 
@@ -176,6 +167,19 @@ listContainer.addEventListener('click', async function handleRoomClickFinal(even
     } else {
         console.log("Clic ignoré (pas sur un élément room valide).");
     }
+
+ // ***** NOUVEAU : Déclencher l'ouverture de la modale *****
+        const hiddenTrigger = document.getElementById('hidden-room-modal-trigger'); // Utilise l'ID du lien/bouton caché
+        if (hiddenTrigger) {
+            console.log("Déclenchement manuel de la modale via le trigger caché...");
+            hiddenTrigger.click(); // Simule le clic pour que Finsweet ouvre la modale
+        } else {
+            console.error("Le déclencheur modal caché '#hidden-room-modal-trigger' est introuvable dans le HTML!");
+        }
+        // *********************************************************
+
+
+ 
 });
     console.log("setupCreatedRoomSelection: Écouteur attaché.");
 }
@@ -704,7 +708,8 @@ async function loadAndDisplaySection(sectionId, updateUrl = false) {
 
     // --- 4. Mettre à jour l'URL ---
     if (updateUrl && history.pushState && propertyId) {
-    const newUrl = `<span class="math-inline">\{window\.location\.pathname\}?property\_id\=</span>{propertyId}&section=${sectionId}`;
+    const newUrl = `${window.location.pathname}?property_id=${propertyId}&section=${sectionId}`;
+     
     // Assurez-vous d'utiliser les accents graves (` `) et qu'il n'y a PAS de <span> ou d'autres balises.
 
     history.pushState({ section: sectionId, propertyId: propertyId }, '', newUrl);
