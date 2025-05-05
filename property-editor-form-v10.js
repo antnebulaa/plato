@@ -681,41 +681,96 @@ const sectionEndpoints = {
 
 // --- DÉFINITIONS DES FONCTIONS ---
 
+// ==================================
+// == loadAndDisplaySection (Version FINALE avec gestion Initiale Mobile) ==
+// ==================================
 async function loadAndDisplaySection(sectionId, updateUrl = false) {
-    console.log(`Phase 1 - Affichage section: ${sectionId}`);
-    const propertyId = getQueryParam('property_id'); // Assurez-vous que getQueryParam est défini avant
+    console.log(`Affichage/Chargement section demandé: ${sectionId}, UpdateURL: ${updateUrl}`);
+    const propertyId = getQueryParam('property_id');
+    if (!propertyId && updateUrl) { // On a besoin du propertyId surtout si on update l'URL
+        console.warn("loadAndDisplaySection: propertyId manquant, impossible de mettre à jour l'URL proprement.");
+        // Ne pas arrêter forcément, on peut afficher la section mais l'URL sera incomplète
+    }
 
     // --- 1. Gérer l'état visuel du menu ---
     document.querySelectorAll('#side-menu-container [data-section]').forEach(el => { // Adaptez '#side-menu-container'
         el.classList.toggle('is-selected', el.getAttribute('data-section') === sectionId);
     });
 
-    // --- 2. Afficher le bon conteneur de section ---
-    document.querySelectorAll('.section-container').forEach(container => { // Assurez-vous d'avoir cette classe
-        container.style.display = 'none';
-    });
-    const targetContainer = document.getElementById(`section-content-${sectionId}`);
-    if (targetContainer) {
-        targetContainer.style.display = 'block';
-    } else {
-        console.error(`Conteneur pour la section "${sectionId}" non trouvé !`);
-        return; // Important d'arrêter si le conteneur n'existe pas
+    // --- 2. Déterminer l'état Mobile/Desktop ---
+    const isMobileView = window.innerWidth < 768; // Adaptez le breakpoint si besoin (ex: 991 pour tablette)
+    const isInitialLoad = !updateUrl; // On sait que c'est le chargement initial si updateUrl est false
+
+    // --- 3. Trouver les conteneurs principaux ---
+    const menuContainer = document.getElementById('side-menu-container'); // Adaptez
+    const backButton = document.getElementById('mobile-back-button'); // Adaptez
+    const contentWrapper = document.getElementById('main-content-wrapper'); // Adaptez
+    const targetContainer = document.getElementById(`section-content-${sectionId}`); // La section spécifique
+
+    // --- Vérification que les conteneurs existent ---
+    if (!targetContainer) {
+        console.error(`Conteneur pour la section "${sectionId}" (#section-content-${sectionId}) non trouvé ! Vérifiez l'ID.`);
+        return; // Arrêter si la section cible n'existe pas
+    }
+    if (!menuContainer || !backButton || !contentWrapper) {
+        console.warn("Un des conteneurs principaux (menu, bouton retour, wrapper contenu) est manquant. Le layout mobile pourrait mal fonctionner.");
     }
 
-    // --- 3. CHARGEMENT DES DONNÉES (IGNORÉ POUR LA PHASE 1) ---
-    console.log(`Phase 1 - Données pour "${sectionId}" non chargées (normal).`);
-    // PAS d'appel fetchXanoData ici pour le moment
+    // --- 4. Logique d'affichage/masquage ---
 
-    // --- 4. Mettre à jour l'URL ---
+    // D'abord, masquer TOUTES les sections internes
+    document.querySelectorAll('.section-container').forEach(container => {
+        container.style.display = 'none';
+    });
+
+    // Ensuite, déterminer quoi afficher en fonction du contexte
+    if (isMobileView) {
+        // --- CAS MOBILE ---
+        if (isInitialLoad) {
+            // Chargement initial mobile : ON VEUT VOIR LE MENU SEUL
+            console.log("Chargement initial mobile : Affichage Menu SEUL.");
+            if (menuContainer) menuContainer.style.display = 'block'; // Assure que le menu est visible
+            if (contentWrapper) contentWrapper.style.display = 'block'; // Le wrapper doit exister, mais son contenu (targetContainer) reste caché
+            if (backButton) backButton.style.display = 'none'; // Cache le bouton retour
+            // On ne met PAS targetContainer.style.display = 'block'
+        } else {
+            // Navigation mobile (clic menu ou popstate) : ON VEUT VOIR LE CONTENU SEUL + RETOUR
+            console.log("Navigation mobile : Affichage Contenu + Bouton Retour.");
+            if (menuContainer) menuContainer.style.display = 'none'; // Cache le menu
+            if (contentWrapper) contentWrapper.style.display = 'block'; // Montre la zone de contenu
+            if (targetContainer) targetContainer.style.display = 'block'; // Montre la section spécifique
+            if (backButton) backButton.style.display = 'block'; // Montre le bouton retour
+        }
+    } else {
+        // --- CAS DESKTOP ---
+        // Toujours afficher le menu, le wrapper de contenu, et la section cible. Cacher bouton retour.
+        console.log("Vue Desktop : Affichage Menu + Contenu.");
+        if (menuContainer) menuContainer.style.display = 'block'; // Assure menu visible
+        if (contentWrapper) contentWrapper.style.display = 'block'; // Assure zone contenu visible
+        if (targetContainer) targetContainer.style.display = 'block'; // Montre la section spécifique
+        if (backButton) backButton.style.display = 'none'; // Assure bouton retour caché
+    }
+
+    // --- 5. Charger les données (Phase 2) ---
+    // Si ce n'est PAS le chargement initial mobile (on veut charger les données quand on voit la section)
+    if (!isInitialMobileLoad && targetContainer /* && !targetContainer.dataset.loaded */) {
+        console.log(`Phase 2 - Déclenchement chargement données pour: ${sectionId}`);
+        // Mettre ici l'appel à fetchXanoData ou fonction spécifique
+        // const endpoint = sectionEndpoints[sectionId];
+        // if (endpoint) {
+        //    await fetchXanoData(xanoClient, endpoint, 'GET', { property_id: propertyId }, targetContainer, targetContainer.querySelector('[data-xano-loading]'));
+        //    targetContainer.dataset.loaded = 'true';
+        // } else if (sectionId === 'photos') { await refreshCurrentRoomPhotos(xanoClient); targetContainer.dataset.loaded = 'true'; } // Gérer photos spécifiquement
+    } else if (isInitialMobileLoad) {
+         console.log("Phase 2 - Chargement initial mobile, données non chargées pour l'instant.");
+    }
+
+
+    // --- 6. Mettre à jour l'URL (Seulement si demandé par updateUrl) ---
     if (updateUrl && history.pushState && propertyId) {
-    const newUrl = `${window.location.pathname}?property_id=${propertyId}&section=${sectionId}`;
-     
-    // Assurez-vous d'utiliser les accents graves (` `) et qu'il n'y a PAS de <span> ou d'autres balises.
-
-    history.pushState({ section: sectionId, propertyId: propertyId }, '', newUrl);
-    console.log(`Phase 1 - URL mise à jour CORRIGÉE : ${newUrl}`); // Log pour vérifier
-} else if (updateUrl && !propertyId) {
-         console.warn("Impossible de mettre à jour l'URL car propertyId manque.");
+        const newUrl = `${window.location.pathname}?property_id=${propertyId}&section=${sectionId}`;
+        history.pushState({ section: sectionId, propertyId: propertyId }, '', newUrl);
+        console.log(`URL mise à jour : ${newUrl}`);
     }
 }
 
