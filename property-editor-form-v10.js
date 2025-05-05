@@ -703,11 +703,13 @@ async function loadAndDisplaySection(sectionId, updateUrl = false) {
     // PAS d'appel fetchXanoData ici pour le moment
 
     // --- 4. Mettre à jour l'URL ---
-    if (updateUrl && history.pushState && propertyId) { // Vérifier aussi propertyId
-        const newUrl = `<span class="math-inline">\{window\.location\.pathname\}?property\_id\=</span>{propertyId}&section=${sectionId}`;
-        history.pushState({ section: sectionId, propertyId: propertyId }, '', newUrl);
-        console.log(`Phase 1 - URL mise à jour : ${newUrl}`);
-    } else if (updateUrl && !propertyId) {
+    if (updateUrl && history.pushState && propertyId) {
+    const newUrl = `<span class="math-inline">\{window\.location\.pathname\}?property\_id\=</span>{propertyId}&section=${sectionId}`;
+    // Assurez-vous d'utiliser les accents graves (` `) et qu'il n'y a PAS de <span> ou d'autres balises.
+
+    history.pushState({ section: sectionId, propertyId: propertyId }, '', newUrl);
+    console.log(`Phase 1 - URL mise à jour CORRIGÉE : ${newUrl}`); // Log pour vérifier
+} else if (updateUrl && !propertyId) {
          console.warn("Impossible de mettre à jour l'URL car propertyId manque.");
     }
 }
