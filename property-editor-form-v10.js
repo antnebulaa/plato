@@ -265,7 +265,7 @@ function setupMobileBackButton() {
 
             // Optionnel : Si jamais masquer les sections ne suffisait pas pour faire
             // réapparaître le menu sur mobile, on pourrait décommenter la ligne suivante :
-            // document.getElementById('side-menu-container').style.display = 'block'; // Ou 'flex'...
+             document.getElementById('side-menu-container').style.display = 'block'; // Ou 'flex'...
         });
         console.log("Écouteur pour bouton retour mobile ajouté (version simplifiée).");
     } else {
@@ -716,7 +716,10 @@ async function loadAndDisplaySection(sectionId, updateUrl = false) {
         console.warn("Un des conteneurs principaux (menu, bouton retour, wrapper contenu) est manquant. Le layout mobile pourrait mal fonctionner.");
     }
 
-    // --- 4. Logique d'affichage/masquage ---
+     // --- 4. Logique d'affichage/masquage ---
+     // --- !!! AJOUTER CETTE LIGNE ICI !!! ---
+     const isInitialMobileLoad = isInitialLoad && isMobileView;
+     // --- FIN AJOUT ---
 
     // D'abord, masquer TOUTES les sections internes
     document.querySelectorAll('.section-container').forEach(container => {
