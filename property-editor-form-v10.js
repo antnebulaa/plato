@@ -742,7 +742,7 @@ async function loadAndDisplaySection(sectionId, updateUrl = false) {
             if (menuContainer) menuContainer.style.display = 'none'; // Cache le menu
             if (contentWrapper) contentWrapper.style.display = 'block'; // Montre la zone de contenu
             if (targetContainer) targetContainer.style.display = 'block'; // Montre la section spécifique
-            if (backButton) backButton.style.display = 'block'; // Montre le bouton retour
+            if (backButton) backButton.style.display = 'flex'; // Montre le bouton retour
         }
     } else {
         // --- CAS DESKTOP ---
