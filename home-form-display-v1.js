@@ -21,17 +21,34 @@ document.addEventListener('DOMContentLoaded', function () {
         xanoClient.setAuthToken(authToken);
     }
 
-    // 2. Initialiser les fonctionnalités de formulaire
-    initXanoForms(xanoClient);
+     initXanoForms(xanoClient);
 
-    // 3. Initialiser la récupération et l'affichage de données
-    initXanoDataEndpoints(xanoClient);
+    // --- Initialisation des Données (Liste des Annonces) ---
+    const listingElement = document.querySelector('[data-xano-endpoint="property/getall"]');
+    if (listingElement) {
+        // Chargement initial sans filtres (ou avec filtres par défaut si nécessaire)
+        fetchFilteredListings(xanoClient, listingElement, {}); // {} = pas de filtres initiaux
+    } else {
+        console.warn("Élément conteneur pour 'property/getall' non trouvé.");
+    }
 
-    // 4. Initialiser les gestionnaires de liens dynamiques (après chargement potentiel des données)
-    // Note: Les liens DANS les listes sont gérés DANS renderListData
-    initXanoLinkHandlers(); // Gère les clics et les liens statiques après chargement
+    initXanoLinkHandlers(); // Après le premier chargement potentiel
 
-});
+    // --- Gestion des Filtres ---
+    const applyFiltersButton = document.getElementById('apply-filters-button');
+    const filtersForm = document.getElementById('filters-form'); // Conteneur des filtres
+
+    if (applyFiltersButton && filtersForm && listingElement) {
+        applyFiltersButton.addEventListener('click', function() {
+            const filterParams = collectFilterValues(filtersForm);
+            fetchFilteredListings(xanoClient, listingElement, filterParams);
+        });
+    } else {
+         if (!applyFiltersButton) console.warn("Bouton 'apply-filters-button' non trouvé.");
+         if (!filtersForm) console.warn("Formulaire 'filters-form' non trouvé.");
+    }
+
+}); // Fin de DOMContentLoaded
 
 // ==========================================
 // == Classe XanoClient Améliorée          ==
@@ -58,19 +75,22 @@ class XanoClient {
         }
 
         let finalUrl = url;
-
         if (method === 'GET' && paramsOrBody) {
-            // Construire les query parameters pour GET
-            const queryParams = new URLSearchParams(paramsOrBody).toString();
+            // Filtrer les clés avec des valeurs null/undefined/vides avant de construire les query params
+            const cleanParams = {};
+            for (const key in paramsOrBody) {
+                if (paramsOrBody[key] !== null && paramsOrBody[key] !== undefined && paramsOrBody[key] !== '') {
+                     cleanParams[key] = paramsOrBody[key];
+                }
+            }
+            const queryParams = new URLSearchParams(cleanParams).toString();
             if (queryParams) {
                 finalUrl = `${url}?${queryParams}`;
             }
         } else if (['POST', 'PUT', 'PATCH'].includes(method) && paramsOrBody) {
             if (isFormData) {
-                // Ne pas définir Content-Type, le navigateur le fera avec la boundary correcte pour FormData
                 options.body = paramsOrBody;
             } else {
-                // Envoyer en JSON par défaut pour les objets
                 options.headers['Content-Type'] = 'application/json';
                 options.body = JSON.stringify(paramsOrBody);
             }
@@ -78,64 +98,38 @@ class XanoClient {
         // DELETE n'a généralement pas de body, mais peut en avoir certains cas (rare)
         // Si paramsOrBody est fourni pour DELETE et n'est pas FormData, on pourrait envisager de le JSON.stringify aussi.
 
-        try {
+         try {
             const response = await fetch(finalUrl, options);
-
-            // Gérer les réponses sans contenu (ex: 204 No Content pour DELETE)
             if (response.status === 204 || response.headers.get('content-length') === '0') {
                 if (!response.ok) {
-                     // Même sans contenu, une erreur peut survenir (ex: 404 non trouvé)
-                    throw new Error(`Erreur HTTP ${response.status}`);
+                   throw new Error(`Erreur HTTP ${response.status}`);
                 }
-                return null; // Pas de contenu à parser
+                return null;
             }
-
-            // Essayer de parser en JSON par défaut
             const responseData = await response.json();
-
             if (!response.ok) {
-                // Si Xano renvoie un message d'erreur dans le JSON
                 const message = responseData.message || `Erreur HTTP ${response.status}`;
                 throw new Error(message);
             }
             return responseData;
-
         } catch (error) {
             console.error(`Erreur lors de l'appel ${method} ${endpoint}:`, error);
-            // Renvoie l'erreur pour qu'elle soit traitée par le code appelant
             throw error;
         }
     }
 
-    async get(endpoint, params = null) {
-        return this._request('GET', endpoint, params);
-    }
-
-    async post(endpoint, body = null, isFormData = false) {
-        return this._request('POST', endpoint, body, isFormData);
-    }
-
-    async put(endpoint, body = null, isFormData = false) {
-        return this._request('PUT', endpoint, body, isFormData);
-    }
-
-    async patch(endpoint, body = null, isFormData = false) {
-        return this._request('PATCH', endpoint, body, isFormData);
-    }
-
-    async delete(endpoint, params = null) {
-        // Pour DELETE, params est souvent dans l'URL, pas dans le body.
-        // Si on voulait passer des params dans l'URL pour DELETE:
-        let finalEndpoint = endpoint;
+    async get(endpoint, params = null) { return this._request('GET', endpoint, params); }
+     async post(endpoint, body = null, isFormData = false) { return this._request('POST', endpoint, body, isFormData); }
+     async put(endpoint, body = null, isFormData = false) { return this._request('PUT', endpoint, body, isFormData); }
+     async patch(endpoint, body = null, isFormData = false) { return this._request('PATCH', endpoint, body, isFormData); }
+     async delete(endpoint, params = null) {
+         let finalEndpoint = endpoint;
          if (params) {
-            const queryParams = new URLSearchParams(params).toString();
-            if (queryParams) {
-                finalEndpoint = `${endpoint}?${queryParams}`;
-            }
-        }
-        // On passe null comme body
-        return this._request('DELETE', finalEndpoint, null);
-    }
+             const queryParams = new URLSearchParams(params).toString();
+             if (queryParams) { finalEndpoint = `${endpoint}?${queryParams}`; }
+         }
+         return this._request('DELETE', finalEndpoint, null);
+      }
 }
 
 // ==========================================
@@ -331,6 +325,124 @@ function initXanoLinkHandlers() {
             }
         }
     });
+}
+
+// ==========================================
+// == Nouvelle Fonction: Collecter Filtres ==
+// ==========================================
+function collectFilterValues(formElement) {
+    const params = {};
+    // Sélectionne tous les inputs, selects, textareas DANS le form qui ont data-filter-key
+    const filterElements = formElement.querySelectorAll('input[data-filter-key], select[data-filter-key], textarea[data-filter-key]');
+
+    filterElements.forEach(el => {
+        const key = el.getAttribute('data-filter-key');
+        if (!key) return; // Sécurité
+
+        let value = null;
+
+        if (el.type === 'checkbox') {
+            if (el.checked) {
+                // Important : Vérifier si Xano attend "true" (string), true (boolean), ou la valeur du champ (ex: "1")
+                // Ici, on prend la `value` de la checkbox si elle existe et n'est pas "on", sinon on envoie `true` (booléen)
+                // Adaptez ceci si Xano attend autre chose !
+                value = (el.value && el.value !== 'on') ? el.value : true;
+            } else {
+                // Ne PAS envoyer de valeur pour les checkboxes décochées (le plus courant)
+                // Si Xano DOIT recevoir "false", décommentez la ligne suivante :
+                // value = false;
+                return; // On ignore la clé si la case n'est pas cochée
+            }
+        } else if (el.type === 'radio') {
+            if (el.checked) {
+                value = el.value;
+            } else {
+                 return; // Ignore les radios non sélectionnés
+            }
+        } else if (el.tagName === 'SELECT') {
+             if (el.value !== '') { // Ignorer si la valeur est vide (ex: l'option "Indifférent")
+               value = el.value;
+             } else {
+                 return; // Ignorer la sélection vide
+             }
+        } else { // Inputs (text, number, date, etc.)
+             if (el.value !== '') { // Ignorer les champs vides
+                value = el.value;
+             } else {
+                return; // Ignorer les champs vides
+             }
+        }
+
+        // Ajouter au dictionnaire de paramètres si une valeur a été déterminée
+        // (Gère aussi le cas où value serait 0 ou false, qui sont des valeurs valides)
+        if (value !== null && value !== undefined) {
+             // Gestion des clés multiples (ex: plusieurs checkboxes avec le même data-filter-key pour un tableau)
+             // Pour l'instant, on suppose une clé = une valeur. Si Xano attend des tableaux (ex: ?features=garage&features=pool),
+             // il faudrait adapter cette partie pour utiliser `append` ou gérer des tableaux.
+             // Pour la plupart des filtres Xano standard, clé=valeur unique fonctionne bien.
+            params[key] = value;
+        }
+    });
+
+    console.log("Filtres collectés:", params); // Pour débogage
+    return params;
+}
+
+
+// ==========================================
+// == Nouvelle Fonction: Récupérer Liste Filtrée ==
+// ==========================================
+async function fetchFilteredListings(client, targetElement, params) {
+    const endpoint = targetElement.getAttribute('data-xano-endpoint');
+    const method = 'GET'; // C'est presque toujours GET pour récupérer une liste filtrée
+    const loadingIndicator = targetElement.querySelector('[data-xano-loading]') || document.querySelector(targetElement.getAttribute('data-xano-loading-selector'));
+
+    // Afficher l'indicateur de chargement
+    if (loadingIndicator) loadingIndicator.style.display = 'block';
+    // Optionnel: Désactiver le bouton pendant le chargement
+    const applyButton = document.getElementById('apply-filters-button');
+    if (applyButton) applyButton.disabled = true;
+
+    try {
+        // Appel API avec les paramètres de filtre (la méthode GET de XanoClient gère l'ajout à l'URL)
+        const responseData = await client.get(endpoint, params);
+
+        // Cacher l'indicateur de chargement AVANT le rendu
+        if (loadingIndicator) loadingIndicator.style.display = 'none';
+
+        // Utiliser votre fonction de rendu existante
+        renderData(responseData, targetElement);
+
+        // Déclencher l'événement de succès (si nécessaire pour d'autres scripts)
+        const successEvent = new CustomEvent('xano:data-loaded', {
+             detail: { data: responseData, element: targetElement, filters: params },
+             bubbles: true
+         });
+        targetElement.dispatchEvent(successEvent);
+
+    } catch (error) {
+        console.error(`Erreur lors de la récupération des données filtrées pour ${endpoint}:`, error);
+        if (loadingIndicator) loadingIndicator.style.display = 'none'; // Cacher aussi en cas d'erreur
+
+        // Afficher l'erreur dans l'élément cible (utilise votre logique existante si possible)
+        const errorDisplay = targetElement.querySelector('[data-xano-error]') || targetElement.querySelector('.xano-empty-message') || targetElement; // Cherche un sous-élément ou utilise l'élément principal/message vide
+        if (errorDisplay) {
+            errorDisplay.textContent = `Erreur: ${error.message || 'Impossible de charger les données.'}`;
+            errorDisplay.style.color = 'red'; // Exemple de style d'erreur
+            // Assurez-vous de vider la liste précédente si une erreur survient après un succès
+             const listContainer = targetElement.querySelector('[data-xano-list-container]') || targetElement;
+             renderListData([], listContainer); // Affiche une liste vide
+        }
+
+        const errorEvent = new CustomEvent('xano:data-error', {
+            detail: { error: error, element: targetElement, filters: params },
+            bubbles: true
+        });
+        targetElement.dispatchEvent(errorEvent);
+    } finally {
+         // Réactiver le bouton
+         if (applyButton) applyButton.disabled = false;
+    }
 }
 
 
@@ -577,45 +689,6 @@ function renderListData(dataArray, listContainerElement) {
                  else { clone.setAttribute('data-xano-link-target', linkTarget); clone.style.cursor = 'pointer'; }
              }
 
-             // --- NOUVEAU CODE POUR L'IMAGE DE FOND ---
-            // Trouvez la div spécifique dans le clone qui représente la room
-            // Ajustez le sélecteur si nécessaire. S'il n'y a qu'une seule div avec ces attributs par item, ceci devrait fonctionner.
-             // --- NOUVEAU CODE POUR L'IMAGE DE FOND (version photo_order == 1) ---
-            const roomDiv = clone.querySelector(`[data-action="select-created-room"][data-room-id]`);
-
-            // Vérifiez si la div a été trouvée et si les données de l'item (room) contiennent un tableau 'images'
-            // Remplacez 'images' par le nom réel du tableau si différent
-            if (roomDiv && item.images && Array.isArray(item.images)) {
-
-                // Trouver la photo avec photo_order === 1
-                // Remplacez 'photo_order' par le nom exact du champ dans vos données Xano si différent
-                const targetPhoto = item.images.find(photo => photo.photo_order === 1);
-
-                // Vérifier si une photo avec photo_order === 1 a été trouvée et si elle a une URL
-                // Remplacez 'url' par le nom exact du champ URL si différent
-                if (targetPhoto && targetPhoto.url) {
-                    const photoUrl = targetPhoto.url;
-                    roomDiv.style.backgroundImage = `url('${photoUrl}')`;
-                    // Optionnel : Styles pour l'affichage du fond
-                    // roomDiv.style.backgroundSize = 'cover';
-                    // roomDiv.style.backgroundPosition = 'center';
-                    // roomDiv.style.backgroundRepeat = 'no-repeat';
-                } else {
-                    // Optionnel : Si aucune photo avec order=1 n'est trouvée, utiliser la première photo comme fallback ?
-                    // Ou définir un fond par défaut.
-                    if (item.images.length > 0 && item.images[0].url) {
-                        console.warn(`Photo avec order=1 non trouvée pour room ID ${item.id}. Utilisation de la première photo.`);
-                        roomDiv.style.backgroundImage = `url('${item.images[0].url}')`;
-                    } else {
-                        console.warn(`Aucune photo valide (ni order=1, ni la première) trouvée pour room ID ${item.id}.`);
-                        // roomDiv.style.backgroundColor = '#f0f0f0'; // Fond par défaut
-                    }
-                }
-            } else if (roomDiv) {
-                 console.warn("Tableau 'images' non trouvé ou invalide pour room ID:", item.id);
-                 // roomDiv.style.backgroundColor = '#f0f0f0'; // Fond par défaut
-            }
-            // --- FIN DU NOUVEAU CODE ---
 
             // Ajouter le clone au conteneur
             container.appendChild(clone);
@@ -839,10 +912,3 @@ function getCookie(name) {
     }
     return null;
 }
-
-
-
-
-
-
-
