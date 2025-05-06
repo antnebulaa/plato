@@ -674,11 +674,11 @@ function renderPhotoItems(dataArray, listContainerElement) {
 
 // Map des sections vers les endpoints Xano (Adaptez avec VOS sections et endpoints)
 const sectionEndpoints = {
-    'general': 'property_editor/general', 
-    'title': 'property_editor/title', 
-    'address': 'property_editor/address', 
-    'RentType': 'property_editor/RentType', 
-    'loyer': 'property_editor/loyer', 
+    'general': 'property_editor/general/', 
+    'title': 'property_editor/title/', 
+    'address': 'property_editor/address/', 
+    'RentType': 'property_editor/RentType/', 
+    'loyer': 'property_editor/loyer/', 
     'photos': null // Géré différemment, peut-être pas d'endpoint direct ici
     // ... ajoutez toutes vos sections ici
 };
