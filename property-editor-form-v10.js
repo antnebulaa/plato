@@ -674,7 +674,11 @@ function renderPhotoItems(dataArray, listContainerElement) {
 
 // Map des sections vers les endpoints Xano (Adaptez avec VOS sections et endpoints)
 const sectionEndpoints = {
-    'general': 'property', // Exemple
+    'general': 'property_editor/general', 
+    'title': 'property_editor/title', 
+    'address': 'property_editor/address', 
+    'RentType': 'property_editor/RentType', 
+    'loyer': 'property_editor/loyer', 
     'photos': null // Géré différemment, peut-être pas d'endpoint direct ici
     // ... ajoutez toutes vos sections ici
 };
@@ -755,18 +759,44 @@ async function loadAndDisplaySection(sectionId, updateUrl = false) {
     }
 
     // --- 5. Charger les données (Phase 2) ---
-    // Si ce n'est PAS le chargement initial mobile (on veut charger les données quand on voit la section)
-    if (!isInitialMobileLoad && targetContainer /* && !targetContainer.dataset.loaded */) {
-        console.log(`Phase 2 - Déclenchement chargement données pour: ${sectionId}`);
-        // Mettre ici l'appel à fetchXanoData ou fonction spécifique
-        // const endpoint = sectionEndpoints[sectionId];
-        // if (endpoint) {
-        //    await fetchXanoData(xanoClient, endpoint, 'GET', { property_id: propertyId }, targetContainer, targetContainer.querySelector('[data-xano-loading]'));
-        //    targetContainer.dataset.loaded = 'true';
-        // } else if (sectionId === 'photos') { await refreshCurrentRoomPhotos(xanoClient); targetContainer.dataset.loaded = 'true'; } // Gérer photos spécifiquement
-    } else if (isInitialMobileLoad) {
-         console.log("Phase 2 - Chargement initial mobile, données non chargées pour l'instant.");
+// Si ce n'est PAS le chargement initial mobile (on veut charger les données quand on voit la section)
+// ET si le conteneur cible existe ET si les données n'ont pas encore été chargées pour ce conteneur
+if (!isInitialMobileLoad && targetContainer && !targetContainer.dataset.loaded) {
+    console.log(`Phase 2 - Déclenchement chargement données pour: ${sectionId}`);
+    const endpoint = sectionEndpoints[sectionId];
+    // Assurez-vous que votre targetContainer (ex: #section-content-general)
+    // contient bien un élément avec [data-xano-loading] si vous voulez un indicateur
+    const loadingIndicator = targetContainer.querySelector('[data-xano-loading]');
+
+    if (endpoint) {
+        console.log(`Appel fetchXanoData pour endpoint: ${endpoint}`);
+        // Assurez-vous que xanoClient et propertyId sont accessibles ici
+        try {
+            await fetchXanoData(xanoClient, endpoint, 'GET', { property_id: propertyId }, targetContainer, loadingIndicator);
+            targetContainer.dataset.loaded = 'true'; // Marquer comme chargé pour éviter rechargement
+            console.log(`Données pour "${sectionId}" chargées et conteneur marqué comme 'loaded'.`);
+        } catch (error) {
+            console.error(`Erreur lors du chargement des données pour la section ${sectionId}:`, error);
+            // Gérer l'erreur d'affichage ici si nécessaire
+        }
+    } else if (sectionId === 'photos') {
+        // La section 'photos' est spéciale. Son contenu (la liste des photos d'une room)
+        // est chargé via refreshCurrentRoomPhotos LORSQU'UNE ROOM EST SÉLECTIONNÉE.
+        // Il n'y a peut-être rien à charger pour le conteneur principal 'section-content-photos'
+        // sauf si vous avez des infos générales à y mettre.
+        console.log("Section Photos: chargement principal géré par sélection de pièce (refreshCurrentRoomPhotos).");
+        // Si vous chargez quelque chose pour le conteneur #section-content-photos lui-même :
+        // targetContainer.dataset.loaded = 'true';
+    } else {
+        console.log(`Aucun endpoint Xano défini dans sectionEndpoints pour la section: ${sectionId}`);
+        // Peut-être marquer comme chargé même si pas d'endpoint pour ne pas réessayer
+        targetContainer.dataset.loaded = 'true';
     }
+} else if (targetContainer && targetContainer.dataset.loaded) {
+    console.log(`Données pour "${sectionId}" déjà chargées, pas de rechargement.`);
+} else if (isInitialMobileLoad) {
+    console.log("Phase 2 - Chargement initial mobile, données non chargées pour l'instant pour la section principale.");
+}
 
 
     // --- 6. Mettre à jour l'URL (Seulement si demandé par updateUrl) ---
