@@ -443,7 +443,7 @@ function initXanoLinkHandlers() {
 // --- Fonctions Logiques (Fetch, Render) ---
 async function fetchXanoData(client, endpoint, method, params, targetElement, loadingIndicator) {
     try {
-     let finalEndpoint = endpointTemplate; // Ex: 'property_editor/general/{property_id}'
+     let finalEndpoint = endpoint; // Ex: 'property_editor/general/{property_id}'
         let processedParams = { ...params }; // Copie pour ne pas modifier l'original
 
         // Remplacer les placeholders dans l'endpoint avec les valeurs des params
