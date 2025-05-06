@@ -443,6 +443,19 @@ function initXanoLinkHandlers() {
 // --- Fonctions Logiques (Fetch, Render) ---
 async function fetchXanoData(client, endpoint, method, params, targetElement, loadingIndicator) {
     try {
+     let finalEndpoint = endpointTemplate; // Ex: 'property_editor/general/{property_id}'
+        let processedParams = { ...params }; // Copie pour ne pas modifier l'original
+
+        // Remplacer les placeholders dans l'endpoint avec les valeurs des params
+        // et les retirer des params pour ne pas les ajouter en query string
+        Object.keys(processedParams).forEach(key => {
+            const placeholder = `{${key}}`;
+            if (finalEndpoint.includes(placeholder)) {
+                finalEndpoint = finalEndpoint.replace(placeholder, encodeURIComponent(processedParams[key]));
+                delete processedParams[key]; // Retirer le paramètre car il est dans le chemin
+            }
+        });
+     
       let responseData;
       switch (method) {
       case 'GET': responseData = await client.get(endpoint, params); break;
@@ -674,11 +687,11 @@ function renderPhotoItems(dataArray, listContainerElement) {
 
 // Map des sections vers les endpoints Xano (Adaptez avec VOS sections et endpoints)
 const sectionEndpoints = {
-    'general': 'property_editor/general', 
-    'title': 'property_editor/title', 
-    'address': 'property_editor/address', 
-    'RentType': 'property_editor/RentType', 
-    'loyer': 'property_editor/loyer', 
+    'general': 'property_editor/general/{property_id}', 
+    'title': 'property_editor/title/{property_id}', 
+    'address': 'property_editor/address/{property_id}', 
+    'RentType': 'property_editor/RentType/{property_id}', 
+    'loyer': 'property_editor/loyer/{property_id}', 
     'photos': null // Géré différemment, peut-être pas d'endpoint direct ici
     // ... ajoutez toutes vos sections ici
 };
