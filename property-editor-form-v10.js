@@ -494,7 +494,7 @@ async function fetchXanoData(client, endpoint, method, params, targetElement, lo
         const successEvent = new CustomEvent('xano:data-loaded', { detail: { data: responseData, element: targetElement }, bubbles: true });
         targetElement.dispatchEvent(successEvent);
     } catch (error) {
-        console.error(`Erreur fetch ${endpoint} (final: ${finalEndpoint}):`, error); // Log un peu plus précis
+        console.error(`Erreur fetch pour endpoint initial "${endpoint}":`, error);
         if (loadingIndicator) loadingIndicator.style.display = 'none';
         const errorDisplay = targetElement.querySelector('[data-xano-error]') || targetElement;
         if (errorDisplay) {
