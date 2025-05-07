@@ -451,21 +451,22 @@ async function fetchXanoData(client, endpoint, method, params, targetElement, lo
 
         // Remplacer les placeholders dans l'endpoint avec les valeurs des params
         // et les retirer des params pour ne pas les ajouter en query string
-        Object.keys(processedParams).forEach(key => {
-            const placeholder = `{${key}}`;
-         console.log(`[fetchXanoData] Vérification placeholder: "<span class="math-inline">\{placeholder\}" dans endpoint\: "</span>{finalEndpoint}"`); // <- Voir les deux chaînes
+        Object.keys(processedParams).forEach(key => { // key sera "property_id"
+            const placeholder = `{${key}}`; // placeholder sera "{property_id}"
+            console.log(`[fetchXanoData] Placeholder à rechercher: "${placeholder}"`);
+            console.log(`[fetchXanoData] Dans la chaîne d'endpoint: "${finalEndpoint}"`);
+         
             if (finalEndpoint.includes(placeholder)) {
-             console.log(`[fetchXanoData] Placeholder "${placeholder}" TROUVÉ. Remplacement par:`, processedParams[key]);
+                console.log(`[fetchXanoData] TROUVÉ! Remplacement de "<span class="math-inline">\{placeholder\}" par "</span>{processedParams[key]}"`);
                 finalEndpoint = finalEndpoint.replace(placeholder, encodeURIComponent(processedParams[key]));
-                delete processedParams[key]; // Retirer le paramètre car il est dans le chemin
-                console.log(`[fetchXanoData] Endpoint après remplacement: "${finalEndpoint}"`);
-                console.log(`[fetchXanoData] Params après suppression de la clé:`, JSON.stringify(processedParams));
+                delete processedParams[key]; // Important pour ne pas l'avoir en query string aussi
             } else {
-                console.log(`[fetchXanoData] Placeholder "${placeholder}" NON TROUVÉ.`); // <- Est-ce qu'on arrive ici ?
+                console.log(`[fetchXanoData] NON TROUVÉ! Le placeholder "<span class="math-inline">\{placeholder\}" n'est pas dans "</span>{finalEndpoint}". Vérifiez la casse et les accolades dans sectionEndpoints.`);
             }
         });
      
       console.log(`[fetchXanoData] Appel Xano avec finalEndpoint: "${finalEndpoint}", processedParams:`, JSON.stringify(processedParams));
+      
       let responseData;
       switch (method) {
       case 'GET': responseData = await client.get(endpoint, params); break;
