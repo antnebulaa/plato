@@ -446,47 +446,65 @@ async function fetchXanoData(client, endpoint, method, params, targetElement, lo
         console.log('[fetchXanoData] Reçu endpoint initial:', endpoint); // <- Voir la valeur exacte
         console.log('[fetchXanoData] Reçu params initiaux:', JSON.stringify(params));
 
-     let finalEndpoint = endpoint; // Ex: 'property_editor/general/{property_id}'
+        let finalEndpoint = endpoint; // Ex: 'property_editor/general/{property_id}'
         let processedParams = { ...params }; // Copie pour ne pas modifier l'original
 
-        // Remplacer les placeholders dans l'endpoint avec les valeurs des params
-        // et les retirer des params pour ne pas les ajouter en query string
-        Object.keys(processedParams).forEach(key => { // key sera "property_id"
-            const placeholder = `{${key}}`; // placeholder sera "{property_id}"
-            console.log(`[fetchXanoData] Placeholder à rechercher: "${placeholder}"`);
-            console.log(`[fetchXanoData] Dans la chaîne d'endpoint: "${finalEndpoint}"`);
-         
+        // Remplacement des placeholders
+        Object.keys(processedParams).forEach(key => {
+            const placeholder = `{${key}}`;
+            // console.log(`[fetchXanoData] Vérification placeholder: "${placeholder}" dans endpoint: "${finalEndpoint}"`);
             if (finalEndpoint.includes(placeholder)) {
-                console.log(`[fetchXanoData] TROUVÉ! Remplacement de "<span class="math-inline">\{placeholder\}" par "</span>{processedParams[key]}"`);
+                // console.log(`[fetchXanoData] Placeholder "${placeholder}" TROUVÉ. Remplacement par:`, processedParams[key]);
                 finalEndpoint = finalEndpoint.replace(placeholder, encodeURIComponent(processedParams[key]));
-                delete processedParams[key]; // Important pour ne pas l'avoir en query string aussi
+                delete processedParams[key]; // Important
+                // console.log(`[fetchXanoData] Endpoint après remplacement: "${finalEndpoint}"`);
+                // console.log(`[fetchXanoData] Params après suppression de la clé:`, JSON.stringify(processedParams));
             } else {
-                console.log(`[fetchXanoData] NON TROUVÉ! Le placeholder "<span class="math-inline">\{placeholder\}" n'est pas dans "</span>{finalEndpoint}". Vérifiez la casse et les accolades dans sectionEndpoints.`);
+                // console.log(`[fetchXanoData] Placeholder "${placeholder}" NON TROUVÉ.`);
             }
         });
+
      
       console.log(`[fetchXanoData] Appel Xano avec finalEndpoint: "${finalEndpoint}", processedParams:`, JSON.stringify(processedParams));
-      
       let responseData;
-      switch (method) {
-      case 'GET': responseData = await client.get(endpoint, params); break;
-      case 'POST': responseData = await client.post(endpoint, params); break;
-      // ... (autres cas de la v8 si présents) ...
-      default: throw new Error(`Méthode HTTP non supportée pour data-xano-endpoint: ${method}`);
-      }
+     
+      // --- !!! CORRECTION CRUCIALE ICI !!! ---
+        switch (method) {
+            case 'GET':
+                responseData = await client.get(finalEndpoint, processedParams); // UTILISER finalEndpoint et processedParams
+                break;
+            case 'POST':
+                // Pour POST, les "params" sont souvent le corps de la requête.
+                // Si processedParams est vide car tout était dans l'URL, et que le corps original était dans params :
+                // Ou si votre client.post gère le remplacement de la même manière que GET pour les placeholders URL
+                // Pour l'instant, supposons que si c'est POST, les processedParams (qui seraient des query string) ne sont pas l'usage principal,
+                // mais on va quand même utiliser finalEndpoint. Le corps serait dans 'paramsOrBody' initial.
+                // Si 'params' ici représente le corps et non des query strings :
+                responseData = await client.post(finalEndpoint, params); // Si params est le corps et que finalEndpoint est bon
+                // Si processedParams était censé être le corps (et que des éléments ont été retirés car dans l'URL)
+                // responseData = await client.post(finalEndpoint, processedParams); // Moins probable pour POST typique
+                break;
+            default:
+                throw new Error(`Méthode HTTP non supportée pour data-xano-endpoint: ${method}`);
+        }
+        // --- FIN CORRECTION CRUCIALE ---
+     
       if (loadingIndicator) loadingIndicator.style.display = 'none';
-      renderData(responseData, targetElement); // Appel rendu
-      const successEvent = new CustomEvent('xano:data-loaded', { detail: { data: responseData, element: targetElement }, bubbles: true });
-      targetElement.dispatchEvent(successEvent);
+        renderData(responseData, targetElement);
+        const successEvent = new CustomEvent('xano:data-loaded', { detail: { data: responseData, element: targetElement }, bubbles: true });
+        targetElement.dispatchEvent(successEvent);
     } catch (error) {
-      console.error(`Erreur fetch ${endpoint}:`, error);
-      if (loadingIndicator) loadingIndicator.style.display = 'none';
-      const errorDisplay = targetElement.querySelector('[data-xano-error]') || targetElement;
-      if (errorDisplay) { errorDisplay.textContent = `Erreur: ${error.message || 'Impossible de charger.'}`; errorDisplay.style.color = 'red'; }
-      const errorEvent = new CustomEvent('xano:data-error', { detail: { error: error, element: targetElement }, bubbles: true });
-      targetElement.dispatchEvent(errorEvent);
+        console.error(`Erreur fetch ${endpoint} (final: ${finalEndpoint}):`, error); // Log un peu plus précis
+        if (loadingIndicator) loadingIndicator.style.display = 'none';
+        const errorDisplay = targetElement.querySelector('[data-xano-error]') || targetElement;
+        if (errorDisplay) {
+            errorDisplay.textContent = `Erreur: ${error.message || 'Impossible de charger les données.'}`; // Message plus clair
+            errorDisplay.style.color = 'red';
+        }
+        const errorEvent = new CustomEvent('xano:data-error', { detail: { error: error, element: targetElement }, bubbles: true });
+        targetElement.dispatchEvent(errorEvent);
     }
-  }
+}
 
 // MODIFIÉ v8 -> v8.3: renderData distingue maintenant le rendu des photos
 function renderData(data, element) {
