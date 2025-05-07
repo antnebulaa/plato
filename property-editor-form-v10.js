@@ -443,6 +443,9 @@ function initXanoLinkHandlers() {
 // --- Fonctions Logiques (Fetch, Render) ---
 async function fetchXanoData(client, endpoint, method, params, targetElement, loadingIndicator) {
     try {
+        console.log('[fetchXanoData] Reçu endpoint initial:', endpoint); // <- Voir la valeur exacte
+        console.log('[fetchXanoData] Reçu params initiaux:', JSON.stringify(params));
+
      let finalEndpoint = endpoint; // Ex: 'property_editor/general/{property_id}'
         let processedParams = { ...params }; // Copie pour ne pas modifier l'original
 
@@ -450,12 +453,19 @@ async function fetchXanoData(client, endpoint, method, params, targetElement, lo
         // et les retirer des params pour ne pas les ajouter en query string
         Object.keys(processedParams).forEach(key => {
             const placeholder = `{${key}}`;
+         console.log(`[fetchXanoData] Vérification placeholder: "<span class="math-inline">\{placeholder\}" dans endpoint\: "</span>{finalEndpoint}"`); // <- Voir les deux chaînes
             if (finalEndpoint.includes(placeholder)) {
+             console.log(`[fetchXanoData] Placeholder "${placeholder}" TROUVÉ. Remplacement par:`, processedParams[key]);
                 finalEndpoint = finalEndpoint.replace(placeholder, encodeURIComponent(processedParams[key]));
                 delete processedParams[key]; // Retirer le paramètre car il est dans le chemin
+                console.log(`[fetchXanoData] Endpoint après remplacement: "${finalEndpoint}"`);
+                console.log(`[fetchXanoData] Params après suppression de la clé:`, JSON.stringify(processedParams));
+            } else {
+                console.log(`[fetchXanoData] Placeholder "${placeholder}" NON TROUVÉ.`); // <- Est-ce qu'on arrive ici ?
             }
         });
      
+      console.log(`[fetchXanoData] Appel Xano avec finalEndpoint: "${finalEndpoint}", processedParams:`, JSON.stringify(processedParams));
       let responseData;
       switch (method) {
       case 'GET': responseData = await client.get(endpoint, params); break;
