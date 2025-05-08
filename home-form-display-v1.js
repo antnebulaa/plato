@@ -26,10 +26,11 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- Initialisation des Données (Liste des Annonces) ---
     const listingElement = document.querySelector('[data-xano-endpoint="property/getall"]');
     if (listingElement) {
+        console.log("DOM LOADED: Appel initial pour la liste."); // LOG 1
         // Chargement initial sans filtres (ou avec filtres par défaut si nécessaire)
         fetchFilteredListings(xanoClient, listingElement, {}); // {} = pas de filtres initiaux
     } else {
-        console.warn("Élément conteneur pour 'property/getall' non trouvé.");
+        console.warn("DOM LOADED: listingElement pour 'property/getall' NON trouvé."); // LOG 2
     }
 
     initXanoLinkHandlers(); // Après le premier chargement potentiel
@@ -38,12 +39,20 @@ document.addEventListener('DOMContentLoaded', function () {
     const applyFiltersButton = document.getElementById('apply-filters-button');
     const filtersForm = document.getElementById('filters-form'); // Conteneur des filtres
 
+    // LOG 3: Vérifier si les éléments sont trouvés
+    console.log("DOM LOADED: applyFiltersButton trouvé?", applyFiltersButton);
+    console.log("DOM LOADED: filtersForm trouvé?", filtersForm);
+    console.log("DOM LOADED: listingElement (pour filtres) trouvé?", listingElement);
+
     if (applyFiltersButton && filtersForm && listingElement) {
         applyFiltersButton.addEventListener('click', function() {
+            console.log("BOUTON FILTRE CLIQUE !"); // LOG 4
             const filterParams = collectFilterValues(filtersForm);
+            console.log("PARAMÈTRES COLLECTÉS APRÈS CLIC:", filterParams); // LOG 5
             fetchFilteredListings(xanoClient, listingElement, filterParams);
         });
     } else {
+         console.warn("AVERTISSEMENT: L'écouteur d'événement pour le filtre N'A PAS été attaché. Vérifiez les éléments ci-dessus."); // LOG 6
          if (!applyFiltersButton) console.warn("Bouton 'apply-filters-button' non trouvé.");
          if (!filtersForm) console.warn("Formulaire 'filters-form' non trouvé.");
     }
@@ -328,29 +337,34 @@ function initXanoLinkHandlers() {
 }
 
 // ==========================================
-// == Nouvelle Fonction: Collecter Filtres ==
+// == Nouvelle Fonction: Collecter Filtres == // OU == Votre Fonction Collecter Filtres existante ==
 // ==========================================
-function collectFilterValues(formElement) {
+function collectFilterValues(formElement) { // formElement est le conteneur de vos filtres
     const params = {};
-    // Sélectionne tous les inputs, selects, textareas DANS le form qui ont data-filter-key
+    console.log("collectFilterValues APPELÉ avec formElement:", formElement); // LOG 7 (comme suggéré)
+    if (!formElement) {
+        console.error("collectFilterValues: formElement est null ! Impossible de trouver les filtres.");
+        return params;
+    }
+
+    // Sélectionne TOUS les inputs, selects, textareas DANS le formElement qui ont data-filter-key
     const filterElements = formElement.querySelectorAll('input[data-filter-key], select[data-filter-key], textarea[data-filter-key]');
+    console.log("collectFilterValues: Nombre d'éléments de filtre trouvés au total:", filterElements.length); // LOG 8 (modifié pour tous les filtres)
 
     filterElements.forEach(el => {
         const key = el.getAttribute('data-filter-key');
+        // LOG 9 (comme suggéré)
+        console.log("collectFilterValues: Traitement de l'élément:", el, "avec data-filter-key:", key, "et valeur brute:", el.value);
+
         if (!key) return; // Sécurité
 
         let value = null;
 
+        // ---- DEBUT DE VOTRE LOGIQUE ORIGINALE (sources [80-88] de home-form-display-v1-1.txt) ----
         if (el.type === 'checkbox') {
             if (el.checked) {
-                // Important : Vérifier si Xano attend "true" (string), true (boolean), ou la valeur du champ (ex: "1")
-                // Ici, on prend la `value` de la checkbox si elle existe et n'est pas "on", sinon on envoie `true` (booléen)
-                // Adaptez ceci si Xano attend autre chose !
                 value = (el.value && el.value !== 'on') ? el.value : true;
             } else {
-                // Ne PAS envoyer de valeur pour les checkboxes décochées (le plus courant)
-                // Si Xano DOIT recevoir "false", décommentez la ligne suivante :
-                // value = false;
                 return; // On ignore la clé si la case n'est pas cochée
             }
         } else if (el.type === 'radio') {
@@ -366,25 +380,28 @@ function collectFilterValues(formElement) {
                  return; // Ignorer la sélection vide
              }
         } else { // Inputs (text, number, date, etc.)
-             if (el.value !== '') { // Ignorer les champs vides
-                value = el.value;
+             // Pour les champs texte, on peut vouloir trimmer les espaces
+             const trimmedValue = el.value.trim();
+             if (trimmedValue !== '') { // Ignorer les champs vides après trim
+                // Pour les nombres, on peut vouloir les convertir en type numérique
+                // Si l'input Xano attend un nombre.
+                // Pour l'instant, on envoie comme chaîne, Xano est souvent flexible.
+                // Si Xano se plaint du type, on pourra convertir ici avec parseFloat() ou parseInt().
+                value = trimmedValue;
              } else {
                 return; // Ignorer les champs vides
              }
         }
+        // ---- FIN DE VOTRE LOGIQUE ORIGINALE ----
 
-        // Ajouter au dictionnaire de paramètres si une valeur a été déterminée
-        // (Gère aussi le cas où value serait 0 ou false, qui sont des valeurs valides)
         if (value !== null && value !== undefined) {
-             // Gestion des clés multiples (ex: plusieurs checkboxes avec le même data-filter-key pour un tableau)
-             // Pour l'instant, on suppose une clé = une valeur. Si Xano attend des tableaux (ex: ?features=garage&features=pool),
-             // il faudrait adapter cette partie pour utiliser `append` ou gérer des tableaux.
-             // Pour la plupart des filtres Xano standard, clé=valeur unique fonctionne bien.
             params[key] = value;
+            // LOG 10 (comme suggéré, mais adapté pour une valeur générique)
+            console.log(`collectFilterValues: Ajout de { "${key}": "${value}" } aux paramètres.`);
         }
     });
 
-    console.log("Filtres collectés:", params); // Pour débogage
+    // console.log("Filtres collectés:", params); // Déjà présent dans le code du bouton, mais peut être utile ici aussi pour voir le résultat final de CETTE fonction
     return params;
 }
 
@@ -396,6 +413,7 @@ async function fetchFilteredListings(client, targetElement, params) {
     const endpoint = targetElement.getAttribute('data-xano-endpoint');
     const method = 'GET'; // C'est presque toujours GET pour récupérer une liste filtrée
     const loadingIndicator = targetElement.querySelector('[data-xano-loading]') || document.querySelector(targetElement.getAttribute('data-xano-loading-selector'));
+    console.log(`WorkspaceFilteredListings APPELÉ pour endpoint: ${endpoint}. Params ENVOYÉS À XANO:`, JSON.stringify(params)); // LOG 11
 
     // Afficher l'indicateur de chargement
     if (loadingIndicator) loadingIndicator.style.display = 'block';
@@ -406,6 +424,7 @@ async function fetchFilteredListings(client, targetElement, params) {
     try {
         // Appel API avec les paramètres de filtre (la méthode GET de XanoClient gère l'ajout à l'URL)
         const responseData = await client.get(endpoint, params);
+        console.log(`WorkspaceFilteredListings RÉPONSE DE XANO pour ${endpoint} avec params ${JSON.stringify(params)}:`, responseData); // LOG 12
 
         // Cacher l'indicateur de chargement AVANT le rendu
         if (loadingIndicator) loadingIndicator.style.display = 'none';
@@ -421,7 +440,7 @@ async function fetchFilteredListings(client, targetElement, params) {
         targetElement.dispatchEvent(successEvent);
 
     } catch (error) {
-        console.error(`Erreur lors de la récupération des données filtrées pour ${endpoint}:`, error);
+        console.error(`Erreur DANS fetchFilteredListings pour ${endpoint} avec params ${JSON.stringify(params)}:`, error); // LOG 13
         if (loadingIndicator) loadingIndicator.style.display = 'none'; // Cacher aussi en cas d'erreur
 
         // Afficher l'erreur dans l'élément cible (utilise votre logique existante si possible)
@@ -508,6 +527,7 @@ async function fetchXanoData(client, endpoint, method, params, targetElement, lo
 }
 
 function renderData(data, element) {
+    console.log("renderData APPELÉ. Données reçues:", data, "Élément cible:", element); // LOG 14
     // Si l'élément a un attribut data-xano-list, c'est une liste
     if (element.hasAttribute('data-xano-list')) {
         // Trouver les données de liste (plus robuste)
@@ -520,6 +540,7 @@ function renderData(data, element) {
         ];
 
         for (const source of potentialDataSources) {
+            console.log("renderData: listData déterminé:", listData); // LOG 15
             if (Array.isArray(source)) {
                 listData = source;
                 break;
