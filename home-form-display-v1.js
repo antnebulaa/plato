@@ -360,36 +360,35 @@ function collectFilterValues(formElement) { // formElement est le conteneur de v
         let value = null;
 
         if (el.type === 'checkbox') {
-            if (el.checked) {
-                // Utiliser la 'value' de la checkbox. Si elle n'est pas définie, on pourrait ignorer ou prendre 'true'
-                // Pour house_type, il FAUT une 'value' (ex: "maison", "appartement")
-                value = el.value; // Assurez-vous que vos checkboxes ont des attributs value="maison", value="appartement"
-                
-                if (!value || value === 'on') { // Si value est vide ou 'on' par défaut, ce n'est pas utilisable pour un enum
-                    console.warn(`Checkbox pour la clé "${key}" est cochée mais n'a pas de valeur définie exploitable. Ignorée.`);
-                    return; // Ignorer cette checkbox spécifique
-                }
-
-                // ---- DEBUT MODIFICATION POUR LISTES ----
-                if (params[key]) { // Si la clé existe déjà (donc c'est au moins le 2ème item pour cette clé)
-                    if (Array.isArray(params[key])) {
-                        params[key].push(value); // Ajoute à la liste existante
-                    } else {
-                        // Convertit en liste avec l'ancienne valeur et la nouvelle
-                        params[key] = [params[key], value];
-                    }
-                } else {
-                    // Première valeur pour cette clé, on la stocke directement
-                    // Pourrait être une liste dès le départ si on sait que c'est un filtre multi-choix
-                    // Pour l'instant, on la laisse simple, et on la convertit en liste si une 2ème valeur arrive
-                    params[key] = value;
-                }
-                // ---- FIN MODIFICATION POUR LISTES ----
-                // On ne `return` pas ici, car l'ajout au paramètre est géré ci-dessus, et on ne veut pas passer au `if (value !== null)` plus bas pour les listes
-                return; // Important de retourner ici pour ne pas écraser avec la logique `params[key] = value` du bas
-            } else {
-                return; // Case non cochée, on l'ignore
+        if (el.checked) {
+            valueForCurrentElement = el.value; 
+            
+            if (!valueForCurrentElement || valueForCurrentElement === 'on') { 
+                console.warn(`Checkbox pour la clé "${key}" ("${el.id || ''}") est cochée mais n'a pas de valeur définie exploitable. Ignorée.`);
+                return; // Passe à l'itération suivante de la boucle filterElements.forEach
             }
+
+            // MAINTENANT, on gère l'ajout à params[key] pour s'assurer que c'est une liste
+            if (!params[key]) { // Si params[key] n'existe pas encore pour cette clé
+                params[key] = []; // Initialise TOUJOURS params[key] comme une liste vide
+            }
+            // On vérifie que params[key] est bien un tableau (au cas où, même si on vient de l'initialiser)
+            if (Array.isArray(params[key])) {
+                params[key].push(valueForCurrentElement); // Ajoute la valeur de la checkbox actuelle à la liste
+            } else {
+                // Ce cas ne devrait plus arriver si on initialise toujours comme tableau,
+                // mais par sécurité, on pourrait le logger ou le gérer.
+                // Pour l'instant, on suppose qu'il sera toujours un tableau grâce à l'initialisation.
+                console.warn(`Problème: params[${key}] devrait être un tableau mais ne l'est pas.`);
+            }
+            // Une fois la valeur de la checkbox traitée et ajoutée à la liste params[key],
+            // on passe à l'élément suivant. On ne veut pas que la logique `params[key] = value`
+            // à la fin de la boucle forEach écrase notre tableau.
+            return; // FIN DU TRAITEMENT POUR CETTE CHECKBOX
+        } else {
+            // Si la checkbox n'est pas cochée, on ne fait rien pour cette clé et on passe à la suite.
+            return; 
+        }
         } else if (el.type === 'radio') {
             if (el.checked) {
                 value = el.value;
