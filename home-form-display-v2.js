@@ -625,7 +625,7 @@ function renderListData(dataArray, listContainerElement) {
      // Vider le conteneur, en préservant le template s'il est à l'intérieur
      // Et en préservant les éléments qui ne sont PAS des data-xano-list-item générés précédemment
      let currentChild = container.firstChild;
-     while (currentChild) {
+     while (currentChild) { /* ... logique de vidage ... */ 
          const nextChild = currentChild.nextSibling;
          // Ne supprimer que les éléments générés précédemment OU si le conteneur est l'élément principal
          // Et s'assurer de ne pas supprimer le template lui-même
@@ -664,7 +664,7 @@ function renderListData(dataArray, listContainerElement) {
 
             // Rendre visible et marquer l'élément cloné
             clone.style.display = ''; // Enlever le display:none potentiel
-             clone.removeAttribute('aria-hidden');
+            clone.removeAttribute('aria-hidden');
             clone.setAttribute('data-xano-list-item', ''); // Marqueur pour l'item généré
             clone.setAttribute('data-xano-item-index', index.toString()); // Index (utile pour debug ou style)
 
@@ -720,6 +720,37 @@ function renderListData(dataArray, listContainerElement) {
             // Ajouter le clone au conteneur
             container.appendChild(clone);
         });
+
+
+        // --- NOUVELLE SECTION : INITIALISATION DES SLIDERS SWIPER ---
+        // Après que tous les clones ont été ajoutés au DOM et peuplés
+        const slidersToInitialize = container.querySelectorAll('.swiper[data-slider-init="true"]');
+        slidersToInitialize.forEach((swiperEl, sliderIndex) => {
+            // Donner un ID unique au conteneur du swiper peut être utile si vous avez des styles spécifiques
+            // ou si vous voulez y accéder plus tard, mais pas indispensable pour l'init Swiper
+            // swiperEl.id = `swiper-${listContainerElement.id}-item-${sliderIndex}`; 
+
+            new Swiper(swiperEl, {
+                // Options SwiperJS de base (vous pouvez les personnaliser)
+                loop: photosArray && photosArray.length > 1, // Boucle seulement s'il y a plus d'une image
+                spaceBetween: 10, // Espace entre les slides
+                pagination: {
+                    el: swiperEl.querySelector('.swiper-pagination'),
+                    clickable: true,
+                },
+                navigation: {
+                    nextEl: swiperEl.querySelector('.swiper-button-next'),
+                    prevEl: swiperEl.querySelector('.swiper-button-prev'),
+                },
+                // Ajoutez d'autres options selon vos besoins :
+                // slidesPerView: 1,
+                // effect: 'fade', 
+                // autoplay: { delay: 3000 },
+            });
+            swiperEl.removeAttribute('data-slider-init'); // Enlever l'attribut pour éviter ré-initialisation
+        });
+        // --- FIN NOUVELLE SECTION : INITIALISATION DES SLIDERS SWIPER ---
+        
     } else {
         // Afficher un message si aucune donnée (amélioration)
         const emptyMessage = listContainerElement.getAttribute('data-xano-empty-message') || "Aucune donnée à afficher.";
@@ -738,15 +769,64 @@ function bindDataToElement(element, data) {
     const dataKey = element.getAttribute('data-xano-bind');
     if (!dataKey) return; // Pas de clé de binding
 
-    // Gestion de clés imbriquées simples (ex: user.name)
+    // --- NOUVELLE LOGIQUE POUR LE SLIDER D'IMAGES ---
+    if (dataKey === '_property_photos_slider') {
+        const photosArray = data._property_photos; // Accède au tableau _property_photos de l'item actuel
+        const swiperContainer = element.querySelector('.swiper'); // Cible le conteneur .swiper
+        
+        if (!swiperContainer) {
+            console.warn("Conteneur .swiper non trouvé pour le slider de l'annonce:", data.id, "Élément:", element);
+            return;
+        }
+        const swiperWrapper = swiperContainer.querySelector('.swiper-wrapper');
+
+        if (photosArray && Array.isArray(photosArray) && swiperWrapper) {
+            swiperWrapper.innerHTML = ''; // Vider les slides précédents au cas où
+
+            if (photosArray.length > 0) {
+                photosArray.forEach(photoEntry => {
+                    // Votre structure de données montre que 'images' est un tableau,
+                    // et l'URL est dans le premier élément de ce tableau 'images'.
+                    if (photoEntry.images && photoEntry.images.length > 0 && photoEntry.images[0].url) {
+                        const imageUrl = photoEntry.images[0].url;
+                        const slideElement = document.createElement('div');
+                        slideElement.className = 'swiper-slide';
+                        
+                        const imgElement = document.createElement('img');
+                        imgElement.src = imageUrl;
+                        // Essayez d'ajouter un alt pertinent
+                        imgElement.alt = data.property_title ? `Photo de ${data.property_title}` : "Photo de la propriété"; 
+                        // Vous pouvez ajouter des styles à imgElement si nécessaire, ex: imgElement.style.width = '100%';
+                        
+                        slideElement.appendChild(imgElement);
+                        swiperWrapper.appendChild(slideElement);
+                    }
+                });
+                // On ne initialise PAS Swiper ici. On va le marquer pour initialisation.
+                swiperContainer.setAttribute('data-slider-init', 'true'); // Marqueur pour l'initialisation
+                element.style.display = ''; // S'assurer que le conteneur du slider est visible
+            } else {
+                // Pas de photos, on cache le conteneur principal du slider pour cette annonce
+                element.style.display = 'none'; 
+            }
+        } else {
+            // Si photosArray n'existe pas ou n'est pas un tableau, ou si swiperWrapper est introuvable
+            console.warn("Pas de données photos valides ou structure de slider incorrecte pour l'annonce:", data.id, "Élément:", element);
+            element.style.display = 'none'; // Cacher le conteneur du slider
+        }
+        return; // Traitement spécifique pour le slider terminé
+    }
+    // --- FIN NOUVELLE LOGIQUE POUR LE SLIDER D'IMAGES ---
+
+    // Gestion de clés imbriquées simples (ex: user.name ou _property_lease_of_property.0.loyer)
     let value = data;
     const keys = dataKey.split('.');
-    for (const key of keys) {
-        if (value && typeof value === 'object' && key in value) {
-            value = value[key];
+    for (const keyPart of keys) { // Renommé 'key' en 'keyPart' pour éviter conflit avec 'key' de la boucle précédente
+        if (value && typeof value === 'object' && keyPart in value) {
+            value = value[keyPart];
         } else {
             // Clé non trouvée ou donnée intermédiaire non objet
-             console.warn(`Clé "${dataKey}" (partie "${key}") non trouvée ou chemin invalide dans:`, data);
+            // console.warn(`Clé "${dataKey}" (partie "${keyPart}") non trouvée ou chemin invalide dans:`, data); // Peut être verbeux
             value = undefined; // Marquer comme non trouvé
             break;
         }
@@ -758,6 +838,12 @@ function bindDataToElement(element, data) {
     // Appliquer la valeur à l'élément
     switch (element.tagName.toLowerCase()) {
         case 'img':
+            // Cette condition est pour s'assurer qu'on ne met pas à jour le src des <img> DANS le slider
+            // si l'élément <img> lui-même avait un data-xano-bind (ce qui n'est pas le cas ici, on le crée dynamiquement)
+            if (!element.closest('.swiper-slide')) { 
+                element.src = displayValue;
+            }
+            break;
         case 'iframe':
         case 'video':
         case 'audio':
@@ -799,11 +885,11 @@ function bindDataToElement(element, data) {
             break;
         case 'a':
              // Ne met à jour href que si ce n'est pas géré par data-xano-link-to
-            if (!element.hasAttribute('data-xano-link-to')) {
+            if (!element.hasAttribute('data-xano-link-to')) { // Ne pas écraser les liens gérés par data-xano-link-to
                  element.href = displayValue;
             }
              // Mettre à jour le texte du lien si vide ou si dataKey != 'href'
-             if (!element.textContent.trim() || dataKey !== 'href') {
+             if (!element.textContent.trim() || dataKey !== 'href') { 
                   element.textContent = displayValue;
               }
             break;
