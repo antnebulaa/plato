@@ -743,10 +743,12 @@ function renderListData(dataArray, listContainerElement) {
         new Swiper(swiperEl, {
             // Options SwiperJS
             loop: enableLoop, // Utilise la variable corrigée basée sur le nombre de slides
-            spaceBetween: 10,
+            spaceBetween: 0,
             pagination: {
-                el: swiperEl.querySelector('.swiper-pagination'), // Important: cible la pagination DANS ce swiperEl
+                el: swiperEl.querySelector('.swiper-pagination'),
                 clickable: true,
+                dynamicBullets: true, // Active les points dynamiques
+                dynamicMainBullets: 5, // Nombre maximum de points visibles principaux (AJUSTEZ SI BESOIN)
             },
             navigation: {
                 nextEl: swiperEl.querySelector('.swiper-button-next'), // Cible les boutons DANS ce swiperEl
