@@ -532,36 +532,20 @@ function renderData(data, element) {
     if (element.hasAttribute('data-xano-list')) {
         // Trouver les données de liste (plus robuste)
         let listData = null;
-        const potentialDataSources = [
-            data,
-            data?.body,
-            data?.items,
-            data?.body?.items
-        ];
 
-        for (const source of potentialDataSources) {
-            console.log("renderData: listData déterminé:", listData); // LOG 15
-            if (Array.isArray(source)) {
-                listData = source;
-                break;
-            }
-            // Si ce n'est pas un tableau, mais un objet, chercher une clé qui contient un tableau
-            if (source && typeof source === 'object') {
-                 for (const key in source) {
-                     if (Array.isArray(source[key])) {
-                         listData = source[key];
-                         // On pourrait vouloir être plus spécifique si plusieurs tableaux existent
-                         // console.warn(`Multiple arrays found in data source for list, using key: ${key}`);
-                         break; // Prend le premier tableau trouvé
-                     }
-                 }
-            }
-             if (listData) break; // Sortir de la boucle externe si trouvé
+         // ---- DEBUT MODIFICATION ----
+        if (data && Array.isArray(data.items)) { // Cible directement data.items
+            listData = data.items;
+        } else if (Array.isArray(data)) { // Au cas où la réponse serait directement un tableau
+            listData = data;
         }
+        // ---- FIN MODIFICATION ----
+        // L'ancienne logique avec potentialDataSources peut être commentée ou supprimée pour l'instant.
 
-
-        if (listData) {
-            renderListData(listData, element); // Utilise le helper
+        console.log("renderData: listData déterminé (après modif):", listData); // LOG 15 (garder)
+        if (listData && Array.isArray(listData)) {
+            renderListData(listData, element);
+        
         } else {
             console.warn('Aucun tableau de données trouvé dans la réponse pour la liste:', data);
              renderListData([], element); // Afficher la liste comme vide
