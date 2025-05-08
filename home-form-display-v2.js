@@ -768,11 +768,13 @@ function renderListData(dataArray, listContainerElement) {
                 // --- FIN AJOUT IMPORTANT ---
             // Ajoutez d'autres options Swiper si nécessaire
         });
+
+        
         swiperEl.removeAttribute('data-slider-init'); // Important: Enlever l'attribut après initialisation réussie
     } catch (swiperError) {
         console.error(`Erreur lors de l'initialisation de Swiper pour le slider #${sliderIndex}:`, swiperEl, swiperError);
     }
-                }, 50); // Délai de 50ms - vous pouvez essayer 0, 50 ou 100
+                }, 200); // Délai de 50ms - vous pouvez essayer 0, 50 ou 100
 
 });
 // --- FIN SECTION CORRIGÉE : INITIALISATION DES SLIDERS SWIPER ---
