@@ -738,7 +738,9 @@ function renderListData(dataArray, listContainerElement) {
             // Donner un ID unique au conteneur du swiper peut être utile si vous avez des styles spécifiques
             // ou si vous voulez y accéder plus tard, mais pas indispensable pour l'init Swiper
             // swiperEl.id = `swiper-${listContainerElement.id}-item-${sliderIndex}`; 
-
+ // --- AJOUT D'UN DÉLAI ---
+    // On attend un tout petit peu que le DOM se stabilise (surtout dans une grille)
+    setTimeout(() => {
     try { // Ajouter un try...catch pour isoler les erreurs d'initialisation Swiper
         new Swiper(swiperEl, {
             // Options SwiperJS
@@ -754,12 +756,24 @@ function renderListData(dataArray, listContainerElement) {
                 nextEl: swiperEl.querySelector('.swiper-button-next'), // Cible les boutons DANS ce swiperEl
                 prevEl: swiperEl.querySelector('.swiper-button-prev'),
             },
+               // --- AJOUT IMPORTANT ---
+                observer: true, // Demande à Swiper de surveiller les changements du DOM
+                observeParents: true, // Surveille aussi les parents
+                // Force un recalcul immédiatement après l'initialisation (parfois utile)
+                on: {
+                    init: function (swiper) {
+                        swiper.update(); 
+                    }
+                }
+                // --- FIN AJOUT IMPORTANT ---
             // Ajoutez d'autres options Swiper si nécessaire
         });
         swiperEl.removeAttribute('data-slider-init'); // Important: Enlever l'attribut après initialisation réussie
     } catch (swiperError) {
         console.error(`Erreur lors de l'initialisation de Swiper pour le slider #${sliderIndex}:`, swiperEl, swiperError);
     }
+                }, 50); // Délai de 50ms - vous pouvez essayer 0, 50 ou 100
+
 });
 // --- FIN SECTION CORRIGÉE : INITIALISATION DES SLIDERS SWIPER ---
         
