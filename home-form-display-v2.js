@@ -725,31 +725,41 @@ function renderListData(dataArray, listContainerElement) {
         // --- NOUVELLE SECTION : INITIALISATION DES SLIDERS SWIPER ---
         // Après que tous les clones ont été ajoutés au DOM et peuplés
         const slidersToInitialize = container.querySelectorAll('.swiper[data-slider-init="true"]');
+        console.log(`renderListData: Trouvé ${slidersToInitialize.length} sliders à initialiser.`); // Log de débogage
+        
         slidersToInitialize.forEach((swiperEl, sliderIndex) => {
+        console.log(`renderListData: Initialisation du slider #${sliderIndex} pour l'élément:`, swiperEl); // Log de débogage
+
+            // Compter les slides réellement présents dans ce conteneur swiper spécifique
+       const slides = swiperEl.querySelectorAll('.swiper-slide');
+       const enableLoop = slides.length > 1; // Activer la boucle seulement s'il y a plus d'une image
+       console.log(`renderListData: Slider #${sliderIndex} a ${slides.length} slides. Loop activée: ${enableLoop}`); // Log de débogage
+
             // Donner un ID unique au conteneur du swiper peut être utile si vous avez des styles spécifiques
             // ou si vous voulez y accéder plus tard, mais pas indispensable pour l'init Swiper
             // swiperEl.id = `swiper-${listContainerElement.id}-item-${sliderIndex}`; 
 
-            new Swiper(swiperEl, {
-                // Options SwiperJS de base (vous pouvez les personnaliser)
-                loop: photosArray && photosArray.length > 1, // Boucle seulement s'il y a plus d'une image
-                spaceBetween: 10, // Espace entre les slides
-                pagination: {
-                    el: swiperEl.querySelector('.swiper-pagination'),
-                    clickable: true,
-                },
-                navigation: {
-                    nextEl: swiperEl.querySelector('.swiper-button-next'),
-                    prevEl: swiperEl.querySelector('.swiper-button-prev'),
-                },
-                // Ajoutez d'autres options selon vos besoins :
-                // slidesPerView: 1,
-                // effect: 'fade', 
-                // autoplay: { delay: 3000 },
-            });
-            swiperEl.removeAttribute('data-slider-init'); // Enlever l'attribut pour éviter ré-initialisation
+    try { // Ajouter un try...catch pour isoler les erreurs d'initialisation Swiper
+        new Swiper(swiperEl, {
+            // Options SwiperJS
+            loop: enableLoop, // Utilise la variable corrigée basée sur le nombre de slides
+            spaceBetween: 10,
+            pagination: {
+                el: swiperEl.querySelector('.swiper-pagination'), // Important: cible la pagination DANS ce swiperEl
+                clickable: true,
+            },
+            navigation: {
+                nextEl: swiperEl.querySelector('.swiper-button-next'), // Cible les boutons DANS ce swiperEl
+                prevEl: swiperEl.querySelector('.swiper-button-prev'),
+            },
+            // Ajoutez d'autres options Swiper si nécessaire
         });
-        // --- FIN NOUVELLE SECTION : INITIALISATION DES SLIDERS SWIPER ---
+        swiperEl.removeAttribute('data-slider-init'); // Important: Enlever l'attribut après initialisation réussie
+    } catch (swiperError) {
+        console.error(`Erreur lors de l'initialisation de Swiper pour le slider #${sliderIndex}:`, swiperEl, swiperError);
+    }
+});
+// --- FIN SECTION CORRIGÉE : INITIALISATION DES SLIDERS SWIPER ---
         
     } else {
         // Afficher un message si aucune donnée (amélioration)
