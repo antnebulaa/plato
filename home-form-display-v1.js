@@ -355,17 +355,40 @@ function collectFilterValues(formElement) { // formElement est le conteneur de v
         const key = el.getAttribute('data-filter-key');
         // LOG 9 (comme suggéré)
         console.log("collectFilterValues: Traitement de l'élément:", el, "avec data-filter-key:", key, "et valeur brute:", el.value);
-
         if (!key) return; // Sécurité
 
         let value = null;
 
-        // ---- DEBUT DE VOTRE LOGIQUE ORIGINALE (sources [80-88] de home-form-display-v1-1.txt) ----
         if (el.type === 'checkbox') {
             if (el.checked) {
-                value = (el.value && el.value !== 'on') ? el.value : true;
+                // Utiliser la 'value' de la checkbox. Si elle n'est pas définie, on pourrait ignorer ou prendre 'true'
+                // Pour house_type, il FAUT une 'value' (ex: "maison", "appartement")
+                value = el.value; // Assurez-vous que vos checkboxes ont des attributs value="maison", value="appartement"
+                
+                if (!value || value === 'on') { // Si value est vide ou 'on' par défaut, ce n'est pas utilisable pour un enum
+                    console.warn(`Checkbox pour la clé "${key}" est cochée mais n'a pas de valeur définie exploitable. Ignorée.`);
+                    return; // Ignorer cette checkbox spécifique
+                }
+
+                // ---- DEBUT MODIFICATION POUR LISTES ----
+                if (params[key]) { // Si la clé existe déjà (donc c'est au moins le 2ème item pour cette clé)
+                    if (Array.isArray(params[key])) {
+                        params[key].push(value); // Ajoute à la liste existante
+                    } else {
+                        // Convertit en liste avec l'ancienne valeur et la nouvelle
+                        params[key] = [params[key], value];
+                    }
+                } else {
+                    // Première valeur pour cette clé, on la stocke directement
+                    // Pourrait être une liste dès le départ si on sait que c'est un filtre multi-choix
+                    // Pour l'instant, on la laisse simple, et on la convertit en liste si une 2ème valeur arrive
+                    params[key] = value;
+                }
+                // ---- FIN MODIFICATION POUR LISTES ----
+                // On ne `return` pas ici, car l'ajout au paramètre est géré ci-dessus, et on ne veut pas passer au `if (value !== null)` plus bas pour les listes
+                return; // Important de retourner ici pour ne pas écraser avec la logique `params[key] = value` du bas
             } else {
-                return; // On ignore la clé si la case n'est pas cochée
+                return; // Case non cochée, on l'ignore
             }
         } else if (el.type === 'radio') {
             if (el.checked) {
@@ -401,7 +424,7 @@ function collectFilterValues(formElement) { // formElement est le conteneur de v
         }
     });
 
-    // console.log("Filtres collectés:", params); // Déjà présent dans le code du bouton, mais peut être utile ici aussi pour voir le résultat final de CETTE fonction
+    console.log("Filtres collectés (potentiellement avec listes):", params);
     return params;
 }
 
