@@ -773,7 +773,7 @@ function renderListData(dataArray, listContainerElement) {
     } catch (swiperError) {
         console.error(`Erreur lors de l'initialisation de Swiper pour le slider #${sliderIndex}:`, swiperEl, swiperError);
     }
-                }, 300); // Essayez avec 250ms ou 300ms ou même 500ms si nécessaire
+                }, 50); // Essayez avec 250ms ou 300ms ou même 500ms si nécessaire
     }); // Fin de requestAnimationFrame
 
 // --- FIN SECTION D'INITIALISATION SWIPER AMÉLIORÉE ---
