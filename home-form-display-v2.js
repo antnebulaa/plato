@@ -741,43 +741,46 @@ function renderListData(dataArray, listContainerElement) {
  // --- AJOUT D'UN DÉLAI ---
     // On attend un tout petit peu que le DOM se stabilise (surtout dans une grille)
     setTimeout(() => {
-    try { // Ajouter un try...catch pour isoler les erreurs d'initialisation Swiper
-        new Swiper(swiperEl, {
-            // Options SwiperJS
-            loop: enableLoop, // Utilise la variable corrigée basée sur le nombre de slides
-            spaceBetween: 0,
-            pagination: {
-                el: swiperEl.querySelector('.swiper-pagination'),
-                clickable: true,
-                dynamicBullets: true, // Active les points dynamiques
-                dynamicMainBullets: 5, // Nombre maximum de points visibles principaux (AJUSTEZ SI BESOIN)
-            },
-            navigation: {
-                nextEl: swiperEl.querySelector('.swiper-button-next'), // Cible les boutons DANS ce swiperEl
-                prevEl: swiperEl.querySelector('.swiper-button-prev'),
-            },
-               // --- AJOUT IMPORTANT ---
-                observer: true, // Demande à Swiper de surveiller les changements du DOM
-                observeParents: true, // Surveille aussi les parents
-                // Force un recalcul immédiatement après l'initialisation (parfois utile)
-                on: {
-                    init: function (swiper) {
-                        swiper.update(); 
-                    }
-                }
-                // --- FIN AJOUT IMPORTANT ---
-            // Ajoutez d'autres options Swiper si nécessaire
-        });
+            console.log(`renderListData: Exécution de l'initialisation (avec délai) pour Slider #${sliderIndex}.`);
+            try { 
+                const slides = swiperEl.querySelectorAll('.swiper-slide');
+                const enableLoop = slides.length > 1; 
+                console.log(`renderListData: Slider #${sliderIndex} a ${slides.length} slides. Loop activée: ${enableLoop}`);
 
+                const swiperInstance = new Swiper(swiperEl, { 
+                    // Options SwiperJS
+                    loop: enableLoop, 
+                    spaceBetween: 10, 
+                    slidesPerView: 1, // Assurez-vous que c'est bien 1 par défaut
+                    pagination: {
+                        el: swiperEl.querySelector('.swiper-pagination'),
+                        clickable: true,
+                        dynamicBullets: true, 
+                        dynamicMainBullets: 5, 
+                    },
+                    navigation: {
+                        nextEl: swiperEl.querySelector('.swiper-button-next'),
+                        prevEl: swiperEl.querySelector('.swiper-button-prev'),
+                    },
+                    observer: true,         // Surveille les changements du slider lui-même
+                    observeParents: true,   // Surveille les changements des parents (important pour Grid/Flex)
+                    observeSlideChildren: true, // Surveille changements dans les slides
+                    updateOnWindowResize: true, // Se met à jour si la fenêtre change de taille
+                });
+
+                // Forcer une mise à jour immédiatement après l'initialisation Swiper
+                // Cela peut l'aider à prendre les dimensions correctes une fois initialisé
+                swiperInstance.update(); 
+                console.log(`renderListData: Slider #${sliderIndex} initialisé et update() appelé.`);
         
         swiperEl.removeAttribute('data-slider-init'); // Important: Enlever l'attribut après initialisation réussie
     } catch (swiperError) {
         console.error(`Erreur lors de l'initialisation de Swiper pour le slider #${sliderIndex}:`, swiperEl, swiperError);
     }
-                }, 200); // Délai de 50ms - vous pouvez essayer 0, 50 ou 100
-
+                }, 300); // Essayez avec 250ms ou 300ms ou même 500ms si nécessaire
+    }); // Fin de requestAnimationFrame
 });
-// --- FIN SECTION CORRIGÉE : INITIALISATION DES SLIDERS SWIPER ---
+// --- FIN SECTION D'INITIALISATION SWIPER AMÉLIORÉE ---
         
     } else {
         // Afficher un message si aucune donnée (amélioration)
