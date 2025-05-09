@@ -1,7 +1,3 @@
-
-<!-- FORM -->
-    <!-- Script principal qui gère les attributs personnalisés -->
-
 // ==========================================
 // == Script Xano Unifié (Formulaires + Données) ==
 // ==========================================
