@@ -779,7 +779,7 @@ function renderListData(dataArray, listContainerElement) {
     }
                 }, 300); // Essayez avec 250ms ou 300ms ou même 500ms si nécessaire
     }); // Fin de requestAnimationFrame
-});
+
 // --- FIN SECTION D'INITIALISATION SWIPER AMÉLIORÉE ---
         
     } else {
