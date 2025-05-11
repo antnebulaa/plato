@@ -8,6 +8,8 @@
 // ==========================================
 // Version optimisée pour Safari/Chrome/Firefox - 11/05/2025
 
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
 document.addEventListener('DOMContentLoaded', function() {
     // --- Configuration du Client Xano ---
     const xanoClient = new XanoClient({
@@ -103,10 +105,88 @@ async function fetchXanoData(client, endpoint, method, params, targetElement) {
         loadingIndicator.style.display = 'block';
     }
 
+    // Solution de contournement pour Safari
+    if (isSafari) {
+        return new Promise((resolve, reject) => {
+            // Utiliser XMLHttpRequest au lieu de fetch pour Safari
+            const xhr = new XMLHttpRequest();
+            const url = `${client.baseUrl}${endpoint}${method === 'GET' ? '?' + new URLSearchParams(params).toString() : ''}`;
+            
+            xhr.open(method, url, true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            
+            // Ajouter le token d'authentification si présent
+            const authToken = getCookie('xano_auth_token');
+            if (authToken) {
+                xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+            }
+            
+            xhr.onload = function() {
+                if (loadingIndicator) {
+                    loadingIndicator.style.display = 'none';
+                }
+                
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    const response = JSON.parse(xhr.responseText);
+                    renderData(response, targetElement);
+                    
+                    // Déclencher l'événement de données chargées
+                    const event = new CustomEvent('xano:data-loaded', {
+                        detail: { data: response, element: targetElement, params: params },
+                        bubbles: true
+                    });
+                    targetElement.dispatchEvent(event);
+                    
+                    resolve(response);
+                } else {
+                    const error = new Error(`Erreur HTTP ${xhr.status}: ${xhr.statusText}`);
+                    console.error(`[FETCH_DATA] Erreur:`, error);
+                    
+                    targetElement.innerHTML = `<div class="xano-error">Erreur: ${error.message}</div>`;
+                    
+                    // Déclencher l'événement d'erreur
+                    const errorEvent = new CustomEvent('xano:data-error', {
+                        detail: { error: error, element: targetElement, params: params },
+                        bubbles: true
+                    });
+                    targetElement.dispatchEvent(errorEvent);
+                    
+                    reject(error);
+                }
+            };
+            
+            xhr.onerror = function() {
+                if (loadingIndicator) {
+                    loadingIndicator.style.display = 'none';
+                }
+                
+                const error = new Error('Erreur réseau');
+                console.error(`[FETCH_DATA] Erreur:`, error);
+                
+                targetElement.innerHTML = `<div class="xano-error">Erreur réseau</div>`;
+                
+                // Déclencher l'événement d'erreur
+                const errorEvent = new CustomEvent('xano:data-error', {
+                    detail: { error: error, element: targetElement, params: params },
+                    bubbles: true
+                });
+                targetElement.dispatchEvent(errorEvent);
+                
+                reject(error);
+            };
+            
+            if (method === 'GET') {
+                xhr.send();
+            } else {
+                xhr.send(JSON.stringify(params));
+            }
+        });
+    }
+
+    // Code original pour les autres navigateurs
     try {
         let response;
         
-        // Effectuer la requête selon la méthode
         switch(method) {
             case 'GET':
                 response = await client.get(endpoint, params);
@@ -120,21 +200,19 @@ async function fetchXanoData(client, endpoint, method, params, targetElement) {
 
         console.log(`[FETCH_DATA] Réponse reçue:`, response);
         
-        // Cacher l'indicateur de chargement
         if (loadingIndicator) {
             loadingIndicator.style.display = 'none';
         }
 
-        // Traiter et afficher les données
         renderData(response, targetElement);
 
-        // Déclencher l'événement de données chargées
         const event = new CustomEvent('xano:data-loaded', {
             detail: { data: response, element: targetElement, params: params },
             bubbles: true
         });
         targetElement.dispatchEvent(event);
 
+        return response;
     } catch (error) {
         console.error(`[FETCH_DATA] Erreur:`, error);
         
@@ -142,16 +220,15 @@ async function fetchXanoData(client, endpoint, method, params, targetElement) {
             loadingIndicator.style.display = 'none';
         }
 
-        // Afficher un message d'erreur
-        const errorMessage = `Erreur: ${error.message || "Impossible de charger les données"}`;
-        targetElement.innerHTML = `<div class="xano-error">${errorMessage}</div>`;
+        targetElement.innerHTML = `<div class="xano-error">Erreur: ${error.message || "Impossible de charger les données"}</div>`;
 
-        // Déclencher l'événement d'erreur
         const errorEvent = new CustomEvent('xano:data-error', {
             detail: { error: error, element: targetElement, params: params },
             bubbles: true
         });
         targetElement.dispatchEvent(errorEvent);
+
+        throw error;
     }
 }
 
@@ -344,65 +421,57 @@ function handleLinksInClone(clone, item) {
 
 // Initialisation des Swiper avec détection de disponibilité du DOM
 function initializeSwipers(container) {
-    // Vérifier que Swiper est chargé
     if (typeof Swiper === 'undefined') {
         console.error("[SWIPER] La bibliothèque Swiper n'est pas chargée");
         return;
     }
     
     const slidersToInitialize = container.querySelectorAll('.swiper[data-slider-init="true"]');
-    console.log(`[SWIPER] ${slidersToInitialize.length} sliders à initialiser`);
     
     if (slidersToInitialize.length === 0) return;
 
-    // Utiliser un MutationObserver pour détecter quand les éléments sont réellement prêts
-    const observer = new MutationObserver((mutations, obs) => {
-        let allSlidersReady = true;
+    // Utilisez MutationObserver pour Safari
+    if (isSafari) {
+        // Forcer un rafraîchissement du DOM dans Safari
+        container.style.display = 'none';
+        // Forcer le navigateur à recalculer la mise en page
+        void container.offsetHeight;
+        container.style.display = '';
         
-        // Vérifier si tous les sliders sont prêts
-        slidersToInitialize.forEach(slider => {
-            if (slider.hasAttribute('data-slider-init') && 
-                !slider.hasAttribute('data-slider-ready') &&
-                slider.offsetParent !== null) { // Vérifie si visible
-                
-                const slides = slider.querySelectorAll('.swiper-slide');
-                if (slides.length > 0) {
-                    // Marquer comme prêt à initialiser
-                    slider.setAttribute('data-slider-ready', 'true');
-                } else {
-                    allSlidersReady = false;
-                }
-            }
-        });
-        
-        // Si tous sont prêts, initialiser et déconnecter l'observateur
-        if (allSlidersReady) {
+        // Attendre que le DOM soit stable
+        const observer = new MutationObserver((mutations, obs) => {
             slidersToInitialize.forEach(slider => {
-                if (slider.hasAttribute('data-slider-ready')) {
+                if (slider.querySelectorAll('.swiper-slide').length > 0) {
                     initializeSingleSwiper(slider);
+                    slider.setAttribute('data-safari-initialized', 'true');
                 }
             });
-            obs.disconnect();
-        }
-    });
-    
-    // Observer les changements dans le conteneur
-    observer.observe(container, { 
-        childList: true, 
-        subtree: true,
-        attributes: true,
-        characterData: false
-    });
-    
-    // Lancer aussi l'initialisation avec requestAnimationFrame pour les cas simples
-    requestAnimationFrame(() => {
-        slidersToInitialize.forEach(slider => {
-            if (!slider.hasAttribute('data-slider-ready')) {
-                initializeSingleSwiper(slider);
+            
+            // Vérifier si tous les sliders sont initialisés
+            const allInitialized = Array.from(slidersToInitialize).every(
+                slider => slider.hasAttribute('data-safari-initialized')
+            );
+            
+            if (allInitialized) {
+                obs.disconnect();
             }
         });
-    });
+        
+        observer.observe(container, { 
+            childList: true, 
+            subtree: true,
+            attributes: true
+        });
+    } else {
+        // Pour les autres navigateurs, utiliser l'approche originale
+        slidersToInitialize.forEach(slider => {
+            requestAnimationFrame(() => {
+                initializeSingleSwiper(slider);
+            });
+        });
+    }
 }
+
 
 // Initialiser un seul slider Swiper
 function initializeSingleSwiper(swiperEl) {
