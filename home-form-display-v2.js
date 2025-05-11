@@ -132,4 +132,4 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- Lancer la récupération des données ---
     fetchAnnouncements();
 });
-</script>
+
