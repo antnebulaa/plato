@@ -93,7 +93,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const fragment = document.createDocumentFragment();
 
         items.forEach(itemData => {
-            let_clone;
+            let clone;
             if (templateNode.tagName === 'TEMPLATE') {
                 clone = templateNode.content.firstElementChild.cloneNode(true);
             } else { // Si le template est un div caché
