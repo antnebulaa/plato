@@ -8,12 +8,35 @@
 // ==========================================
 // Version optimisée pour Safari/Chrome/Firefox - 11/05/2025
 
+// Détection de Safari - à placer au niveau global, avant l'event listener
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+console.log("Navigation sur Safari:", isSafari);
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Vérification de l'état du document pour gérer le problème Safari
+    if (document.readyState !== 'loading') {
+        console.log("[READY] Document déjà chargé, exécution immédiate");
+        initializeXanoClient();
+    } else {
+        console.log("[WAITING] Document en cours de chargement, attente...");
+        // Safari peut avoir un comportement différent avec DOMContentLoaded
+        // Nous utilisons cette approche pour plus de fiabilité
+        if (isSafari) {
+            // Forcer un court délai pour Safari
+            setTimeout(initializeXanoClient, 20);
+        } else {
+            // Comportement normal pour les autres navigateurs
+            initializeXanoClient();
+        }
+    }
+});
+
+// Fonction d'initialisation séparée pour éviter les problèmes de timing
+function initializeXanoClient() {
+    console.log("[INIT] Initialisation du client Xano");
     // --- Configuration du Client Xano ---
     const xanoClient = new XanoClient({
-        apiGroupBaseUrl: 'https://xwxl-obyg-b3e3.p7.xano.io/api:qom0bt4V', // À adapter à votre environnement
+        apiGroupBaseUrl: 'https://xwxl-obyg-b3e3.p7.xano.io/api:qom0bt4V'
     });
 
     // --- Initialisation pour toutes les listes de données ---
@@ -49,8 +72,14 @@ document.addEventListener('DOMContentLoaded', function() {
             xanoClient.setAuthToken(authToken);
         }
 
-        // Récupérer les données
-        fetchXanoData(xanoClient, endpoint, method, params, listingElement);
+        // Approche conditionnelle pour Safari vs autres navigateurs
+        if (isSafari) {
+            console.log("[SAFARI] Utilisation de XMLHttpRequest pour", endpoint);
+            fetchDataWithXHR(endpoint, method, params, listingElement);
+        } else {
+            console.log("[STANDARD] Utilisation de fetch/client Xano pour", endpoint);
+            fetchXanoData(xanoClient, endpoint, method, params, listingElement);
+        }
     });
 
     // --- Gestion des liens de navigation ---
@@ -92,7 +121,87 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
-});
+}
+
+// Fonction pour Safari utilisant XMLHttpRequest
+function fetchDataWithXHR(endpoint, method, params, element) {
+    console.log("[SAFARI] Appel XMLHttpRequest pour", endpoint, params);
+    
+    const loadingIndicatorSelector = element.getAttribute('data-xano-loading-selector');
+    const loadingIndicator = loadingIndicatorSelector ? document.querySelector(loadingIndicatorSelector) : null;
+    
+    if (loadingIndicator) {
+        loadingIndicator.style.display = 'block';
+    }
+    
+    const xhr = new XMLHttpRequest();
+    const baseUrl = 'https://xwxl-obyg-b3e3.p7.xano.io/api:qom0bt4V';
+    let url = `${baseUrl}/${endpoint}`;
+    
+    // Ajouter les paramètres à l'URL pour les requêtes GET
+    if (method === 'GET' && Object.keys(params).length > 0) {
+        url += '?' + new URLSearchParams(params).toString();
+    }
+    
+    xhr.open(method, url, true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    
+    // Ajouter l'authentification si disponible
+    const authToken = getCookie('xano_auth_token');
+    if (authToken) {
+        xhr.setRequestHeader('Authorization', `Bearer ${authToken}`);
+    }
+    
+    xhr.onload = function() {
+        if (loadingIndicator) {
+            loadingIndicator.style.display = 'none';
+        }
+        
+        if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+                const response = JSON.parse(xhr.responseText);
+                console.log("[SAFARI] Données reçues:", response);
+                
+                // Forcer un délai très court pour permettre au DOM de se stabiliser
+                setTimeout(() => {
+                    renderData(response, element);
+                    
+                    // Déclencher l'événement manuellement
+                    const event = new CustomEvent('xano:data-loaded', {
+                        detail: { data: response, element: element, params: params },
+                        bubbles: true
+                    });
+                    element.dispatchEvent(event);
+                }, 50);
+            } catch (e) {
+                console.error("[SAFARI] Erreur de parsing JSON:", e);
+                element.innerHTML = `<div class="xano-error">Erreur de format: ${e.message}</div>`;
+            }
+        } else {
+            console.error('[SAFARI] Erreur lors de la requête XHR:', xhr.status, xhr.statusText);
+            element.innerHTML = `<div class="xano-error">Erreur ${xhr.status}: ${xhr.statusText}</div>`;
+        }
+    };
+    
+    xhr.onerror = function() {
+        if (loadingIndicator) {
+            loadingIndicator.style.display = 'none';
+        }
+        
+        console.error('[SAFARI] Erreur réseau lors de la requête XHR');
+        element.innerHTML = `<div class="xano-error">Erreur réseau</div>`;
+    };
+    
+    // Envoyer les données pour les méthodes autres que GET
+    if (method !== 'GET' && Object.keys(params).length > 0) {
+        xhr.send(JSON.stringify(params));
+    } else {
+        xhr.send();
+    }
+}
+
+
+
 
 // Fonction principale pour récupérer les données Xano
 async function fetchXanoData(client, endpoint, method, params, targetElement) {
@@ -299,7 +408,7 @@ function extractListData(data) {
 }
 
 // Fonction pour rendre une liste de données
-function renderListData(dataArray, listContainerElement) {
+function renderListData(dataArray, element) {
     console.log(`[RENDER_LIST] Rendu de ${dataArray.length} éléments`);
     
     // Vérifier que dataArray est un tableau
@@ -371,7 +480,32 @@ function renderListData(dataArray, listContainerElement) {
     
     // Initialiser les sliders Swiper en utilisant requestAnimationFrame
     initializeSwipers(container);
+    // Initialisation conditionnelle de Swiper
+    const slidersToInitialize = container.querySelectorAll('.swiper[data-slider-init="true"]');
+    
+    if (isSafari) {
+        // Code spécifique à Safari pour Swiper
+        slidersToInitialize.forEach(slider => {
+            // Forcer un rafraîchissement du DOM
+            slider.style.display = 'none';
+            void slider.offsetHeight;
+            slider.style.display = '';
+            
+            // Initialisation avec délai court
+            setTimeout(() => {
+                initializeSingleSwiper(slider);
+            }, 100);
+        });
+    } else {
+        // Code original pour autres navigateurs
+        slidersToInitialize.forEach(slider => {
+            requestAnimationFrame(() => {
+                initializeSingleSwiper(slider);
+            });
+        });
+    }
 }
+
 
 // Fonction pour gérer les liens dans un clone
 function handleLinksInClone(clone, item) {
