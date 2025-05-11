@@ -3,325 +3,103 @@
 // ==========================================
 // Date: 2025-03-30
 
-document.addEventListener('DOMContentLoaded', function () {
-    // --- Configuration ---
+document.addEventListener('DOMContentLoaded', function() {
+    // --- Configuration du Client Xano ---
+    // Si vous utilisez votre classe XanoClient personnalisée de home-form-display-v2-2.txt
+    // assurez-vous que la définition de cette classe est présente avant ce script.
+    // Sinon, si vous voulez utiliser le SDK Xano comme dans votre "ancien script fonctionnel",
+    // vous initialiserez différemment.
+    // Pour cet exemple, je suppose que vous continuez avec votre classe XanoClient personnalisée.
     const xanoClient = new XanoClient({
-        // !!! IMPORTANT: Remplacez par VOTRE URL de base Xano !!!
-        apiGroupBaseUrl: 'https://xwxl-obyg-b3e3.p7.xano.io/api:qom0bt4V',
-    }); 
+        apiGroupBaseUrl: 'https://xwxl-obyg-b3e3.p7.xano.io/api:qom0bt4V', // Votre URL de base Xano
+    });
 
-    // --- Initialisation ---
-    // 1. Gérer l'authentification (si cookie présent)
-    const authToken = getCookie('xano_auth_token');
-    if (authToken) {
-        xanoClient.setAuthToken(authToken);
-    }
-
-     initXanoForms(xanoClient);
-
-    // --- Initialisation des Données (Liste des Annonces) ---
+    // --- Initialisation pour la liste des annonces property/getall ---
     const listingElement = document.querySelector('[data-xano-endpoint="property/getall"]');
     if (listingElement) {
-        console.log("DOM LOADED: Appel initial pour la liste."); // LOG 1
-        // Chargement initial sans filtres (ou avec filtres par défaut si nécessaire)
-        fetchFilteredListings(xanoClient, listingElement, {}); // {} = pas de filtres initiaux
-    } else {
-        console.warn("DOM LOADED: listingElement pour 'property/getall' NON trouvé."); // LOG 2
-    }
+        console.log("[INIT] Élément pour property/getall trouvé. Appel initial.");
+        
+        const endpoint = listingElement.getAttribute('data-xano-endpoint');
+        const method = (listingElement.getAttribute('data-xano-method') || 'GET').toUpperCase();
+        const params = {}; // Pour l'appel initial à property/getall, pas de filtres
 
-    initXanoLinkHandlers(); // Après le premier chargement potentiel
-
-    // --- Gestion des Filtres ---
-    const applyFiltersButton = document.getElementById('apply-filters-button');
-    const filtersForm = document.getElementById('filters-form'); // Conteneur des filtres
-
-    // LOG 3: Vérifier si les éléments sont trouvés
-    console.log("DOM LOADED: applyFiltersButton trouvé?", applyFiltersButton);
-    console.log("DOM LOADED: filtersForm trouvé?", filtersForm);
-    console.log("DOM LOADED: listingElement (pour filtres) trouvé?", listingElement);
-
-    if (applyFiltersButton && filtersForm && listingElement) {
-        applyFiltersButton.addEventListener('click', function() {
-            console.log("BOUTON FILTRE CLIQUE !"); // LOG 4
-            const filterParams = collectFilterValues(filtersForm);
-            console.log("PARAMÈTRES COLLECTÉS APRÈS CLIC:", filterParams); // LOG 5
-            fetchFilteredListings(xanoClient, listingElement, filterParams);
-        });
-    } else {
-         console.warn("AVERTISSEMENT: L'écouteur d'événement pour le filtre N'A PAS été attaché. Vérifiez les éléments ci-dessus."); // LOG 6
-         if (!applyFiltersButton) console.warn("Bouton 'apply-filters-button' non trouvé.");
-         if (!filtersForm) console.warn("Formulaire 'filters-form' non trouvé.");
-    }
-
-}); // Fin de DOMContentLoaded
-
-// ==========================================
-// == Classe XanoClient Améliorée          ==
-// ==========================================
-class XanoClient {
-    constructor(config) {
-        this.apiGroupBaseUrl = config.apiGroupBaseUrl;
-        this.authToken = null;
-    }
-
-    setAuthToken(token) {
-        this.authToken = token;
-    }
-
-    async _request(method, endpoint, paramsOrBody = null, isFormData = false) {
-        const url = `${this.apiGroupBaseUrl}/${endpoint}`;
-        const options = {
-            method: method,
-            headers: {},
-        };
-
-        if (this.authToken) {
-            options.headers['Authorization'] = `Bearer ${this.authToken}`;
-        }
-
-        let finalUrl = url;
-        if (method === 'GET' && paramsOrBody) {
-            // Filtrer les clés avec des valeurs null/undefined/vides avant de construire les query params
-            const cleanParams = {};
-            for (const key in paramsOrBody) {
-                if (paramsOrBody[key] !== null && paramsOrBody[key] !== undefined && paramsOrBody[key] !== '') {
-                     cleanParams[key] = paramsOrBody[key];
-                }
-            }
-            const queryParams = new URLSearchParams(cleanParams).toString();
-            if (queryParams) {
-                finalUrl = `${url}?${queryParams}`;
-            }
-        } else if (['POST', 'PUT', 'PATCH'].includes(method) && paramsOrBody) {
-            if (isFormData) {
-                options.body = paramsOrBody;
-            } else {
-                options.headers['Content-Type'] = 'application/json';
-                options.body = JSON.stringify(paramsOrBody);
-            }
-        }
-        // DELETE n'a généralement pas de body, mais peut en avoir certains cas (rare)
-        // Si paramsOrBody est fourni pour DELETE et n'est pas FormData, on pourrait envisager de le JSON.stringify aussi.
-
-         try {
-            const response = await fetch(finalUrl, options);
-            if (response.status === 204 || response.headers.get('content-length') === '0') {
-                if (!response.ok) {
-                   throw new Error(`Erreur HTTP ${response.status}`);
-                }
-                return null;
-            }
-            const responseData = await response.json();
-            if (!response.ok) {
-                const message = responseData.message || `Erreur HTTP ${response.status}`;
-                throw new Error(message);
-            }
-            return responseData;
-        } catch (error) {
-            console.error(`Erreur lors de l'appel ${method} ${endpoint}:`, error);
-            throw error;
-        }
-    }
-
-    async get(endpoint, params = null) { return this._request('GET', endpoint, params); }
-     async post(endpoint, body = null, isFormData = false) { return this._request('POST', endpoint, body, isFormData); }
-     async put(endpoint, body = null, isFormData = false) { return this._request('PUT', endpoint, body, isFormData); }
-     async patch(endpoint, body = null, isFormData = false) { return this._request('PATCH', endpoint, body, isFormData); }
-     async delete(endpoint, params = null) {
-         let finalEndpoint = endpoint;
-         if (params) {
-             const queryParams = new URLSearchParams(params).toString();
-             if (queryParams) { finalEndpoint = `${endpoint}?${queryParams}`; }
-         }
-         return this._request('DELETE', finalEndpoint, null);
-      }
-}
-
-// ==========================================
-// == Initialisation des Formulaires       ==
-// ==========================================
-function initXanoForms(xanoClient) {
-    const xanoForms = document.querySelectorAll('[data-xano-form]');
-    xanoForms.forEach((form) => {
-        form.addEventListener('submit', async function (e) {
-            e.preventDefault();
-
-            const endpoint = form.getAttribute('data-xano-form');
-            const method = (form.getAttribute('data-xano-form-method') || 'POST').toUpperCase();
-
-            // Indicateurs et bouton
-            const loadingElement = form.querySelector('[data-xano-form-loading]') || document.querySelector(form.getAttribute('data-xano-form-loading-selector')); // Supporte l'attribut direct ou un sélecteur
-            const errorElement = form.querySelector('[data-xano-form-error]') || document.querySelector(form.getAttribute('data-xano-form-error-selector'));
-            const submitButton = form.querySelector('button[type="submit"], input[type="submit"]');
-
-            if (errorElement) errorElement.style.display = 'none'; // Cacher ancienne erreur
-            if (loadingElement) loadingElement.style.display = 'block';
-            if (submitButton) submitButton.disabled = true;
-
-            try {
-                // Récupérer l'ID si nécessaire pour PUT/PATCH/DELETE
-                let finalEndpoint = endpoint;
-                let requestBody = null;
-
-                if (form.hasAttribute('data-xano-form-id-param')) {
-                    const idParamName = form.getAttribute('data-xano-form-id-param');
-                    const idValue = getQueryParam(idParamName); // Utilise le helper getQueryParam
-                    if (idValue && ['PUT', 'PATCH', 'DELETE'].includes(method)) {
-                        // Typiquement, l'ID fait partie de l'URL pour ces méthodes
-                        finalEndpoint = `${endpoint}/${idValue}`;
-                    } else if (idValue && method === 'POST') {
-                         // Parfois, pour POST, l'ID peut être une partie du corps
-                         // ou l'endpoint peut le gérer comme un paramètre spécial
-                         // Ici, on suppose qu'il fait partie de l'URL pour rester cohérent
-                         // ou alors il faudrait le mettre dans le FormData
-                         // Si besoin dans le body, collectFormDataWithFiles devrait l'ajouter
-                         console.warn("Utilisation de data-xano-form-id-param avec POST. L'ID sera ajouté à l'URL. Assurez-vous que c'est le comportement attendu.")
-                         finalEndpoint = `${endpoint}/${idValue}`;
-                    }
-                }
-
-                // Collecter les données du formulaire, y compris les fichiers
-                const formData = collectFormDataWithFiles(form); // Utilise le helper
-
-                // Déterminer la méthode client à appeler
-                let responseData;
-                switch (method) {
-                    case 'POST':
-                        responseData = await xanoClient.post(finalEndpoint, formData, true); // true = isFormData
-                        break;
-                    case 'PUT':
-                        responseData = await xanoClient.put(finalEndpoint, formData, true);
-                        break;
-                    case 'PATCH':
-                        responseData = await xanoClient.patch(finalEndpoint, formData, true);
-                        break;
-                    case 'DELETE':
-                        // DELETE n'utilise généralement pas FormData, l'ID est dans l'URL
-                        responseData = await xanoClient.delete(finalEndpoint);
-                        break;
-                    default:
-                        throw new Error(`Méthode de formulaire non supportée: ${method}`);
-                }
-
-                 // Succès
-                const successEvent = new CustomEvent('xano:form-success', {
-                    detail: { response: responseData, form: form },
-                    bubbles: true,
-                });
-                form.dispatchEvent(successEvent);
-
-                // Gérer la redirection via attribut HTML
-                if (form.hasAttribute('data-xano-form-redirect')) {
-                    const redirectUrl = form.getAttribute('data-xano-form-redirect');
-                    window.location.href = redirectUrl;
-                } else {
-                    // Si pas de redirection, on peut vouloir réinitialiser le formulaire ou autre
-                    // form.reset(); // Optionnel: vider le formulaire après succès
-                }
-
-            } catch (error) {
-                console.error('Erreur lors de la soumission du formulaire:', error);
-                if (errorElement) {
-                    errorElement.textContent = error.message || "Une erreur inconnue est survenue.";
-                    errorElement.style.display = 'block';
-                }
-                const errorEvent = new CustomEvent('xano:form-error', {
-                    detail: { error: error, form: form },
-                    bubbles: true,
-                });
-                form.dispatchEvent(errorEvent);
-            } finally {
-                if (loadingElement) loadingElement.style.display = 'none';
-                if (submitButton) submitButton.disabled = false;
-            }
-        });
-    });
-}
-
-// ==========================================
-// == Init Récupération/Affichage Données  ==
-// ==========================================
-function initXanoDataEndpoints(xanoClient) {
-    const xanoElements = document.querySelectorAll('[data-xano-endpoint]');
-    xanoElements.forEach(element => {
-        const endpoint = element.getAttribute('data-xano-endpoint');
-        const method = (element.getAttribute('data-xano-method') || 'GET').toUpperCase();
-        const params = {}; // Pour GET ou DELETE
-
-        // Récupérer tous les paramètres statiques pour l'API call
-        for (const attr of element.attributes) {
+        // Récupérer les data-xano-param-* statiques s'il y en a pour property/getall
+        for (const attr of listingElement.attributes) {
             if (attr.name.startsWith('data-xano-param-')) {
                 params[attr.name.replace('data-xano-param-', '')] = attr.value;
             }
         }
+        
+        // IMPORTANT: Si property/getall est PUBLIC, on n'a pas besoin de setAuthToken ici pour CET appel.
+        // Si d'autres xanoElements sur la page nécessitent une authentification, le code
+        // de l'ancien script qui boucle sur xanoElements et setAuthToken pour chacun peut être pertinent.
+        // Pour property/getall public, on peut simplifier :
+        // const authToken = getCookie('xano_auth_token');
+        // if (authToken) {
+        //     // xanoClient.setAuthToken(authToken); // Uniquement si property/getall le requiert
+        // }
 
-        // Vérifier si nous avons des paramètres d'URL à utiliser
-        if (element.hasAttribute('data-xano-use-url-param')) {
-            const urlParamName = element.getAttribute('data-xano-use-url-param');
-            const urlParamValue = getQueryParam(urlParamName); // Utilise le helper
-            if (urlParamValue !== null) { // Vérifier si le paramètre existe, même vide
-                const apiParamName = element.getAttribute('data-xano-url-param-to-api') || urlParamName;
-                params[apiParamName] = urlParamValue;
-            }
+        fetchXanoDataInternal(xanoClient, endpoint, method, params, listingElement);
+
+        // --- Gestion des Filtres (si vous réutilisez les filtres de home-form-display-v2-2.txt) ---
+        const applyFiltersButton = document.getElementById('apply-filters-button');
+        const filtersForm = document.getElementById('filters-form');
+
+        if (applyFiltersButton && filtersForm) {
+            console.log("[INIT] Bouton de filtres et formulaire trouvés.");
+            applyFiltersButton.addEventListener('click', function() {
+                console.log("[FILTRE] Bouton Appliquer Filtres cliqué.");
+                const filterParams = collectFilterValues(filtersForm); // Assurez-vous que collectFilterValues est défini
+                console.log("[FILTRE] Paramètres collectés:", filterParams);
+                fetchXanoDataInternal(xanoClient, endpoint, method, filterParams, listingElement);
+            });
+        } else {
+            console.warn("[INIT] Bouton de filtres ou formulaire non trouvé. La fonctionnalité de filtre sera inactive.");
         }
 
-        // Afficher indicateur de chargement (amélioration)
-        const loadingIndicator = element.querySelector('[data-xano-loading]') || document.querySelector(element.getAttribute('data-xano-loading-selector'));
-        if (loadingIndicator) loadingIndicator.style.display = 'block';
+    } else {
+        console.warn("[INIT] Aucun élément trouvé avec data-xano-endpoint='property/getall'.");
+    }
 
-        // Appeler fetchXanoData
-        fetchXanoData(xanoClient, endpoint, method, params, element, loadingIndicator);
-    });
-}
-
-// ==========================================
-// == Init Gestionnaires de Liens          ==
-// ==========================================
-function initXanoLinkHandlers() {
-    // Gérer les liens statiques (non dans les listes) APRÈS que les données soient potentiellement chargées
-    // pour les cas où l'ID du lien viendrait d'un data-xano-endpoint sur un parent.
+    // --- Gestion des liens de navigation génériques (hors liste) ---
+    // Cette partie vient de votre script fonctionnel et peut être conservée.
+    // Elle est utile pour les liens qui ne sont pas dans les items de la liste.
     document.addEventListener('xano:data-loaded', function(event) {
-        const loadedElement = event.detail.element; // Élément qui a chargé les données
-        const data = event.detail.data; // Données chargées
+        const loadedElementContext = event.detail.element; // L'élément qui a chargé les données (ex: #listing-container)
+        // const dataContext = event.detail.data; // Les données brutes chargées par cet élément
 
-        // Cibler les liens DANS l'élément qui vient de charger, ou globalement s'ils ne sont pas dans une liste
-        const potentialLinks = loadedElement.querySelectorAll('[data-xano-link-to]');
-
-        potentialLinks.forEach(linkElement => {
-             // Ne traiter que si ce n'est PAS un lien déjà géré dans renderListData
-            if (!linkElement.closest('[data-xano-list-item]')) {
+        // On ne cible que les liens qui ne sont PAS DANS un item de liste généré
+        // car les liens DANS les items sont gérés lors du rendu de la liste.
+        document.querySelectorAll('[data-xano-link-to]').forEach(linkElement => {
+            if (!linkElement.closest('[data-xano-list-item]')) { // Ne pas toucher aux liens DANS les items de la liste
                 const targetPage = linkElement.getAttribute('data-xano-link-to');
-                const idField = linkElement.getAttribute('data-xano-link-param-id') || 'id'; // Champ ID dans les données
-                 const idParamName = linkElement.getAttribute('data-xano-link-url-param') || 'id'; // Nom du param dans l'URL cible
-
-                // Essayer de trouver l'ID dans les données chargées (peut être un objet unique)
-                // On prend data.body si c'est la structure Xano standard, sinon data directement.
-                const sourceData = data?.body ? data.body : data;
+                const idField = linkElement.getAttribute('data-xano-link-param-id') || 'id';
+                const idParamName = linkElement.getAttribute('data-xano-link-url-param') || 'id';
                 let linkTarget = targetPage;
 
-                 if (sourceData && typeof sourceData === 'object' && sourceData[idField]) {
-                    linkTarget = `${targetPage}?${idParamName}=${encodeURIComponent(sourceData[idField])}`;
-                } else if (linkElement.hasAttribute('data-xano-data-id')) {
-                     // Fallback si l'ID a été mis via data-xano-data-id par bindDataToElement
-                     linkTarget = `${targetPage}?${idParamName}=${encodeURIComponent(linkElement.getAttribute('data-xano-data-id'))}`;
-                 }
-                 // Si pas d'ID trouvé, le lien reste tel quel (targetPage)
+                // Pour ces liens hors liste, l'ID doit venir d'une source différente,
+                // par exemple, si 'loadedElementContext' a chargé un objet unique avec un ID.
+                // Ou si le lien a un data-xano-data-id statique ou mis par un autre script.
+                if (linkElement.hasAttribute('data-xano-data-id')) {
+                    const dataId = linkElement.getAttribute('data-xano-data-id');
+                    linkTarget = `${targetPage}?${idParamName}=${encodeURIComponent(dataId)}`;
+                } else if (event.detail.data && typeof event.detail.data === 'object' && event.detail.data[idField]) {
+                    // Si les données chargées par l'élément parent sont un objet unique avec l'ID
+                     linkTarget = `${targetPage}?${idParamName}=${encodeURIComponent(event.detail.data[idField])}`;
+                }
 
-                // Mettre à jour l'URL du lien
+
                 if (linkElement.tagName === 'A') {
                     linkElement.href = linkTarget;
                 } else {
-                    // Pour les non-liens, stocker la cible et ajouter un style/gestionnaire de clic
                     linkElement.setAttribute('data-xano-link-target', linkTarget);
-                    linkElement.style.cursor = 'pointer'; // Indiquer qu'il est cliquable
+                    linkElement.style.cursor = 'pointer';
                 }
             }
         });
     });
 
-    // Gestionnaire de clic global pour les éléments non-<a> avec data-xano-link-target
     document.addEventListener('click', function(event) {
-        // Remonter le DOM pour trouver l'élément cliquable le plus proche
         const clickedElement = event.target.closest('[data-xano-link-target]');
         if (clickedElement && clickedElement.tagName !== 'A') {
             const linkTarget = clickedElement.getAttribute('data-xano-link-target');
@@ -330,401 +108,216 @@ function initXanoLinkHandlers() {
             }
         }
     });
-}
+});
 
-// ==========================================
-// == Nouvelle Fonction: Collecter Filtres == // OU == Votre Fonction Collecter Filtres existante ==
-// ==========================================
-function collectFilterValues(formElement) { // formElement est le conteneur de vos filtres
-    const params = {};
-    console.log("collectFilterValues APPELÉ avec formElement:", formElement); // LOG 7 (comme suggéré)
-    if (!formElement) {
-        console.error("collectFilterValues: formElement est null ! Impossible de trouver les filtres.");
-        return params;
-    }
-
-    // Sélectionne TOUS les inputs, selects, textareas DANS le formElement qui ont data-filter-key
-    const filterElements = formElement.querySelectorAll('input[data-filter-key], select[data-filter-key], textarea[data-filter-key]');
-    console.log("collectFilterValues: Nombre d'éléments de filtre trouvés au total:", filterElements.length); // LOG 8 (modifié pour tous les filtres)
-
-    filterElements.forEach(el => {
-        const key = el.getAttribute('data-filter-key');
-        // LOG 9 (comme suggéré)
-        console.log("collectFilterValues: Traitement de l'élément:", el, "avec data-filter-key:", key, "et valeur brute:", el.value);
-        if (!key) return; // Sécurité
-
-        let value = null;
-
-        if (el.type === 'checkbox') {
-        if (el.checked) {
-            valueForCurrentElement = el.value; 
-            
-            if (!valueForCurrentElement || valueForCurrentElement === 'on') { 
-                console.warn(`Checkbox pour la clé "${key}" ("${el.id || ''}") est cochée mais n'a pas de valeur définie exploitable. Ignorée.`);
-                return; // Passe à l'itération suivante de la boucle filterElements.forEach
-            }
-
-            // MAINTENANT, on gère l'ajout à params[key] pour s'assurer que c'est une liste
-            if (!params[key]) { // Si params[key] n'existe pas encore pour cette clé
-                params[key] = []; // Initialise TOUJOURS params[key] comme une liste vide
-            }
-            // On vérifie que params[key] est bien un tableau (au cas où, même si on vient de l'initialiser)
-            if (Array.isArray(params[key])) {
-                params[key].push(valueForCurrentElement); // Ajoute la valeur de la checkbox actuelle à la liste
-            } else {
-                // Ce cas ne devrait plus arriver si on initialise toujours comme tableau,
-                // mais par sécurité, on pourrait le logger ou le gérer.
-                // Pour l'instant, on suppose qu'il sera toujours un tableau grâce à l'initialisation.
-                console.warn(`Problème: params[${key}] devrait être un tableau mais ne l'est pas.`);
-            }
-            // Une fois la valeur de la checkbox traitée et ajoutée à la liste params[key],
-            // on passe à l'élément suivant. On ne veut pas que la logique `params[key] = value`
-            // à la fin de la boucle forEach écrase notre tableau.
-            return; // FIN DU TRAITEMENT POUR CETTE CHECKBOX
-        } else {
-            // Si la checkbox n'est pas cochée, on ne fait rien pour cette clé et on passe à la suite.
-            return; 
-        }
-        } else if (el.type === 'radio') {
-            if (el.checked) {
-                value = el.value;
-            } else {
-                 return; // Ignore les radios non sélectionnés
-            }
-        } else if (el.tagName === 'SELECT') {
-             if (el.value !== '') { // Ignorer si la valeur est vide (ex: l'option "Indifférent")
-               value = el.value;
-             } else {
-                 return; // Ignorer la sélection vide
-             }
-        } else { // Inputs (text, number, date, etc.)
-             // Pour les champs texte, on peut vouloir trimmer les espaces
-             const trimmedValue = el.value.trim();
-             if (trimmedValue !== '') { // Ignorer les champs vides après trim
-                // Pour les nombres, on peut vouloir les convertir en type numérique
-                // Si l'input Xano attend un nombre.
-                // Pour l'instant, on envoie comme chaîne, Xano est souvent flexible.
-                // Si Xano se plaint du type, on pourra convertir ici avec parseFloat() ou parseInt().
-                value = trimmedValue;
-             } else {
-                return; // Ignorer les champs vides
-             }
-        }
-        // ---- FIN DE VOTRE LOGIQUE ORIGINALE ----
-
-        if (value !== null && value !== undefined) {
-            params[key] = value;
-            // LOG 10 (comme suggéré, mais adapté pour une valeur générique)
-            console.log(`collectFilterValues: Ajout de { "${key}": "${value}" } aux paramètres.`);
-        }
-    });
-
-    console.log("Filtres collectés (potentiellement avec listes):", params);
-    return params;
-}
-
-
-// ==========================================
-// == Nouvelle Fonction: Récupérer Liste Filtrée ==
-// ==========================================
-async function fetchFilteredListings(client, targetElement, params) {
-    const endpoint = targetElement.getAttribute('data-xano-endpoint');
+// Renommée pour éviter conflit si vous avez un fetchXanoData pour d'autres éléments génériques.
+async function fetchXanoDataInternal(client, endpoint, method, params, targetElement) {
+    console.log(`[FETCH_DATA_INTERNAL] Appel API: ${method} ${endpoint}, Params:`, JSON.stringify(params));
     const loadingIndicatorSelector = targetElement.getAttribute('data-xano-loading-selector');
     const loadingIndicator = loadingIndicatorSelector ? document.querySelector(loadingIndicatorSelector) : null;
-    
-    console.log(`[1. FETCH_INIT] Appel à ${endpoint}. Params:`, JSON.stringify(params));
-
     if (loadingIndicator) loadingIndicator.style.display = 'block';
-    const applyButton = document.getElementById('apply-filters-button');
-    if (applyButton) applyButton.disabled = true;
 
-    let extractedItemsArray = null; 
+    let responseData = null; // Pour stocker la réponse brute pour les événements
+    let itemsToRender = []; // Tableau d'items extrait
     let errorMessage = null;
-    let rawResponseForEvents = null; 
 
     try {
-        const responseData = await client.get(endpoint, params);
-        rawResponseForEvents = responseData;
+        // Utilisation de client._request pour être cohérent avec home-form-display-v2-2.txt
+        // Assurez-vous que votre classe XanoClient a bien les méthodes get, post, etc.
+        // ou une méthode _request générique. Le script fonctionnel utilisait client.get(), etc.
+        // Je vais supposer que client.get() existe et est correct.
+        if (method === 'GET') {
+            responseData = await client.get(endpoint, params);
+        } else {
+            throw new Error(`Méthode HTTP ${method} non implémentée pour cette fonction simplifiée.`);
+        }
 
-        console.log(`[2. FETCH_SUCCESS] Réponse BRUTE de XANO pour ${endpoint}:`, JSON.stringify(responseData));
+        console.log(`[FETCH_DATA_INTERNAL] Réponse BRUTE de XANO:`, JSON.stringify(responseData));
+        rawResponseForEvents = responseData; // Conserver pour l'événement
 
+        // --- Logique de Détection Flexible du Tableau d'Items (inspirée de l'ancien script) ---
         if (!responseData || typeof responseData !== 'object') {
-            console.error('[3. DATA_ERROR] Réponse XANO invalide ou non-objet:', responseData);
+            console.error('[DATA_ERROR] Réponse XANO invalide ou non-objet:', responseData);
             errorMessage = "Erreur: Données serveur au format inattendu.";
-            extractedItemsArray = []; 
         } else if (Array.isArray(responseData)) {
-            extractedItemsArray = responseData;
-            console.log('[3. DATA_EXTRACT] Items trouvés: la réponse est directement un tableau.');
+            itemsToRender = responseData;
+            console.log('[DATA_EXTRACT] Items trouvés: la réponse est directement un tableau.');
         } else { 
-            extractedItemsArray = []; // Initialiser au cas où rien n'est trouvé
             if (Array.isArray(responseData.items)) {
-                extractedItemsArray = responseData.items;
-                console.log('[3. DATA_EXTRACT] Items trouvés dans responseData.items');
+                itemsToRender = responseData.items;
+                console.log('[DATA_EXTRACT] Items trouvés dans responseData.items');
             } else if (responseData.body) { 
                 if (Array.isArray(responseData.body.items)) {
-                    extractedItemsArray = responseData.body.items;
-                    console.log('[3. DATA_EXTRACT] Items trouvés dans responseData.body.items');
+                    itemsToRender = responseData.body.items;
+                    console.log('[DATA_EXTRACT] Items trouvés dans responseData.body.items');
                 } else if (Array.isArray(responseData.body)) {
-                    extractedItemsArray = responseData.body;
-                    console.log('[3. DATA_EXTRACT] Items trouvés dans responseData.body (tableau direct)');
+                    itemsToRender = responseData.body;
+                    console.log('[DATA_EXTRACT] Items trouvés dans responseData.body (tableau direct)');
                 }
             }
-            
-            if (extractedItemsArray.length === 0 && !Array.isArray(responseData.items) && !(responseData.body && (Array.isArray(responseData.body.items) || Array.isArray(responseData.body)))) {
-                 // Si après les vérifications directes, on n'a rien, on peut tenter une recherche plus large (optionnel)
+            if (itemsToRender.length === 0 && !(Array.isArray(responseData.items) || (responseData.body && (Array.isArray(responseData.body.items) || Array.isArray(responseData.body))))) {
                  let foundDynamically = false;
                  for (const key in responseData) {
                      if (Array.isArray(responseData[key])) {
-                         extractedItemsArray = responseData[key];
-                         console.warn(`[3. DATA_EXTRACT_WARN] Items trouvés dynamiquement dans responseData.${key}`);
-                         foundDynamically = true;
-                         break;
+                         itemsToRender = responseData[key];
+                         console.warn(`[DATA_EXTRACT_WARN] Items trouvés dynamiquement dans responseData.${key}`);
+                         foundDynamically = true; break;
                      }
                  }
                  if (!foundDynamically && responseData.body && typeof responseData.body === 'object') {
                      for (const key in responseData.body) {
                          if (Array.isArray(responseData.body[key])) {
-                             extractedItemsArray = responseData.body[key];
-                             console.warn(`[3. DATA_EXTRACT_WARN] Items trouvés dynamiquement dans responseData.body.${key}`);
-                             break;
+                             itemsToRender = responseData.body[key];
+                             console.warn(`[DATA_EXTRACT_WARN] Items trouvés dynamiquement dans responseData.body.${key}`); break;
                          }
                      }
                  }
             }
-            if (extractedItemsArray.length === 0) {
-                 console.warn('[3. DATA_WARN] Aucun tableau d\'items identifiable après toutes les vérifications. Réponse:', responseData);
+             if (itemsToRender.length === 0) {
+                 console.warn('[DATA_WARN] Aucun tableau d\'items identifiable après toutes les vérifications. La liste sera vide ou affichera un message "vide". Réponse:', responseData);
             }
         }
-        console.log(`[4. DATA_READY] ${extractedItemsArray.length} items préparés pour l'affichage.`);
+        console.log(`[DATA_READY] ${itemsToRender.length} items préparés pour l'affichage.`);
 
     } catch (error) {
-        console.error(`[2. FETCH_FAIL] Erreur DANS fetchFilteredListings pour ${endpoint}:`, error.message, error.stack);
+        console.error(`[FETCH_DATA_INTERNAL_FAIL] Erreur:`, error.message, error.stack);
         rawResponseForEvents = { error: { message: error.message, stack: error.stack }};
-        errorMessage = `Erreur: ${error.message || 'Impossible de charger les données.'}`;
-        extractedItemsArray = []; 
+        errorMessage = `Erreur Xano: ${error.message || 'Impossible de charger les données.'}`;
     } finally {
         if (loadingIndicator) loadingIndicator.style.display = 'none';
+        
+        renderListItemsInternal(itemsToRender, targetElement, errorMessage);
 
-        handleRenderListings(extractedItemsArray, targetElement, errorMessage);
-
+        // Dispatch events
         if (!errorMessage) {
-            const successEvent = new CustomEvent('xano:data-loaded', {
-                detail: { data: rawResponseForEvents, element: targetElement, filters: params },
-                bubbles: true
-            });
-            targetElement.dispatchEvent(successEvent);
+            targetElement.dispatchEvent(new CustomEvent('xano:data-loaded', {
+                detail: { data: rawResponseForEvents, element: targetElement, params: params }, bubbles: true
+            }));
         } else {
-            const errorEvent = new CustomEvent('xano:data-error', {
-                detail: { error: {message: errorMessage}, response: rawResponseForEvents, element: targetElement, filters: params },
-                bubbles: true
-            });
-            targetElement.dispatchEvent(errorEvent);
+            targetElement.dispatchEvent(new CustomEvent('xano:data-error', {
+                detail: { error: {message: errorMessage}, response: rawResponseForEvents, element: targetElement, params: params }, bubbles: true
+            }));
         }
-
-        if (applyButton) applyButton.disabled = false;
     }
 }
 
-// Vous devez maintenant avoir une fonction `handleRenderListings`
-// qui utilise `extractedItemsArray` et `errorMessage`.
-// Elle contiendra la logique de votre `renderData` (partie liste) et `renderListData`.
-
-// Exemple de ce que `handleRenderListings` pourrait être (basé sur votre script home-form-display-v2-2.txt):
-function handleRenderListings(itemsArray, listWrapperElement, errorMessageFromFetch) {
-    console.log('[5. RENDER_START] Appel de handleRenderListings. Items:', itemsArray ? itemsArray.length : 'N/A', 'Erreur Fetch:', errorMessageFromFetch);
+// Inspiré de renderData (partie liste) + renderListData de l'ancien script ET de home-form-display-v2-2.txt
+function renderListItemsInternal(dataArray, listWrapperElement, errorMessage) {
+    console.log('[RENDER_LIST_INTERNAL] Début. Items:', dataArray ? dataArray.length : 'N/A', 'Erreur:', errorMessage);
 
     const itemsContainer = listWrapperElement.querySelector('[data-xano-list-container]') || listWrapperElement;
-    itemsContainer.innerHTML = ''; // Nettoyage radical et simple
-
-    if (errorMessageFromFetch) {
-        console.log('[6. RENDER_MESSAGE] Affichage message d\'erreur de fetch:', errorMessageFromFetch);
-        const errorDisplay = document.createElement('div');
-        errorDisplay.className = 'xano-error-message-display render-message';
-        errorDisplay.style.color = 'red';
-        errorDisplay.style.padding = '20px';
-        errorDisplay.style.textAlign = 'center';
-        errorDisplay.textContent = errorMessageFromFetch;
-        itemsContainer.appendChild(errorDisplay);
-        return; 
-    }
-
     const templateSelector = listWrapperElement.getAttribute('data-xano-list');
-    if (!templateSelector) {
-        console.error('[RENDER_ERROR] Attribut data-xano-list manquant sur:', listWrapperElement);
-        itemsContainer.innerHTML = '<p style="color:red; padding:20px; text-align:center;">Erreur de configuration : data-xano-list manquant.</p>';
+    const templateElement = templateSelector ? document.querySelector(templateSelector) : null;
+
+    itemsContainer.innerHTML = ''; // Nettoyage
+
+    if (errorMessage) {
+        itemsContainer.innerHTML = `<p style="color:red; padding:20px; text-align:center;">${errorMessage}</p>`;
         return;
     }
-
-    const templateElement = document.querySelector(templateSelector);
     if (!templateElement) {
-        console.error(`[RENDER_ERROR] Template "${templateSelector}" introuvable.`);
-        itemsContainer.innerHTML = `<p style="color:red; padding:20px; text-align:center;">Erreur de configuration : Template "${templateSelector}" introuvable.</p>`;
+        itemsContainer.innerHTML = `<p style="color:red; padding:20px; text-align:center;">Erreur de configuration : Template "${templateSelector || 'non spécifié'}" introuvable.</p>`;
         return;
+    }
+    if (!Array.isArray(dataArray)) { // Sécurité additionnelle
+        console.warn("[RENDER_LIST_INTERNAL] dataArray n'est pas un tableau. Affichage message vide.", dataArray);
+        dataArray = [];
     }
 
     if (templateElement.tagName !== 'TEMPLATE') {
-        templateElement.style.display = 'none';
-        templateElement.setAttribute('aria-hidden', 'true');
+        templateElement.style.display = 'none'; // Cacher le modèle div s'il n'est pas une balise <template>
     }
-    
-    if (itemsArray && itemsArray.length > 0) {
-        const fragment = document.createDocumentFragment();
-        itemsArray.forEach((itemData, index) => {
-            const clone = (templateElement.tagName === 'TEMPLATE')
-                ? templateElement.content.firstElementChild.cloneNode(true)
-                : templateElement.cloneNode(true);
 
-            if (!clone) {
-                console.warn(`[RENDER_WARN] Échec du clonage du template pour item ${index}`);
-                return;
-            }
-
-            clone.style.display = ''; 
-            clone.removeAttribute('aria-hidden');
-            clone.setAttribute('data-xano-list-item', ''); 
-            clone.setAttribute('data-xano-item-index', index.toString());
-
-            // --- Application des données via votre bindDataToElement existant ---
-            // Pour les liaisons directes de contenu (data-xano-bind)
-            const elementsToBind = clone.querySelectorAll('[data-xano-bind]');
-            elementsToBind.forEach(boundEl => {
-                bindDataToElement(boundEl, itemData); // Votre fonction existante
-            });
-
-            // Pour les liaisons d'attributs (data-xano-bind-attr-*)
-            // Il faut vérifier le clone lui-même et tous ses descendants.
-            // bindDataToElement dans home-form-display-v2-2.txt (lignes 251+) gère déjà cela.
-            // Un appel sur le clone suffit s'il a l'attribut, sinon sur les enfants.
-            // Pour être sûr, on peut itérer comme ceci (ou simplifier si bindDataToElement est appelé sur le clone et gère les enfants):
-            
-            // Si le clone lui-même a des data-xano-bind-attr-*
-            for (const attr of clone.attributes) {
-                 if (attr.name.startsWith('data-xano-bind-attr-')) {
-                     bindDataToElement(clone, itemData); // bindDataToElement de home-form-display-v2-2.txt devrait le gérer
-                     break; 
-                 }
-            }
-            // Et pour tous les enfants du clone
-            clone.querySelectorAll('*').forEach(childElement => {
-                 for (const attr of childElement.attributes) { // Vérifie tous les attributs de l'enfant
-                     if (attr.name.startsWith('data-xano-bind-attr-')) {
-                         bindDataToElement(childElement, itemData); // bindDataToElement de home-form-display-v2-2.txt devrait le gérer
-                         break; // Supposons un seul type de bind-attr par élément pour cet appel
-                     }
-                 }
-            });
-            // Note: Votre `bindDataToElement` existant (lignes 251+) semble déjà parcourir les attributs de l'élément qu'on lui passe.
-            // Donc, appeler `bindDataToElement(clone, itemData)` une fois, puis sur chaque enfant ayant `[data-xano-bind]` ou `[data-xano-bind-attr-*]` est une option.
-            // La manière la plus simple est de laisser la logique actuelle des querySelectorAll pour `[data-xano-bind]`
-            // et d'ajouter une pour `[data-xano-bind-attr-*]` si nécessaire, ou de s'assurer que `bindDataToElement` est appelé sur chaque élément pertinent.
-            // Le plus sûr est d'appeler bindDataToElement sur chaque élément qui *pourrait* avoir un binding.
-            // Le `bindDataToElement` de `home-form-display-v2-2.txt` est appelé avec l'élément et les données.
-            // Il lit ensuite `data-xano-bind` OU `data-xano-bind-attr-*` sur cet élément.
-            // Donc, on doit appeler bindDataToElement pour le clone et chaque descendant qui pourrait être lié.
-            
-            // Simplification:
-            // Le `bindDataToElement` fourni dans `home-form-display-v2-2.txt` (ligne 205) regarde `element.getAttribute('data-xano-bind')`.
-            // Puis (ligne 251) il regarde `element.attributes` pour `data-xano-bind-attr-*`.
-            // Donc, il suffit d'appeler bindDataToElement sur tous les éléments pertinents du clone.
-            // Le querySelectorAll pour `[data-xano-bind]` est bon.
-            // On peut aussi ajouter `clone.querySelectorAll('[data-xano-bind-attr-src], [data-xano-bind-attr-href], etc...')`
-            // Ou, plus générique, si `bindDataToElement` est bien écrit, le passer sur tous les éléments et il ne fera rien si pas d'attribut.
-            // Pour le moment, on garde la logique existante de `home-form-display-v2-2.txt` qui est appelée pour chaque `[data-xano-bind]`.
-            // Votre `bindDataToElement` (ligne 251) vérifie déjà les `data-xano-bind-attr-*` sur l'élément qui lui est passé.
-
-            // --- Gestion des liens dynamiques [data-xano-link-to] ---
-            // (Logique de home-form-display-v2-2.txt, lignes 174-184)
-            const linkElements = clone.querySelectorAll('[data-xano-link-to]');
-            linkElements.forEach(linkElement => {
-                const targetPage = linkElement.getAttribute('data-xano-link-to');
-                const idField = linkElement.getAttribute('data-xano-link-param-id') || 'id';
-                const idParamName = linkElement.getAttribute('data-xano-link-url-param') || 'id';
-                let linkTarget = targetPage; 
-                const idValue = getNestedValue(itemData, idField); // Utiliser getNestedValue
-
-                if (idValue !== undefined && idValue !== null) {
-                    linkTarget = `${targetPage}?${idParamName}=${encodeURIComponent(idValue)}`;
-                }
-                if (linkElement.tagName === 'A') {
-                    linkElement.href = linkTarget;
-                } else {
-                    linkElement.setAttribute('data-xano-link-target', linkTarget);
-                    linkElement.style.cursor = 'pointer';
-                }
-            });
-             // Si le clone lui-même est un lien (cas moins courant pour un item de liste complexe)
-             if (clone.hasAttribute('data-xano-link-to')){
-                 const targetPage = clone.getAttribute('data-xano-link-to');
-                 const idField = clone.getAttribute('data-xano-link-param-id') || 'id';
-                 const idParamName = clone.getAttribute('data-xano-link-url-param') || 'id';
-                 let linkTarget = targetPage;
-                 const idValue = getNestedValue(itemData, idField);
-                 if (idValue !== undefined && idValue !== null) {
-                     linkTarget = `${targetPage}?${idParamName}=${encodeURIComponent(idValue)}`;
-                 }
-                 if (clone.tagName === 'A') { clone.href = linkTarget; }
-                 else { clone.setAttribute('data-xano-link-target', linkTarget); clone.style.cursor = 'pointer'; }
-             }
-
-            fragment.appendChild(clone);
-        });
-        itemsContainer.appendChild(fragment);
-        console.log('[7. RENDER_DOM_APPENDED] Items ajoutés au DOM.');
-
-        // --- Initialisation des Sliders Swiper ---
-        // (Logique de home-form-display-v2-2.txt, lignes 186-200)
-        // Cette logique s'attend à ce que `bindDataToElement` pour `_property_photos_slider`
-        // ait ajouté l'attribut `data-slider-init="true"` sur les éléments `.swiper` concernés.
-        const slidersToInitialize = itemsContainer.querySelectorAll('.swiper[data-slider-init="true"]');
-        console.log(`[8. SWIPER_INIT_START] ${slidersToInitialize.length} sliders à initialiser.`);
-        slidersToInitialize.forEach((swiperEl, sliderIdx) => {
-            console.log(`[SWIPER] Préparation init slider #${sliderIdx}:`, swiperEl);
-            setTimeout(() => { // Le setTimeout est souvent pour la stabilité du rendu DOM
-                try {
-                    const slides = swiperEl.querySelectorAll('.swiper-slide');
-                    const enableLoop = slides.length > 1; 
-                    console.log(`[SWIPER] Initialisation slider #${sliderIdx}. Slides: ${slides.length}, Loop: ${enableLoop}`);
-                    
-                    // Assurez-vous que la variable Swiper est bien disponible globalement ou importée si besoin
-                    const swiperInstance = new Swiper(swiperEl, { 
-                        loop: enableLoop, 
-                        spaceBetween: 10, 
-                        slidesPerView: 1,
-                        pagination: {
-                            el: swiperEl.querySelector('.swiper-pagination'), // Assurez-vous que ces sélecteurs existent dans votre template de slider
-                            clickable: true,
-                            dynamicBullets: true, 
-                            dynamicMainBullets: 5, 
-                        },
-                        navigation: {
-                            nextEl: swiperEl.querySelector('.swiper-button-next'), // Assurez-vous que ces sélecteurs existent
-                            prevEl: swiperEl.querySelector('.swiper-button-prev'), // Assurez-vous que ces sélecteurs existent
-                        },
-                        observer: true,
-                        observeParents: true,
-                        observeSlideChildren: true,
-                        updateOnWindowResize: true,
-                    });
-                    swiperInstance.update(); // Forcer une mise à jour
-                    swiperEl.removeAttribute('data-slider-init'); // Très important!
-                    console.log(`[SWIPER] Slider #${sliderIdx} initialisé.`);
-                } catch (swiperError) {
-                    console.error(`[SWIPER_ERROR] Erreur sur slider #${sliderIdx}:`, swiperError, swiperEl);
-                }
-            }, 300); // Délai de 300ms, ajustable
-        });
-
-    } else { 
-        const emptyMessageText = listWrapperElement.getAttribute('data-xano-empty-message') || "Aucune donnée à afficher.";
-        console.log('[6. RENDER_EMPTY] Affichage liste vide:', emptyMessageText);
-        const messageElement = document.createElement('div');
-        messageElement.className = 'xano-empty-message render-message';
-        messageElement.style.padding = '20px';
-        messageElement.style.textAlign = 'center';
-        messageElement.textContent = emptyMessageText;
-        itemsContainer.appendChild(messageElement);
+    if (dataArray.length === 0) {
+        const emptyMsg = listWrapperElement.getAttribute('data-xano-empty-message') || "Aucune donnée à afficher.";
+        itemsContainer.innerHTML = `<div class="xano-empty-message" style="padding:20px; text-align:center;">${emptyMsg}</div>`;
+        return;
     }
-    console.log('[9. RENDER_COMPLETE] Fin de handleRenderListings.');
+
+    const fragment = document.createDocumentFragment();
+    dataArray.forEach((item, index) => {
+        const clone = (templateElement.tagName === 'TEMPLATE')
+            ? templateElement.content.firstElementChild.cloneNode(true)
+            : templateElement.cloneNode(true);
+
+        clone.style.display = ''; // Assurer la visibilité
+        clone.setAttribute('data-xano-list-item', ''); // Marqueur pour styles ou scripts futurs
+        clone.setAttribute('data-xano-item-index', index.toString());
+
+        // Utiliser VOTRE bindDataToElement de home-form-display-v2-2.txt
+        // qui gère les chemins imbriqués et le slider.
+        // Il faut s'assurer qu'il est appelé pour chaque élément du clone qui a des bindings.
+        
+        // Si bindDataToElement s'attend à ce qu'on lui passe l'élément qui a l'attribut data-xano-bind :
+        clone.querySelectorAll('[data-xano-bind]').forEach(boundEl => {
+            bindDataToElement(boundEl, item);
+        });
+        // Et pour les attributs, si votre bindDataToElement les gère aussi (comme celui de home-form-display-v2-2.txt ligne 251+)
+        // On peut l'appeler sur chaque élément. Il ne fera rien s'il ne trouve pas d'attributs de binding.
+        // Ou être plus spécifique si bindDataToElement ne scanne pas tous les attributs de lui-même.
+        // Le bindDataToElement de home-form-display-v2-2.txt scanne les attributs de l'élément qu'on lui donne.
+        // Donc, on l'appelle sur le clone et ses descendants pertinents.
+        bindDataToElement(clone, item); // Pour le clone lui-même
+        clone.querySelectorAll('*').forEach(child => bindDataToElement(child, item)); // Pour tous les descendants
+
+
+        // Gestion des liens DANS l'item (adapté de home-form-display-v2-2.txt)
+        clone.querySelectorAll('[data-xano-link-to]').forEach(linkEl => {
+            const targetPage = linkEl.getAttribute('data-xano-link-to');
+            const idField = linkEl.getAttribute('data-xano-link-param-id') || 'id';
+            const idParamName = linkEl.getAttribute('data-xano-link-url-param') || 'id';
+            const idValue = getNestedValue(item, idField); // IMPORTANT: Utiliser getNestedValue
+            if (idValue !== undefined && idValue !== null) {
+                const finalLink = `${targetPage}?${idParamName}=${encodeURIComponent(idValue)}`;
+                if (linkEl.tagName === 'A') linkEl.href = finalLink;
+                else {
+                     linkEl.setAttribute('data-xano-link-target', finalLink); // Pour clics sur non-<a>
+                     linkEl.style.cursor = 'pointer';
+                }
+            }
+        });
+        // Si le clone lui-même est un lien
+        if (clone.hasAttribute('data-xano-link-to')) {
+            const targetPage = clone.getAttribute('data-xano-link-to');
+            const idField = clone.getAttribute('data-xano-link-param-id') || 'id';
+            const idParamName = clone.getAttribute('data-xano-link-url-param') || 'id';
+            const idValue = getNestedValue(item, idField);
+            if (idValue !== undefined && idValue !== null) {
+                const finalLink = `${targetPage}?${idParamName}=${encodeURIComponent(idValue)}`;
+                if (clone.tagName === 'A') clone.href = finalLink;
+                else { clone.setAttribute('data-xano-link-target', finalLink); clone.style.cursor = 'pointer';}
+            }
+        }
+        
+        fragment.appendChild(clone);
+    });
+    itemsContainer.appendChild(fragment);
+
+    // Initialisation Swiper (adapté de home-form-display-v2-2.txt)
+    // Cette partie s'attend à ce que bindDataToElement pour _property_photos_slider
+    // ait marqué les .swiper avec data-slider-init="true"
+    const slidersToInitialize = itemsContainer.querySelectorAll('.swiper[data-slider-init="true"]');
+    console.log(`[RENDER_LIST_INTERNAL] Sliders à initialiser: ${slidersToInitialize.length}`);
+    slidersToInitialize.forEach((swiperEl, sliderIndex) => {
+        console.log(`[SWIPER] Préparation init slider #${sliderIndex}:`, swiperEl);
+        setTimeout(() => {
+            try {
+                const slides = swiperEl.querySelectorAll('.swiper-slide');
+                const enableLoop = slides.length > 1;
+                console.log(`[SWIPER] Initialisation slider #${sliderIndex}. Slides: ${slides.length}, Loop: ${enableLoop}`);
+                const swiperInstance = new Swiper(swiperEl, {
+                    loop: enableLoop, spaceBetween: 10, slidesPerView: 1,
+                    pagination: { el: swiperEl.querySelector('.swiper-pagination'), clickable: true, dynamicBullets: true, dynamicMainBullets: 5 },
+                    navigation: { nextEl: swiperEl.querySelector('.swiper-button-next'), prevEl: swiperEl.querySelector('.swiper-button-prev') },
+                    observer: true, observeParents: true, observeSlideChildren: true, updateOnWindowResize: true,
+                });
+                swiperInstance.update();
+                swiperEl.removeAttribute('data-slider-init');
+                console.log(`[SWIPER] Slider #${sliderIndex} initialisé.`);
+            } catch (e) { console.error(`[SWIPER_ERROR] sur slider #${sliderIndex}:`, e, swiperEl); }
+        }, 300);
+    });
+    console.log('[RENDER_LIST_INTERNAL] Terminé.');
 }
 
 // N'oubliez pas d'avoir la fonction getNestedValue que j'ai fournie précédemment si vous l'utilisez:
