@@ -2,6 +2,7 @@
 // == SCRIPT XANO LISTING - VERSION ÉPURÉE ==
 // ==========================================
 document.addEventListener('DOMContentLoaded', function () {
+    alert("SCRIPT CHARGE ET DOMCONTENTLOADED");
     console.log('[NEW_SCRIPT] DOMContentLoaded');
 
     // Configuration de base du client Xano (simplifié pour cet exemple)
