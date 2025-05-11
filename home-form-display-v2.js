@@ -408,7 +408,7 @@ function extractListData(data) {
 }
 
 // Fonction pour rendre une liste de données
-function renderListData(dataArray, element) {
+function renderListData(dataArray, element) {  // ← le paramètre s'appelle 'element'
     console.log(`[RENDER_LIST] Rendu de ${dataArray.length} éléments`);
     
     // Vérifier que dataArray est un tableau
@@ -418,7 +418,7 @@ function renderListData(dataArray, element) {
     }
     
     // Obtenir le sélecteur et l'élément du template
-    const templateSelector = listContainerElement.getAttribute('data-xano-list');
+    const templateSelector = element.getAttribute('data-xano-list');  // ← Doit utiliser 'element' et non 'listContainerElement'
     if (!templateSelector) {
         console.error('[RENDER_LIST] Attribut data-xano-list manquant');
         return;
@@ -431,7 +431,7 @@ function renderListData(dataArray, element) {
     }
     
     // Trouver le conteneur où injecter les éléments
-    const container = listContainerElement.querySelector('[data-xano-list-container]') || listContainerElement;
+    const container = element.querySelector('[data-xano-list-container]') || element;  // ← Utiliser 'element'
     
     // Vider le conteneur, sauf le template si c'est un enfant direct
     container.innerHTML = '';
@@ -443,7 +443,7 @@ function renderListData(dataArray, element) {
     
     // Si aucune donnée, afficher un message
     if (dataArray.length === 0) {
-        const emptyMessage = listContainerElement.getAttribute('data-xano-empty-message') || "Aucune donnée à afficher";
+        const emptyMessage = element.getAttribute('data-xano-empty-message') || "Aucune donnée à afficher";  // ← Utiliser 'element'
         container.innerHTML = `<div class="xano-empty-message">${emptyMessage}</div>`;
         return;
     }
