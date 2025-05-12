@@ -310,8 +310,6 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (initError) { /* ... */ }
 });
 
-
-
 // --- Classe XanoClient (Modifiée v8.3 pour DELETE avec body) ---
 class XanoClient {
     constructor(config) { this.apiGroupBaseUrl = config.apiGroupBaseUrl; this.authToken = null; }
@@ -346,58 +344,92 @@ class XanoClient {
 // --- Initialisation des Formulaires (Identique v8) ---
 function initXanoForms(xanoClient) {
     const xanoForms = document.querySelectorAll('[data-xano-form]');
+    console.log('initXanoForms: Nombre de formulaires Xano trouvés:', xanoForms.length); // LOG 1
+
     xanoForms.forEach((form) => {
-      form.addEventListener('submit', async function (e) {
-        e.preventDefault();
-        const endpoint = form.getAttribute('data-xano-form');
-        const method = (form.getAttribute('data-xano-form-method') || 'POST').toUpperCase();
-        const loadingElement = form.querySelector('[data-xano-form-loading]') || document.querySelector(form.getAttribute('data-xano-form-loading-selector'));
-        const errorElement = form.querySelector('[data-xano-form-error]') || document.querySelector(form.getAttribute('data-xano-form-error-selector'));
-        const submitButton = form.querySelector('button[type="submit"], input[type="submit"]');
-        if (errorElement) errorElement.style.display = 'none';
-        if (loadingElement) loadingElement.style.display = 'block';
-        if (submitButton) submitButton.disabled = true;
-        try {
-          let finalEndpoint = endpoint;
-          if (form.hasAttribute('data-xano-form-id-param')) {
-            const idParamName = form.getAttribute('data-xano-form-id-param'); const idValue = getQueryParam(idParamName);
-            if (idValue && ['PUT', 'PATCH', 'DELETE'].includes(method)) { finalEndpoint = `${endpoint}/${idValue}`; }
-            else if (idValue && method === 'POST') { console.warn("ID param utilisé avec POST."); finalEndpoint = `${endpoint}/${idValue}`; }
-          }
-          // Utilise TOUJOURS FormData comme dans la v8 originale
-          const formData = collectFormDataWithFiles(form);
-          let responseData;
-          switch (method) {
-          case 'POST': responseData = await xanoClient.post(finalEndpoint, formData, true); break;
-          case 'PUT': responseData = await xanoClient.put(finalEndpoint, formData, true); break;
-          case 'PATCH': responseData = await xanoClient.patch(finalEndpoint, formData, true); break;
-          case 'DELETE': responseData = await xanoClient.delete(finalEndpoint); break; // Pas de body pour DELETE ici (ID dans URL)
-          default: throw new Error(`Méthode formulaire non supportée: ${method}`);
-          }
-          const successEvent = new CustomEvent('xano:form-success', { detail: { response: responseData, form: form }, bubbles: true });
-          form.dispatchEvent(successEvent);
-          if (form.hasAttribute('data-xano-form-redirect')) { window.location.href = form.getAttribute('data-xano-form-redirect'); }
-          else {
-             // INFO v8.3: Rafraîchissement après upload si nécessaire
-             if (form.getAttribute('data-xano-form') === 'upload_multiple_photos' && currentSelectedRoomId) {
-                 console.log("Upload photos réussi, rafraîchissement...");
-                 await refreshCurrentRoomPhotos(xanoClient); // Utilise helper pour rafraîchir
-             } else {
-                // form.reset(); // Optionnel
-             }
-          }
-        } catch (error) {
-          console.error('Erreur soumission formulaire:', error);
-          if (errorElement) { errorElement.textContent = error.message || "Erreur inconnue."; errorElement.style.display = 'block'; }
-          const errorEvent = new CustomEvent('xano:form-error', { detail: { error: error, form: form }, bubbles: true });
-          form.dispatchEvent(errorEvent);
-        } finally {
-          if (loadingElement) loadingElement.style.display = 'none';
-          if (submitButton) submitButton.disabled = false;
+        const formEndpointForOuterLog = form.getAttribute('data-xano-form'); // Renommé pour éviter conflit de portée
+
+        // Log spécifique pour le formulaire d'ajout de pièce
+        if (formEndpointForOuterLog === 'property_photos_rooms') {
+            console.log('[DEBUG] Formulaire "property_photos_rooms" TROUVÉ. Attachement de l\'écouteur submit.');
         }
-      });
+
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const currentFormEndpoint = form.getAttribute('data-xano-form'); // Endpoint pour les logs internes à l'event listener
+
+            // Log spécifique si l'écouteur se déclenche pour ce formulaire
+            if (currentFormEndpoint === 'property_photos_rooms') {
+                console.log('[DEBUG] ÉVÉNEMENT SUBMIT DÉCLENCHÉ pour "property_photos_rooms"!');
+            }
+
+            // const endpoint = form.getAttribute('data-xano-form'); // Déjà récupéré en tant que currentFormEndpoint
+            const method = (form.getAttribute('data-xano-form-method') || 'POST').toUpperCase();
+            const loadingElement = form.querySelector('[data-xano-form-loading]') || document.querySelector(form.getAttribute('data-xano-form-loading-selector'));
+            const errorElement = form.querySelector('[data-xano-form-error]') || document.querySelector(form.getAttribute('data-xano-form-error-selector'));
+            const submitButton = form.querySelector('button[type="submit"], input[type="submit"]');
+
+            if (errorElement) errorElement.style.display = 'none';
+            if (loadingElement) loadingElement.style.display = 'block';
+            if (submitButton) submitButton.disabled = true;
+        try {
+                let finalEndpoint = currentFormEndpoint; // Utiliser currentFormEndpoint
+                if (form.hasAttribute('data-xano-form-id-param')) {
+                    const idParamName = form.getAttribute('data-xano-form-id-param');
+                    const idValue = getQueryParam(idParamName);
+                    if (idValue && ['PUT', 'PATCH', 'DELETE'].includes(method)) {
+                        finalEndpoint = `${currentFormEndpoint}/${idValue}`; // Utiliser currentFormEndpoint
+                    } else if (idValue && method === 'POST') {
+                        console.warn("ID param utilisé avec POST.");
+                        finalEndpoint = `${currentFormEndpoint}/${idValue}`; // Utiliser currentFormEndpoint
+                    }
+                }
+                // Utilise TOUJOURS FormData comme dans la v8 originale
+                const formData = collectFormDataWithFiles(form);
+
+         if (currentFormEndpoint === 'property_photos_rooms') {
+                    const formDataForLog = {};
+                    // On utilise la variable 'formData' déjà créée ci-dessus
+                    for (let [key, value] of formData.entries()) { // formData.entries() est correct
+                        formDataForLog[key] = value;
+                    }
+                    console.log('[DEBUG] Données collectées pour property_photos_rooms AVANT APPEL XANO:', JSON.stringify(formDataForLog));
+                }
+         
+          let responseData;
+                switch (method) {
+                    case 'POST': responseData = await xanoClient.post(finalEndpoint, formData, true); break;
+                    case 'PUT': responseData = await xanoClient.put(finalEndpoint, formData, true); break;
+                    case 'PATCH': responseData = await xanoClient.patch(finalEndpoint, formData, true); break;
+                    case 'DELETE': responseData = await xanoClient.delete(finalEndpoint); break; // Pas de body pour DELETE ici (ID dans URL)
+                    default: throw new Error(`Méthode formulaire non supportée: ${method}`);
+                }
+                const successEvent = new CustomEvent('xano:form-success', { detail: { response: responseData, form: form }, bubbles: true });
+                form.dispatchEvent(successEvent);
+                if (form.hasAttribute('data-xano-form-redirect')) {
+                    window.location.href = form.getAttribute('data-xano-form-redirect');
+                } else {
+                    // INFO v8.3: Rafraîchissement après upload si nécessaire
+                    if (form.getAttribute('data-xano-form') === 'upload_multiple_photos' && currentSelectedRoomId) {
+                        console.log("Upload photos réussi, rafraîchissement...");
+                        await refreshCurrentRoomPhotos(xanoClient); // Utilise helper pour rafraîchir
+                    } else {
+                        // form.reset(); // Optionnel
+                    }
+                }
+            } catch (error) {
+                console.error('Erreur soumission formulaire:', error);
+                if (errorElement) { errorElement.textContent = error.message || "Erreur inconnue."; errorElement.style.display = 'block'; }
+                const errorEvent = new CustomEvent('xano:form-error', { detail: { error: error, form: form }, bubbles: true });
+                form.dispatchEvent(errorEvent);
+            } finally {
+                if (loadingElement) loadingElement.style.display = 'none';
+                if (submitButton) submitButton.disabled = false;
+            }
+        });
     });
-  }
+}
 
 // --- Init Récupération/Affichage Données (Identique v8) ---
 function initXanoDataEndpoints(xanoClient) {
