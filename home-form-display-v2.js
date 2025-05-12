@@ -58,35 +58,40 @@ async function fetchAnnouncements(params = {}) { // <<<< ACCEPTE params ICI, ave
 
     try {
         let urlToFetch = `${XANO_API_BASE_URL}/${endpoint}`;
+        let paramsForURL = { ...params }; // Copier les params pour ne pas modifier l'original si besoin ailleurs
 
-        // --- PARTIE CRUCIALE POUR AJOUTER LES FILTRES À L'URL ---
-        if (params && Object.keys(params).length > 0) {
+        // --- MODIFICATION IMPORTANTE POUR LES FILTRES DE TYPE TABLEAU (comme house_type) ---
+        if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
+            if (paramsForURL.house_type.length > 0) {
+                paramsForURL.house_type = paramsForURL.house_type.join(','); // Transforme ["maison", "appartement"] en "maison,appartement"
+                console.log(`[NEW_SCRIPT_FETCH_DEBUG] house_type transformé en CSV: "${paramsForURL.house_type}"`);
+            } else {
+                // Si le tableau est vide, on ne veut peut-être pas envoyer le paramètre house_type du tout
+                delete paramsForURL.house_type; 
+                console.log("[NEW_SCRIPT_FETCH_DEBUG] house_type était un tableau vide, supprimé des paramètres URL.");
+            }
+        }
+        // Répétez ce bloc if pour d'autres filtres qui seraient des tableaux et que Xano attend en CSV
+
+        if (Object.keys(paramsForURL).length > 0) {
             const cleanParamsForURL = {};
-            for (const key in params) {
-                if (params[key] !== null && params[key] !== undefined &&
-                    ( (Array.isArray(params[key]) && params[key].length > 0) || 
-                      (typeof params[key] === 'string' && params[key] !== '') || 
-                      (typeof params[key] === 'number') || // Pourrait être utile si un filtre est un nombre (comme 0)
-                      (typeof params[key] === 'boolean') // Si Xano attend des booléens
+            for (const key in paramsForURL) {
+                if (paramsForURL[key] !== null && paramsForURL[key] !== undefined &&
+                    ( (Array.isArray(paramsForURL[key])) /* ne devrait plus arriver pour house_type ici */ || 
+                      (typeof paramsForURL[key] === 'string' && paramsForURL[key].trim() !== '') || 
+                      (typeof paramsForURL[key] === 'number') ||
+                      (typeof paramsForURL[key] === 'boolean') 
                     )
                 ) {
-                    // Si params[key] est un tableau (ex: pour des checkboxes), 
-                    // URLSearchParams le gère en ajoutant plusieurs fois le même paramètre.
-                    // Ex: key[]=value1&key[]=value2. Vérifiez si Xano attend cela ou une chaîne CSV.
-                    // Si Xano attend une chaîne CSV pour un tableau, vous feriez :
-                    // if (Array.isArray(params[key])) {
-                    //    cleanParamsForURL[key] = params[key].join(',');
-                    // } else {
-                    //    cleanParamsForURL[key] = params[key];
-                    // }
-                    cleanParamsForURL[key] = params[key];
+                    cleanParamsForURL[key] = paramsForURL[key];
                 }
             }
             if (Object.keys(cleanParamsForURL).length > 0) {
                 urlToFetch += '?' + new URLSearchParams(cleanParamsForURL).toString();
             }
         }
-        // --- FIN DE LA PARTIE CRUCIALE ---
+        // --- FIN DE LA MODIFICATION ---
+
 
         console.log('[NEW_SCRIPT_FETCH] URL finale pour l\'appel fetch:', urlToFetch); // LOG TRÈS IMPORTANT
 
@@ -476,6 +481,8 @@ function collectFilterValues(formElement) {
     });
 
     console.log("[FILTRES_COLLECT] Paramètres collectés finaux (avant envoi API):", JSON.stringify(params));
+    console.log("[FILTRES_COLLECT_DEBUG] Valeur de params.house_type AVANT return:", JSON.stringify(params.house_type));
+// Si vous aviez une ligne comme params.house_type = params.house_type.join(','), commentez-la !
     return params;
 }
 
