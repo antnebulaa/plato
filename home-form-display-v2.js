@@ -411,6 +411,7 @@ function bindDataToElement(element, data) {
 // DANS VOTRE SCRIPT home-form-display-v3.txt (celui dans le footer)
 // REMPLACEZ la fonction collectFilterValues existante par celle-ci :
 
+
 function collectFilterValues(formElement) {
     const params = {};
     if (!formElement) {
@@ -433,29 +434,20 @@ function collectFilterValues(formElement) {
                 // *** LECTURE DE data-value-api ICI ***
                 const dataApiValue = el.getAttribute('data-value-api');
 
-                if (dataApiValue !== null && dataApiValue !== "") { // Vérifier si l'attribut existe et n'est pas vide
-                    valueToXano = dataApiValue; 
+                if (dataApiValue !== null && dataApiValue.trim() !== "") { // Vérifier si l'attribut existe ET n'est pas une chaîne vide
+                    valueToXano = dataApiValue.trim(); 
                     console.log(`[FILTRES_COLLECT] Checkbox cochée: key="${key}", lu depuis data-value-api="${valueToXano}"`);
                 } else {
-                    // Fallback ou avertissement si data-value-api est manquant pour une checkbox cochée
-                    console.warn(`[FILTRES_COLLECT_WARN] Checkbox pour clé "${key}" (ID: ${el.id || 'N/A'}) est cochée, MAIS l'attribut 'data-value-api' est MANQUANT ou vide. Sa valeur HTML 'value' est "${el.value}". Cette checkbox sera IGNORÉE.`);
-                    return; // On ignore cette checkbox car on ne peut pas déterminer sa valeur sémantique
+                    console.warn(`[FILTRES_COLLECT_WARN] Checkbox pour clé "${key}" (ID: ${el.id || 'N/A'}) est cochée, MAIS l'attribut 'data-value-api' est MANQUANT ou vide. Sa valeur HTML 'value' est "${el.value}". Cette checkbox sera IGNORÉE pour éviter d'envoyer une valeur incorrecte comme "on".`);
+                    return; // On ignore cette checkbox
                 }
                 
-                // Logique pour regrouper les valeurs des checkboxes avec la même clé dans un tableau
                 if (!params[key]) { 
                     params[key] = [];
                 }
-                // S'assurer que params[key] est bien un tableau avant de pusher
                 if (!Array.isArray(params[key])) {
-                    // Si ce n'est pas un tableau (parce qu'une valeur précédente pour cette clé venait d'un autre type d'input),
-                    // il faut décider comment gérer ce conflit. Pour des filtres, il est rare d'avoir le même 'key'
-                    // pour une checkbox et un input texte par exemple. On va supposer ici que si params[key] existe,
-                    // il devrait déjà être un tableau si la première checkbox pour cette clé a été traitée.
-                    // Pour plus de robustesse, si params[key] existe et n'est pas un tableau, on pourrait le transformer ou logger une erreur.
-                    // Pour l'instant, on s'attend à ce qu'il soit initialisé comme [] la première fois.
                      console.warn(`[FILTRES_COLLECT_WARN] params["${key}"] n'était pas un tableau comme attendu, tentative de correction.`);
-                     params[key] = [params[key]]; // Essaie de le convertir en tableau
+                     params[key] = [params[key]]; 
                 }
                 params[key].push(valueToXano);
                 return; 
@@ -463,28 +455,22 @@ function collectFilterValues(formElement) {
                 return; 
             }
         } else if (el.type === 'radio') {
-            if (el.checked) {
-                valueToXano = el.value;
-            } else {
-                return; 
-            }
+            // ... (logique pour les radios, si vous en avez) ...
+            if (el.checked) valueToXano = el.value;
+            else return;
         } else if (el.tagName === 'SELECT') {
-            if (el.value !== '' && el.value !== null && el.value !== undefined) {
-                valueToXano = el.value;
-            } else {
-                return; 
-            }
+            // ... (logique pour les selects) ...
+            if (el.value !== '' && el.value !== null && el.value !== undefined) valueToXano = el.value;
+            else return;
         } else { // Inputs (text, number, date, etc.)
             const trimmedValue = el.value.trim();
-            if (trimmedValue !== '') {
-                valueToXano = trimmedValue;
-            } else {
-                return; 
-            }
+            if (trimmedValue !== '') valueToXano = trimmedValue;
+            else return; 
         }
 
         if (valueToXano !== null) { 
             params[key] = valueToXano;
+            // Correction du log pour afficher correctement clé et valeur
             console.log(`[FILTRES_COLLECT] Ajout filtre (non-checkbox): {"${key}": "${valueToXano}"}`);
         }
     });
@@ -492,7 +478,6 @@ function collectFilterValues(formElement) {
     console.log("[FILTRES_COLLECT] Paramètres collectés finaux (avant envoi API):", JSON.stringify(params));
     return params;
 }
-
 
 
 // AJOUTEZ CETTE FONCTION À VOTRE SCRIPT (celui dans le footer)
