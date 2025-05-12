@@ -40,46 +40,89 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
-    // --- Fonction pour récupérer les données ---
-    async function fetchAnnouncements() {
-        console.log(`[NEW_SCRIPT_FETCH] Appel à l'endpoint: ${endpoint}`);
-        itemsContainer.innerHTML = '<p>Chargement des annonces...</p>'; // Message de chargement simple
+  // DANS VOTRE SCRIPT home-form-display-v3.txt
+// REMPLACEZ VOTRE fetchAnnouncements ACTUELLE PAR CELLE-CI :
 
-        try {
-            const response = await fetch(`${XANO_API_BASE_URL}/${endpoint}`); // Pas d'authentification ici car public
-            
-            if (!response.ok) {
-                // Gérer les erreurs HTTP (4xx, 5xx)
-                const errorData = await response.json().catch(() => ({ message: response.statusText }));
-                throw new Error(`Erreur HTTP ${response.status}: ${errorData.message || response.statusText}`);
-            }
+async function fetchAnnouncements(params = {}) { // <<<< ACCEPTE params ICI, avec {} comme valeur par défaut
+    // Assurez-vous que 'endpoint', 'itemsContainer', 'XANO_API_BASE_URL', 
+    // 'templateElement', et 'emptyMessage' sont accessibles ici.
+    // Ils sont définis dans la portée de DOMContentLoaded, donc c'est bon car fetchAnnouncements y est aussi définie.
 
-            const responseData = await response.json();
-            console.log('[NEW_SCRIPT_FETCH] Réponse brute de Xano:', JSON.stringify(responseData));
-
-            // Logique de détection du tableau d'items (flexible)
-            let itemsArray = null;
-            if (Array.isArray(responseData)) { itemsArray = responseData; }
-            else if (responseData && Array.isArray(responseData.items)) { itemsArray = responseData.items; }
-            else if (responseData && responseData.body && Array.isArray(responseData.body.items)) { itemsArray = responseData.body.items; }
-            else if (responseData && responseData.body && Array.isArray(responseData.body)) { itemsArray = responseData.body; }
-            else if (responseData && typeof responseData === 'object') { // Recherche générique
-                for (const key in responseData) { if (Array.isArray(responseData[key])) { itemsArray = responseData[key]; break; } }
-            }
-
-            if (itemsArray && Array.isArray(itemsArray)) {
-                console.log(`[NEW_SCRIPT_FETCH] ${itemsArray.length} items trouvés.`);
-                renderAnnouncements(itemsArray, templateElement, itemsContainer, emptyMessage);
-            } else {
-                console.warn('[NEW_SCRIPT_FETCH] Tableau d\'items non trouvé ou invalide.', responseData);
-                itemsContainer.innerHTML = `<p style="color:orange;">${emptyMessage}</p>`;
-            }
-
-        } catch (error) {
-            console.error('[NEW_SCRIPT_FETCH] Erreur lors de la récupération des données:', error);
-            itemsContainer.innerHTML = `<p style="color:red;">Erreur de chargement: ${error.message}</p>`;
-        }
+    console.log(`[NEW_SCRIPT_FETCH] Appel à l'endpoint: ${endpoint} avec params:`, JSON.stringify(params));
+    
+    if (!itemsContainer) { // Juste une sécurité
+        console.error("[NEW_SCRIPT_FETCH] ERREUR: itemsContainer n'est pas défini!");
+        return;
     }
+    itemsContainer.innerHTML = '<p>Chargement des annonces...</p>'; 
+
+    try {
+        let urlToFetch = `${XANO_API_BASE_URL}/${endpoint}`;
+
+        // --- PARTIE CRUCIALE POUR AJOUTER LES FILTRES À L'URL ---
+        if (params && Object.keys(params).length > 0) {
+            const cleanParamsForURL = {};
+            for (const key in params) {
+                if (params[key] !== null && params[key] !== undefined &&
+                    ( (Array.isArray(params[key]) && params[key].length > 0) || 
+                      (typeof params[key] === 'string' && params[key] !== '') || 
+                      (typeof params[key] === 'number') || // Pourrait être utile si un filtre est un nombre (comme 0)
+                      (typeof params[key] === 'boolean') // Si Xano attend des booléens
+                    )
+                ) {
+                    // Si params[key] est un tableau (ex: pour des checkboxes), 
+                    // URLSearchParams le gère en ajoutant plusieurs fois le même paramètre.
+                    // Ex: key[]=value1&key[]=value2. Vérifiez si Xano attend cela ou une chaîne CSV.
+                    // Si Xano attend une chaîne CSV pour un tableau, vous feriez :
+                    // if (Array.isArray(params[key])) {
+                    //    cleanParamsForURL[key] = params[key].join(',');
+                    // } else {
+                    //    cleanParamsForURL[key] = params[key];
+                    // }
+                    cleanParamsForURL[key] = params[key];
+                }
+            }
+            if (Object.keys(cleanParamsForURL).length > 0) {
+                urlToFetch += '?' + new URLSearchParams(cleanParamsForURL).toString();
+            }
+        }
+        // --- FIN DE LA PARTIE CRUCIALE ---
+
+        console.log('[NEW_SCRIPT_FETCH] URL finale pour l\'appel fetch:', urlToFetch); // LOG TRÈS IMPORTANT
+
+        const response = await fetch(urlToFetch); 
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: response.statusText }));
+            throw new Error(`Erreur HTTP ${response.status}: ${errorData.message || response.statusText}`);
+        }
+
+        const responseData = await response.json();
+        console.log('[NEW_SCRIPT_FETCH] Réponse brute de Xano:', JSON.stringify(responseData));
+
+        let itemsArray = null;
+        // ... (votre logique de détection flexible de itemsArray reste la même) ...
+        if (Array.isArray(responseData)) { itemsArray = responseData; }
+        else if (responseData && Array.isArray(responseData.items)) { itemsArray = responseData.items; }
+        else if (responseData && responseData.body && Array.isArray(responseData.body.items)) { itemsArray = responseData.body.items; }
+        else if (responseData && responseData.body && Array.isArray(responseData.body)) { itemsArray = responseData.body; }
+        else if (responseData && typeof responseData === 'object') { 
+            for (const key in responseData) { if (Array.isArray(responseData[key])) { itemsArray = responseData[key]; break; } }
+        }
+
+        if (itemsArray && Array.isArray(itemsArray)) {
+            console.log(`[NEW_SCRIPT_FETCH] ${itemsArray.length} items trouvés.`);
+            renderAnnouncements(itemsArray, templateElement, itemsContainer, emptyMessage);
+        } else {
+            console.warn('[NEW_SCRIPT_FETCH] Tableau d\'items non trouvé ou invalide.', responseData);
+            if (itemsContainer) itemsContainer.innerHTML = `<p style="color:orange;">${emptyMessage}</p>`;
+        }
+
+    } catch (error) {
+        console.error('[NEW_SCRIPT_FETCH] Erreur lors de la récupération des données:', error);
+        if (itemsContainer) itemsContainer.innerHTML = `<p style="color:red;">Erreur de chargement: ${error.message}</p>`;
+    }
+}
 
     // --- Fonction pour afficher les données ---
     function renderAnnouncements(items, templateNode, container, noDataMessage) {
