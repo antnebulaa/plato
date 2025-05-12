@@ -61,16 +61,16 @@ async function fetchAnnouncements(params = {}) { // <<<< ACCEPTE params ICI, ave
         let paramsForURL = { ...params }; // Copier les params pour ne pas modifier l'original si besoin ailleurs
 
         // --- MODIFICATION IMPORTANTE POUR LES FILTRES DE TYPE TABLEAU (comme house_type) ---
-        if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
+if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
     if (paramsForURL.house_type.length > 0) {
         if (paramsForURL.house_type.length === 1) {
             // Si un seul élément, envoyer comme une chaîne simple
             paramsForURL.house_type = paramsForURL.house_type[0];
             console.log(`[NEW_SCRIPT_FETCH_DEBUG] house_type (valeur unique) transformé en string: "${paramsForURL.house_type}"`);
         } else {
-            // Si plusieurs éléments, envoyer comme une chaîne JSON
-            paramsForURL.house_type = JSON.stringify(paramsForURL.house_type);
-            console.log(`[NEW_SCRIPT_FETCH_DEBUG] house_type (valeurs multiples) transformé en JSON string: "${paramsForURL.house_type}"`);
+            // Si plusieurs éléments, envoyer comme une chaîne CSV (séparée par des virgules)
+            paramsForURL.house_type = paramsForURL.house_type.join(','); // <--- REVENIR A JOIN(',')
+            console.log(`[NEW_SCRIPT_FETCH_DEBUG] house_type (valeurs multiples) transformé en CSV string: "${paramsForURL.house_type}"`);
         }
     } else {
         // Si le tableau est vide, supprimer le paramètre
