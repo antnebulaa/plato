@@ -409,7 +409,6 @@ function bindDataToElement(element, data) {
 
 
 // À PLACER EN DEHORS DE DOMContentLoaded, avec les autres définitions de fonctions
-
 function collectFilterValues(formElement) {
     const params = {};
     if (!formElement) {
@@ -425,59 +424,72 @@ function collectFilterValues(formElement) {
         const key = el.getAttribute('data-filter-key');
         if (!key) return;
 
-        let value = null; 
-        let valueForCheckbox = null;
+        let valueToXano = null; // Ce sera la valeur que nous envoyons à Xano
 
         if (el.type === 'checkbox') {
             if (el.checked) {
-                valueForCheckbox = el.value;
-                if (!valueForCheckbox || valueForCheckbox === 'on') {
-                     // Si value est 'on' ou vide, Xano attend peut-être un booléen ou une valeur spécifique.
-                     // Pour l'instant, on prend la valeur brute. Adaptez si Xano attend 'true' / 'false'
-                     // ou si vous voulez ignorer les checkbox avec value="on".
-                    console.warn(`Checkbox pour clé "${key}" (ID: <span class="math-inline">\{el\.id \|\| 'N/A'\}\) est cochée avec valeur "</span>{valueForCheckbox}".`);
-                }
+                // *** MODIFICATION IMPORTANTE ICI ***
+                // On lit l'attribut 'data-value-api' que vous avez ajouté dans Webflow
+                const dataApiValue = el.getAttribute('data-value-api');
 
-                if (!params[key]) { // Si c'est la première checkbox pour cette clé
+                if (dataApiValue) {
+                    valueToXano = dataApiValue; // On utilise la valeur de data-value-api
+                    console.log(`[FILTRES_COLLECT] Checkbox cochée: key="${key}", data-value-api="${valueToXano}"`);
+                } else {
+                    // Fallback si data-value-api n'est pas là, mais ce ne devrait pas être le cas
+                    // si vous l'avez bien configuré pour chaque checkbox CMS.
+                    // On pourrait prendre el.value, mais il est souvent 'on' ou vide.
+                    console.warn(`[FILTRES_COLLECT_WARN] Checkbox pour clé "${key}" (ID: ${el.id || 'N/A'}) est cochée, MAIS l'attribut 'data-value-api' est MANQUANT ou vide. Sa valeur HTML 'value' est "${el.value}". Ce filtre risque de ne pas fonctionner. Assurez-vous d'ajouter data-value-api="valeur_pour_xano" à vos checkboxes dans Webflow.`);
+                    // Décidez si vous voulez envoyer quelque chose ou ignorer cette checkbox
+                    // Pour l'instant, on l'ignore si data-value-api n'est pas là.
+                    return; 
+                }
+                
+                // Logique pour regrouper les valeurs des checkboxes avec la même clé dans un tableau
+                if (!params[key]) { 
                     params[key] = [];
                 }
                 if (Array.isArray(params[key])) {
-                    params[key].push(valueForCheckbox);
+                    params[key].push(valueToXano); // Ajoute la valeur de data-value-api au tableau
+                } else { 
+                     params[key] = [params[key], valueToXano]; 
+                     console.warn(`[FILTRES_COLLECT_WARN] params["${key}"] n'était pas un tableau, transformé en tableau.`);
                 }
-                // Important : on ne veut pas de l'assignation `params[key] = value;` plus bas pour les checkboxes gérées en tableau.
-                // Donc on s'arrête ici pour CETTE checkbox.
-                return; 
+                return; // Traitement de CETTE checkbox terminé, passer à la suivante.
             } else {
-                return; // Checkbox non cochée, on ne l'ajoute pas.
+                return; // Checkbox non cochée, ne rien faire.
             }
         } else if (el.type === 'radio') {
             if (el.checked) {
-                value = el.value;
+                valueToXano = el.value;
             } else {
                 return; 
             }
         } else if (el.tagName === 'SELECT') {
-            if (el.value !== '' && el.value !== null && el.value !== undefined) { // Ignorer les sélections "vides"
-                value = el.value;
+            if (el.value !== '' && el.value !== null && el.value !== undefined) {
+                valueToXano = el.value;
             } else {
                 return; 
             }
         } else { // Inputs (text, number, date, etc.)
             const trimmedValue = el.value.trim();
             if (trimmedValue !== '') {
-                value = trimmedValue;
+                valueToXano = trimmedValue;
             } else {
                 return; 
             }
         }
 
-        // Cette assignation ne se fera que pour les types autres que checkbox (qui ont un return dans leur bloc if)
-        if (value !== null) { 
-            params[key] = value;
-            console.log(`[FILTRES_COLLECT] Ajout filtre: {"<span class="math-inline">\{key\}"\: "</span>{value}"}`);
+        // Assignation pour les types autres que checkbox (qui ont un 'return' dans leur bloc 'if')
+        if (valueToXano !== null) { 
+            params[key] = valueToXano;
+            // Correction du log pour afficher correctement clé et valeur
+            console.log(`[FILTRES_COLLECT] Ajout filtre: {"${key}": "${valueToXano}"}`);
         }
     });
-    console.log("[FILTRES_COLLECT] Paramètres collectés finaux:", params);
+
+    // Pas besoin de joindre en CSV ici car Xano attend un tableau pour house_type (enum[])
+    console.log("[FILTRES_COLLECT] Paramètres collectés finaux:", JSON.stringify(params)); // Loguer en JSON pour voir les tableaux
     return params;
 }
 
