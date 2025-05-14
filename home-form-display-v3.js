@@ -150,24 +150,36 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
 
     // --- Fonction pour afficher les données ---
     function renderAnnouncements(items, templateNode, container, noDataMessage) {
-        console.log(`[NEW_SCRIPT_RENDER] Rendu de ${items.length} items.`);
-        container.innerHTML = ''; // Nettoyer le conteneur avant d'ajouter
+    console.log(`[NEW_SCRIPT_RENDER] Rendu de ${items.length} items.`);
+    container.innerHTML = ''; // Nettoyer le conteneur avant d'ajouter
 
-        if (items.length === 0) {
-            container.innerHTML = `<p style="padding:20px; text-align:center;">${noDataMessage}</p>`;
-            return;
-        }
+    if (items.length === 0) {
+        // Afficher le message si aucun item n'est trouvé
+        const emptyEl = document.createElement('div'); // Ou le type d'élément que vous voulez
+        emptyEl.className = 'empty-state-message'; // Ajoutez une classe pour le style
+        emptyEl.innerHTML = `<p style="padding:20px; text-align:center;">${noDataMessage}</p>`; // Votre message
+        container.appendChild(emptyEl);
+        console.log("[NEW_SCRIPT_RENDER] Aucun item à afficher, message d'état vide ajouté.");
+        return;
+    }
+
 
         const fragment = document.createDocumentFragment();
-
-        items.forEach(itemData => {
-            let clone;
-            if (templateNode.tagName === 'TEMPLATE') {
-                clone = templateNode.content.firstElementChild.cloneNode(true);
-            } else { // Si le template est un div caché
-                clone = templateNode.cloneNode(true);
-                clone.style.display = ''; // Rendre visible
-            }
+    items.forEach(itemData => {
+        let clone;
+        // Si templateNode est l'élément avec id="annonce-item-template"
+        // et qu'il n'est pas une balise <template> HTML5
+        if (templateNode.tagName !== 'TEMPLATE') {
+            clone = templateNode.cloneNode(true);
+            clone.style.display = ''; // IMPORTANT: Rend le clone visible
+            clone.removeAttribute('id'); // IMPORTANT: Supprime l'ID pour éviter les doublons
+        } else {
+            // Si vous utilisiez une vraie balise <template>, la logique serait un peu différente
+            // clone = templateNode.content.firstElementChild.cloneNode(true);
+            // Mais avec un div comme template, la méthode ci-dessus est bonne.
+            console.error("Le template est une balise <template>, la logique de clonage doit être ajustée si ce n'est pas un div.");
+            return; // Ou gérer ce cas
+        }
 
               // --- DÉBUT DE LA SECTION DE BINDING MODIFIÉE ---
     // On va appeler VOTRE fonction bindDataToElement (celle de home-form-display-v2-2.txt)
@@ -187,14 +199,11 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
             fragment.appendChild(clone);
         });
         
-         itemsContainer.appendChild(fragment); // Ou container.appendChild(fragment)
+        container.appendChild(fragment); // Ou container.appendChild(fragment)
     console.log("[NOM_DE_VOTRE_FONCTION_RENDER] Items ajoutés au DOM.");
-
-    // APPEL À L'INITIALISATION DES SLIDERS
-    initializePageSwipers(itemsContainer); // On passe le conteneur où les nouveaux items (et sliders) ont été ajoutés
-
+    initializePageSwipers(container); // Assurez-vous que c'est bien le 'container' et non 'itemsContainer' si 'itemsContainer' est le même que 'container'
     console.log("[NOM_DE_VOTRE_FONCTION_RENDER] Terminé, initialisation Swiper demandée.");
-    }
+}
 
     // --- Lancer la récupération des données ---
     fetchAnnouncements();
