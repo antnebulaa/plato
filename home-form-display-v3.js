@@ -97,8 +97,20 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
                 urlToFetch += '?' + new URLSearchParams(cleanParamsForURL).toString();
             }
         }
-        // --- FIN DE LA MODIFICATION ---
 
+          // NOUVEAU : Gestion de city (similaire à house_type)
+    if (paramsForURL.city && Array.isArray(paramsForURL.city)) {
+        if (paramsForURL.city.length > 0) {
+            if (paramsForURL.city.length === 1) {
+                paramsForURL.city = paramsForURL.city[0]; // Une seule ville -> chaîne simple
+            } else {
+                paramsForURL.city = paramsForURL.city.join(','); // Plusieurs villes -> chaîne CSV
+            }
+            console.log(`[NEW_SCRIPT_FETCH_DEBUG] city transformé en: "${paramsForURL.city}"`);
+        } else {
+            delete paramsForURL.city; // Tableau de villes vide, on supprime le paramètre
+        }
+    }
 
         console.log('[NEW_SCRIPT_FETCH] URL finale pour l\'appel fetch:', urlToFetch); // LOG TRÈS IMPORTANT
 
@@ -433,6 +445,7 @@ function collectFilterValues(formElement) {
     console.log("[FILTRES_COLLECT] Appel pour le formulaire:", formElement);
 
     const filterElements = formElement.querySelectorAll('input[data-filter-key], select[data-filter-key], textarea[data-filter-key]');
+    // On exclut #user-input car il ne contient plus la valeur de filtre finale pour la ville
     console.log(`[FILTRES_COLLECT] Trouvé ${filterElements.length} éléments de filtre.`);
 
     filterElements.forEach(el => {
@@ -440,32 +453,20 @@ function collectFilterValues(formElement) {
         if (!key) return;
 
         let valueToXano = null; 
-
         if (el.type === 'checkbox') {
+            // ... votre code pour les checkboxes ...
+            // (qui construit params[key] comme un tableau)
+            // Assurez-vous qu'il y a un return ici pour ne pas tomber dans la logique non-checkbox
             if (el.checked) {
-                // *** LECTURE DE data-value-api ICI ***
                 const dataApiValue = el.getAttribute('data-value-api');
-
-                if (dataApiValue !== null && dataApiValue.trim() !== "") { // Vérifier si l'attribut existe ET n'est pas une chaîne vide
-                    valueToXano = dataApiValue.trim(); 
-                    console.log(`[FILTRES_COLLECT] Checkbox cochée: key="${key}", lu depuis data-value-api="${valueToXano}"`);
-                } else {
-                    console.warn(`[FILTRES_COLLECT_WARN] Checkbox pour clé "${key}" (ID: ${el.id || 'N/A'}) est cochée, MAIS l'attribut 'data-value-api' est MANQUANT ou vide. Sa valeur HTML 'value' est "${el.value}". Cette checkbox sera IGNORÉE pour éviter d'envoyer une valeur incorrecte comme "on".`);
-                    return; // On ignore cette checkbox
-                }
-                
-                if (!params[key]) { 
-                    params[key] = [];
-                }
-                if (!Array.isArray(params[key])) {
-                     console.warn(`[FILTRES_COLLECT_WARN] params["${key}"] n'était pas un tableau comme attendu, tentative de correction.`);
-                     params[key] = [params[key]]; 
-                }
-                params[key].push(valueToXano);
-                return; 
-            } else {
-                return; 
+                if (dataApiValue !== null && dataApiValue.trim() !== "") {
+                    valueToXano = dataApiValue.trim();
+                    if (!params[key]) params[key] = [];
+                    if (!Array.isArray(params[key])) params[key] = [params[key]]; // Correction si existant et non tableau
+                    params[key].push(valueToXano);
+                } else { /* warning et skip */ return; }
             }
+            return; // Important pour les checkboxes
         } else if (el.type === 'radio') {
             // ... (logique pour les radios, si vous en avez) ...
             if (el.checked) valueToXano = el.value;
@@ -480,16 +481,22 @@ function collectFilterValues(formElement) {
             else return; 
         }
 
-        if (valueToXano !== null) { 
+         if (valueToXano !== null) { // Ne devrait plus s'appliquer aux checkboxes ici
             params[key] = valueToXano;
-            // Correction du log pour afficher correctement clé et valeur
-            console.log(`[FILTRES_COLLECT] Ajout filtre (non-checkbox): {"${key}": "${valueToXano}"}`);
+            console.log(`[FILTRES_COLLECT] Ajout filtre (non-checkbox/city): {"${key}": "${valueToXano}"}`);
         }
     });
 
+   // Ajout des villes sélectionnées (si `selectedCities` est accessible)
+    if (typeof selectedCities !== 'undefined' && selectedCities.length > 0) {
+        // On envoie une copie du tableau pour éviter les modifications par référence
+        params['city'] = [...selectedCities];
+        console.log(`[FILTRES_COLLECT] Villes sélectionnées ajoutées:`, JSON.stringify(params['city']));
+    } else {
+        console.log("[FILTRES_COLLECT] Aucune ville sélectionnée via les tags.");
+    }
+
     console.log("[FILTRES_COLLECT] Paramètres collectés finaux (avant envoi API):", JSON.stringify(params));
-    console.log("[FILTRES_COLLECT_DEBUG] Valeur de params.house_type AVANT return:", JSON.stringify(params.house_type));
-// Si vous aviez une ligne comme params.house_type = params.house_type.join(','), commentez-la !
     return params;
 }
 
