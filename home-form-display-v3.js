@@ -125,30 +125,52 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
         console.log('[NEW_SCRIPT_FETCH] Réponse brute de Xano:', JSON.stringify(responseData));
 
         let itemsArray = null;
-        // ... (votre logique de détection flexible de itemsArray reste la même) ...
-        if (Array.isArray(responseData)) { itemsArray = responseData; }
-        else if (responseData && Array.isArray(responseData.items)) { itemsArray = responseData.items; }
-        else if (responseData && responseData.body && Array.isArray(responseData.body.items)) { itemsArray = responseData.body.items; }
-        else if (responseData && responseData.body && Array.isArray(responseData.body)) { itemsArray = responseData.body; }
-        else if (responseData && typeof responseData === 'object') { 
-            for (const key in responseData) { if (Array.isArray(responseData[key])) { itemsArray = responseData[key]; break; } }
+let totalItemsFromServer = 0; // Initialiser
+
+// 1. LOGIQUE COMBINÉE POUR TROUVER itemsArray :
+// On essaie d'abord la nouvelle structure attendue (avec result1)
+if (responseData && responseData.result1 && Array.isArray(responseData.result1.items)) {
+    itemsArray = responseData.result1.items;
+} 
+// SINON (si responseData.result1.items n'est pas trouvé), on essaie vos anciennes méthodes de fallback
+else {
+    console.warn("[NEW_SCRIPT_FETCH] Structure attendue responseData.result1.items non trouvée. Tentative de fallbacks pour itemsArray...");
+    if (Array.isArray(responseData)) { // Cas où la réponse est directement le tableau d'items
+        itemsArray = responseData;
+    } else if (responseData && Array.isArray(responseData.items)) { // Votre ancien cas principal
+        itemsArray = responseData.items;
+    } else if (responseData && responseData.body && Array.isArray(responseData.body.items)) {
+        itemsArray = responseData.body.items;
+    } else if (responseData && responseData.body && Array.isArray(responseData.body)) {
+        itemsArray = responseData.body;
+    } else if (responseData && typeof responseData === 'object' && responseData !== null) {
+        // Recherche d'un tableau au premier niveau de l'objet responseData
+        for (const key in responseData) {
+            if (Array.isArray(responseData[key])) {
+                itemsArray = responseData[key];
+                console.log(`[NEW_SCRIPT_FETCH] itemsArray trouvé via fallback dans responseData.${key}`);
+                break; 
+            }
         }
+    }
+}
 
-        // 2. NOUVELLE LOGIQUE (AJOUTÉE) POUR TROUVER totalItemsFromServer :
-        // Ceci se base sur le fait que responseData est l'objet JSON complet de Xano.
-        if (responseData && typeof responseData.totalItemsCount === 'number') {
-           totalItemsFromServer = responseData.totalItemsCount;
-       } else if (itemsArray) { 
-           // Fallback si totalItemsCount n'est pas là : utiliser la longueur de itemsArray
-           // Ce ne sera que le compte de la page actuelle si la pagination est active et qu'il y a plusieurs pages.
-          totalItemsFromServer = itemsArray.length; 
-          if (!responseData || typeof responseData.totalItemsCount === 'undefined') { // Loguer seulement si totalItemsCount était vraiment attendu
-          console.warn("[NEW_SCRIPT_FETCH] 'totalItemsCount' non trouvé dans la réponse Xano ou n'est pas un nombre. Le texte du bouton sera basé sur les items de la page actuelle.");
-          }
-       }
-      // Si itemsArray est null et totalItemsCount n'est pas là, totalItemsFromServer restera 0.
+        // 2. LOGIQUE POUR TROUVER totalItemsFromServer (reste la même, elle est bonne) :
+if (responseData && typeof responseData.totalItemsCount === 'number') {
+    totalItemsFromServer = responseData.totalItemsCount;
+} else if (itemsArray && itemsArray.length > 0) { // Utiliser la longueur de itemsArray seulement s'il a été trouvé
+    totalItemsFromServer = itemsArray.length; 
+    if (!responseData || typeof responseData.totalItemsCount === 'undefined') {
+      console.warn("[NEW_SCRIPT_FETCH] 'totalItemsCount' non trouvé dans la réponse Xano ou n'est pas un nombre. Le texte du bouton sera basé sur les items de la page actuelle.");
+    }
+} else if (responseData && responseData.result1 && typeof responseData.result1.itemsReceived === 'number' && responseData.result1.nextPage === null) {
+    // Fallback supplémentaire si totalItemsCount n'est pas là, mais qu'on a des infos de pagination de result1
+    totalItemsFromServer = responseData.result1.itemsReceived; // ou responseData.result1.offset + responseData.result1.itemsReceived
+    console.warn("[NEW_SCRIPT_FETCH] Utilisation de responseData.result1.itemsReceived comme fallback pour totalItemsFromServer.");
+}
+// Si itemsArray est null et totalItemsCount n'est pas là, totalItemsFromServer restera 0.
 
-      // --- FIN DE LA SECTION D'EXTRACTION ---
+// --- FIN DE LA SECTION D'EXTRACTION ---
 
         if (itemsArray && Array.isArray(itemsArray)) {
             console.log(`[NEW_SCRIPT_FETCH] ${itemsArray.length} items trouvés.`);
