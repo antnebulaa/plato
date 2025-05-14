@@ -221,6 +221,47 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
         if (!applyFiltersButtonElement) console.warn("[FILTRES_SETUP] AVERTISSEMENT: Bouton avec ID 'apply-filters-button' non trouvé.");
     }
     // --- FIN DE L'INITIALISATION DES FILTRES ---
+
+    // --- NOUVEAU : INITIALISATION DES SLIDERS DE FOURCHETTE ---
+    console.log("[SLIDERS_SETUP] Initialisation des sliders de fourchette.");
+
+    const loyerSliderWrapper = document.getElementById('slider-loyer-wrapper'); // L'ID du div que vous avez mis dans le HTML
+    if (loyerSliderWrapper) {
+        console.log("[SLIDERS_SETUP] Conteneur pour slider de loyer trouvé. Création du slider.");
+        createRangeSlider({
+            containerElement: loyerSliderWrapper,
+            min: 0,
+            max: 10000,
+            step: 100,
+            initialMin: 0, 
+            initialMax: 10000,
+            minFilterKey: 'min_loyer', // Sera utilisé par collectFilterValues
+            maxFilterKey: 'max_loyer', // Sera utilisé par collectFilterValues
+            unit: ' €'
+        });
+    } else {
+        console.warn("[SLIDERS_SETUP] AVERTISSEMENT: Conteneur avec ID 'slider-loyer-wrapper' non trouvé.");
+    }
+
+    // Exemple pour un futur slider de surface
+    const surfaceSliderWrapper = document.getElementById('slider-surface-wrapper');
+    if (surfaceSliderWrapper) {
+        console.log("[SLIDERS_SETUP] Conteneur pour slider de surface trouvé. Création du slider.");
+        createRangeSlider({
+            containerElement: surfaceSliderWrapper,
+            min: 0,
+            max: 500,
+            step: 5,
+            initialMin: 0,
+            initialMax: 500,
+            minFilterKey: 'min_surface',
+            maxFilterKey: 'max_surface',
+            unit: ' m²'
+        });
+    } else {
+        console.warn("[SLIDERS_SETUP] AVERTISSEMENT: Conteneur avec ID 'slider-surface-wrapper' non trouvé.");
+    }
+    // --- FIN DE L'INITIALISATION DES SLIDERS DE FOURCHETTE ---
 });
 
 
