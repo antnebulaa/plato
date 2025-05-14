@@ -134,6 +134,22 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
             for (const key in responseData) { if (Array.isArray(responseData[key])) { itemsArray = responseData[key]; break; } }
         }
 
+        // 2. NOUVELLE LOGIQUE (AJOUTÉE) POUR TROUVER totalItemsFromServer :
+        // Ceci se base sur le fait que responseData est l'objet JSON complet de Xano.
+        if (responseData && typeof responseData.totalItemsCount === 'number') {
+           totalItemsFromServer = responseData.totalItemsCount;
+       } else if (itemsArray) { 
+           // Fallback si totalItemsCount n'est pas là : utiliser la longueur de itemsArray
+           // Ce ne sera que le compte de la page actuelle si la pagination est active et qu'il y a plusieurs pages.
+          totalItemsFromServer = itemsArray.length; 
+          if (!responseData || typeof responseData.totalItemsCount === 'undefined') { // Loguer seulement si totalItemsCount était vraiment attendu
+          console.warn("[NEW_SCRIPT_FETCH] 'totalItemsCount' non trouvé dans la réponse Xano ou n'est pas un nombre. Le texte du bouton sera basé sur les items de la page actuelle.");
+          }
+       }
+      // Si itemsArray est null et totalItemsCount n'est pas là, totalItemsFromServer restera 0.
+
+      // --- FIN DE LA SECTION D'EXTRACTION ---
+
         if (itemsArray && Array.isArray(itemsArray)) {
             console.log(`[NEW_SCRIPT_FETCH] ${itemsArray.length} items trouvés.`);
             renderAnnouncements(itemsArray, templateElement, itemsContainer, emptyMessage);
@@ -482,9 +498,6 @@ function bindDataToElement(element, data) {
 }
 
 
-// DANS VOTRE SCRIPT home-form-display-v3.txt (celui dans le footer)
-// REMPLACEZ la fonction collectFilterValues existante par celle-ci :
-
 
 function collectFilterValues(formElement) {
     const params = {};
@@ -601,4 +614,24 @@ function initializePageSwipers(parentElement) {
             }
         }); // Fin de requestAnimationFrame
     });
+}
+
+// DANS home-form-display-v3.txt (ou votre fichier principal de script)
+
+function updateFilterButtonText(count) {
+    const applyFiltersButtonElement = document.getElementById('apply-filters-button'); // Même ID que vous utilisez déjà
+
+    if (applyFiltersButtonElement) {
+        if (count === null || count === undefined) { // En cas d'erreur de chargement
+            applyFiltersButtonElement.textContent = "Appliquer les filtres"; // Texte par défaut
+        } else if (count === 0) {
+            applyFiltersButtonElement.textContent = "0 logements trouvés";
+        } else if (count === 1) {
+            applyFiltersButtonElement.textContent = "Afficher 1 logement";
+        } else {
+            applyFiltersButtonElement.textContent = `Afficher ${count} logements`;
+        }
+    } else {
+        console.warn("[UPDATE_BUTTON] Bouton avec ID 'apply-filters-button' non trouvé pour mise à jour du texte.");
+    }
 }
