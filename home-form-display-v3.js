@@ -78,7 +78,21 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
         console.log("[NEW_SCRIPT_FETCH_DEBUG] house_type était un tableau vide, supprimé des paramètres URL.");
     }
 }
-        // Répétez ce bloc if pour d'autres filtres qui seraient des tableaux et que Xano attend en CSV
+        // Répétez ce bloc if ci-dessus pour d'autres filtres qui seraient des tableaux et que Xano attend en CSV
+
+          // NOUVEAU : Gestion de city (similaire à house_type)
+    if (paramsForURL.city && Array.isArray(paramsForURL.city)) {
+        if (paramsForURL.city.length > 0) {
+            if (paramsForURL.city.length === 1) {
+                paramsForURL.city = paramsForURL.city[0]; // Une seule ville -> chaîne simple
+            } else {
+                paramsForURL.city = paramsForURL.city.join(','); // Plusieurs villes -> chaîne CSV
+            }
+            console.log(`[NEW_SCRIPT_FETCH_DEBUG] city transformé en: "${paramsForURL.city}"`);
+        } else {
+            delete paramsForURL.city; // Tableau de villes vide, on supprime le paramètre
+        }
+    }
 
         if (Object.keys(paramsForURL).length > 0) {
             const cleanParamsForURL = {};
@@ -97,20 +111,6 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
                 urlToFetch += '?' + new URLSearchParams(cleanParamsForURL).toString();
             }
         }
-
-          // NOUVEAU : Gestion de city (similaire à house_type)
-    if (paramsForURL.city && Array.isArray(paramsForURL.city)) {
-        if (paramsForURL.city.length > 0) {
-            if (paramsForURL.city.length === 1) {
-                paramsForURL.city = paramsForURL.city[0]; // Une seule ville -> chaîne simple
-            } else {
-                paramsForURL.city = paramsForURL.city.join(','); // Plusieurs villes -> chaîne CSV
-            }
-            console.log(`[NEW_SCRIPT_FETCH_DEBUG] city transformé en: "${paramsForURL.city}"`);
-        } else {
-            delete paramsForURL.city; // Tableau de villes vide, on supprime le paramètre
-        }
-    }
 
         console.log('[NEW_SCRIPT_FETCH] URL finale pour l\'appel fetch:', urlToFetch); // LOG TRÈS IMPORTANT
 
