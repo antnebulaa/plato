@@ -128,7 +128,7 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
 let totalItemsFromServer = 0; // Initialiser
 
 // 1. LOGIQUE COMBINÉE POUR TROUVER itemsArray :
-// On essaie d'abord la nouvelle structure attendue (avec result1)
+// On essaie d'abord la nouvelle structure attendue (avec result1 de votre log Xano)
 if (responseData && responseData.result1 && Array.isArray(responseData.result1.items)) {
     itemsArray = responseData.result1.items;
 } 
@@ -155,21 +155,21 @@ else {
     }
 }
 
-        // 2. LOGIQUE POUR TROUVER totalItemsFromServer (reste la même, elle est bonne) :
-if (responseData && typeof responseData.totalItemsCount === 'number') {
-    totalItemsFromServer = responseData.totalItemsCount;
-} else if (itemsArray && itemsArray.length > 0) { // Utiliser la longueur de itemsArray seulement s'il a été trouvé
-    totalItemsFromServer = itemsArray.length; 
-    if (!responseData || typeof responseData.totalItemsCount === 'undefined') {
-      console.warn("[NEW_SCRIPT_FETCH] 'totalItemsCount' non trouvé dans la réponse Xano ou n'est pas un nombre. Le texte du bouton sera basé sur les items de la page actuelle.");
-    }
-} else if (responseData && responseData.result1 && typeof responseData.result1.itemsReceived === 'number' && responseData.result1.nextPage === null) {
-    // Fallback supplémentaire si totalItemsCount n'est pas là, mais qu'on a des infos de pagination de result1
-    totalItemsFromServer = responseData.result1.itemsReceived; // ou responseData.result1.offset + responseData.result1.itemsReceived
-    console.warn("[NEW_SCRIPT_FETCH] Utilisation de responseData.result1.itemsReceived comme fallback pour totalItemsFromServer.");
+        // 2. LOGIQUE POUR TROUVER totalItemsFromServer :
+// (En supposant que vous avez simplifié Xano pour utiliser responseData.result1.itemsTotal)
+if (responseData && responseData.result1 && typeof responseData.result1.itemsTotal === 'number') {
+    totalItemsFromServer = responseData.result1.itemsTotal;
 }
-// Si itemsArray est null et totalItemsCount n'est pas là, totalItemsFromServer restera 0.
-
+// Fallback si Xano met aussi un totalItemsCount au premier niveau (après l'avoir mappé depuis result1.itemsTotal)
+else if (responseData && typeof responseData.totalItemsCount === 'number') { 
+    totalItemsFromServer = responseData.totalItemsCount;
+}
+// Fallback si aucun total n'est trouvé mais qu'on a des items sur la page
+else if (itemsArray && itemsArray.length > 0) { 
+    totalItemsFromServer = itemsArray.length; 
+    console.warn("[NEW_SCRIPT_FETCH] 'totalItemsCount' ou 'result1.itemsTotal' non trouvé ou non numérique. Le texte du bouton sera basé sur les items de la page actuelle.");
+}
+// Si itemsArray est null/vide et aucun total n'est trouvé, totalItemsFromServer restera 0.
 // --- FIN DE LA SECTION D'EXTRACTION ---
 
         if (itemsArray && Array.isArray(itemsArray)) {
