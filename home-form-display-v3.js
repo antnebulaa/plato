@@ -93,96 +93,98 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
             delete paramsForURL.city; // Tableau de villes vide, on supprime le paramètre
         }
     }
-
-        if (Object.keys(paramsForURL).length > 0) {
-            const cleanParamsForURL = {};
-            for (const key in paramsForURL) {
-                if (paramsForURL[key] !== null && paramsForURL[key] !== undefined &&
-                    ( (Array.isArray(paramsForURL[key])) /* ne devrait plus arriver pour house_type ici */ || 
-                      (typeof paramsForURL[key] === 'string' && paramsForURL[key].trim() !== '') || 
-                      (typeof paramsForURL[key] === 'number') ||
-                      (typeof paramsForURL[key] === 'boolean') 
-                    )
-                ) {
+    // Construction de l'URL (s'assurer que paramsForURL est bien utilisé pour cleanParamsForURL)
+    if (Object.keys(paramsForURL).length > 0) {
+        const cleanParamsForURL = {};
+        for (const key in paramsForURL) {
+            if (paramsForURL[key] !== null && paramsForURL[key] !== undefined) {
+                if (typeof paramsForURL[key] === 'string' && paramsForURL[key].trim() !== '') {
+                    cleanParamsForURL[key] = paramsForURL[key];
+                } else if (typeof paramsForURL[key] === 'number' || typeof paramsForURL[key] === 'boolean') {
                     cleanParamsForURL[key] = paramsForURL[key];
                 }
-            }
-            if (Object.keys(cleanParamsForURL).length > 0) {
-                urlToFetch += '?' + new URLSearchParams(cleanParamsForURL).toString();
+                // Note: Si un paramètre est un tableau ici (ne devrait plus être le cas pour city/house_type), 
+                // URLSearchParams le transformera en CSV par défaut.
             }
         }
+        if (Object.keys(cleanParamsForURL).length > 0) {
+            urlToFetch += '?' + new URLSearchParams(cleanParamsForURL).toString();
+        }
+    }
 
         console.log('[NEW_SCRIPT_FETCH] URL finale pour l\'appel fetch:', urlToFetch); // LOG TRÈS IMPORTANT
 
-        const response = await fetch(urlToFetch); 
-        
+        try {
+        const response = await fetch(urlToFetch);
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ message: response.statusText }));
+            updateFilterButtonText(null); // Appel en cas d'erreur HTTP
             throw new Error(`Erreur HTTP ${response.status}: ${errorData.message || response.statusText}`);
         }
 
         const responseData = await response.json();
-        console.log('[NEW_SCRIPT_FETCH] Réponse brute de Xano:', JSON.stringify(responseData));
+        console.log('[FETCH_RESPONSE] Réponse brute de Xano:', JSON.stringify(responseData, null, 2));
 
+        // --- SECTION POUR EXTRAIRE itemsArray ET totalItemsFromServer ---
         let itemsArray = null;
-let totalItemsFromServer = 0; // Initialiser
+        let totalItemsFromServer = 0;
 
 // 1. LOGIQUE COMBINÉE POUR TROUVER itemsArray :
-// On essaie d'abord la nouvelle structure attendue (avec result1 de votre log Xano)
-if (responseData && responseData.result1 && Array.isArray(responseData.result1.items)) {
-    itemsArray = responseData.result1.items;
-} 
-// SINON (si responseData.result1.items n'est pas trouvé), on essaie vos anciennes méthodes de fallback
-else {
-    console.warn("[NEW_SCRIPT_FETCH] Structure attendue responseData.result1.items non trouvée. Tentative de fallbacks pour itemsArray...");
-    if (Array.isArray(responseData)) { // Cas où la réponse est directement le tableau d'items
-        itemsArray = responseData;
-    } else if (responseData && Array.isArray(responseData.items)) { // Votre ancien cas principal
-        itemsArray = responseData.items;
-    } else if (responseData && responseData.body && Array.isArray(responseData.body.items)) {
-        itemsArray = responseData.body.items;
-    } else if (responseData && responseData.body && Array.isArray(responseData.body)) {
-        itemsArray = responseData.body;
-    } else if (responseData && typeof responseData === 'object' && responseData !== null) {
-        // Recherche d'un tableau au premier niveau de l'objet responseData
-        for (const key in responseData) {
-            if (Array.isArray(responseData[key])) {
-                itemsArray = responseData[key];
-                console.log(`[NEW_SCRIPT_FETCH] itemsArray trouvé via fallback dans responseData.${key}`);
-                break; 
+        if (responseData && responseData.result1 && Array.isArray(responseData.result1.items)) {
+            itemsArray = responseData.result1.items;
+            console.log('[FETCH_EXTRACT] itemsArray trouvé dans result1.items:', itemsArray.length + " items");
+        } else {
+            console.warn("[NEW_SCRIPT_FETCH] Structure attendue responseData.result1.items non trouvée. Tentative de fallbacks pour itemsArray...");
+            if (Array.isArray(responseData)) {
+                itemsArray = responseData;
+            } else if (responseData && Array.isArray(responseData.items)) {
+                itemsArray = responseData.items;
+            } else if (responseData && responseData.body && Array.isArray(responseData.body.items)) {
+                itemsArray = responseData.body.items;
+            } else if (responseData && responseData.body && Array.isArray(responseData.body)) {
+                itemsArray = responseData.body;
+            } else if (responseData && typeof responseData === 'object' && responseData !== null) {
+                for (const key in responseData) {
+                    if (Array.isArray(responseData[key])) {
+                        itemsArray = responseData[key];
+                        console.log(`[NEW_SCRIPT_FETCH] itemsArray trouvé via fallback dans responseData.${key}`);
+                        break;
+                    }
+                }
             }
         }
-    }
-}
 
         // 2. LOGIQUE POUR TROUVER totalItemsFromServer :
-// (En supposant que vous avez simplifié Xano pour utiliser responseData.result1.itemsTotal)
-if (responseData && responseData.result1 && typeof responseData.result1.itemsTotal === 'number') {
-    totalItemsFromServer = responseData.result1.itemsTotal;
-}
-// Fallback si Xano met aussi un totalItemsCount au premier niveau (après l'avoir mappé depuis result1.itemsTotal)
-else if (responseData && typeof responseData.totalItemsCount === 'number') { 
-    totalItemsFromServer = responseData.totalItemsCount;
-}
-// Fallback si aucun total n'est trouvé mais qu'on a des items sur la page
-else if (itemsArray && itemsArray.length > 0) { 
-    totalItemsFromServer = itemsArray.length; 
-    console.warn("[NEW_SCRIPT_FETCH] 'totalItemsCount' ou 'result1.itemsTotal' non trouvé ou non numérique. Le texte du bouton sera basé sur les items de la page actuelle.");
-}
-// Si itemsArray est null/vide et aucun total n'est trouvé, totalItemsFromServer restera 0.
-// --- FIN DE LA SECTION D'EXTRACTION ---
-
-        if (itemsArray && Array.isArray(itemsArray)) {
-            console.log(`[NEW_SCRIPT_FETCH] ${itemsArray.length} items trouvés.`);
-            renderAnnouncements(itemsArray, templateElement, itemsContainer, emptyMessage);
+        if (responseData && typeof responseData.totalItemsCount === 'number') {
+            totalItemsFromServer = responseData.totalItemsCount;
+            console.log('[FETCH_EXTRACT] totalItemsFromServer trouvé dans responseData.totalItemsCount:', totalItemsFromServer);
+        } else if (responseData && responseData.result1 && typeof responseData.result1.itemsTotal === 'number') {
+            totalItemsFromServer = responseData.result1.itemsTotal;
+            console.log('[FETCH_EXTRACT] totalItemsFromServer trouvé via fallback dans responseData.result1.itemsTotal:', totalItemsFromServer);
+        } else if (itemsArray && itemsArray.length > 0) {
+            totalItemsFromServer = itemsArray.length;
+            console.warn("[NEW_SCRIPT_FETCH] Aucun total (totalItemsCount ou result1.itemsTotal) trouvé. Fallback sur la longueur des items de la page:", totalItemsFromServer);
         } else {
-            console.warn('[NEW_SCRIPT_FETCH] Tableau d\'items non trouvé ou invalide.', responseData);
-            if (itemsContainer) itemsContainer.innerHTML = `<p style="color:orange;">${emptyMessage}</p>`;
+             console.warn('[NEW_SCRIPT_FETCH] Aucun total trouvé et pas d\'itemsArray pour fallback. totalItemsFromServer sera 0.');
         }
+        // --- FIN DE LA SECTION D'EXTRACTION ---
+
+        // --- LOGIQUE D'AFFICHAGE ET MISE À JOUR DU BOUTON (C'EST CETTE PARTIE) ---
+        if (itemsArray && Array.isArray(itemsArray)) {
+            console.log(`[FETCH_PROCESS] Affichage de ${itemsArray.length} items. Total global rapporté pour bouton: ${totalItemsFromServer}.`);
+            renderAnnouncements(itemsArray, templateElement, itemsContainer, emptyMessage);
+            updateFilterButtonText(totalItemsFromServer); // APPEL CRUCIAL
+        } else {
+            console.warn('[FETCH_PROCESS] itemsArray final est null ou non tableau. Pas de rendu. Total rapporté pour bouton:', totalItemsFromServer);
+            if (itemsContainer) itemsContainer.innerHTML = `<p style="color:orange;">${emptyMessage}</p>`;
+            updateFilterButtonText(totalItemsFromServer); // Mettre à jour le bouton même si pas d'items (pour afficher "0 trouvés")
+        }
+        // --- FIN DE LA LOGIQUE D'AFFICHAGE ---
 
     } catch (error) {
-        console.error('[NEW_SCRIPT_FETCH] Erreur lors de la récupération des données:', error);
-        if (itemsContainer) itemsContainer.innerHTML = `<p style="color:red;">Erreur de chargement: ${error.message}</p>`;
+        console.error('[FETCH_ERROR] Erreur lors de la récupération ou du traitement des données:', error);
+        if (itemsContainer) itemsContainer.innerHTML = `<p style="color:red;">Erreur: ${error.message}</p>`;
+        updateFilterButtonText(null); // Texte d'erreur/par défaut sur le bouton
     }
 }
 
@@ -641,11 +643,13 @@ function initializePageSwipers(parentElement) {
 // DANS home-form-display-v3.txt (ou votre fichier principal de script)
 
 function updateFilterButtonText(count) {
-    const applyFiltersButtonElement = document.getElementById('apply-filters-button'); // Même ID que vous utilisez déjà
+    console.log('[UPDATE_BUTTON_LOG] Appel de updateFilterButtonText avec count:', count);
+    const applyFiltersButtonElement = document.getElementById('apply-filters-button');
 
     if (applyFiltersButtonElement) {
-        if (count === null || count === undefined) { // En cas d'erreur de chargement
-            applyFiltersButtonElement.textContent = "Appliquer les filtres"; // Texte par défaut
+        console.log('[UPDATE_BUTTON_LOG] Bouton trouvé:', applyFiltersButtonElement);
+        if (count === null || count === undefined) {
+            applyFiltersButtonElement.textContent = "Appliquer les filtres";
         } else if (count === 0) {
             applyFiltersButtonElement.textContent = "0 logements trouvés";
         } else if (count === 1) {
@@ -653,7 +657,8 @@ function updateFilterButtonText(count) {
         } else {
             applyFiltersButtonElement.textContent = `Afficher ${count} logements`;
         }
+        console.log('[UPDATE_BUTTON_LOG] Texte du bouton mis à jour à:', applyFiltersButtonElement.textContent);
     } else {
-        console.warn("[UPDATE_BUTTON] Bouton avec ID 'apply-filters-button' non trouvé pour mise à jour du texte.");
+        console.warn("[UPDATE_BUTTON_LOG] Bouton avec ID 'apply-filters-button' non trouvé.");
     }
 }
