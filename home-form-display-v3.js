@@ -56,11 +56,11 @@ async function fetchAnnouncements(params = {}) { // <<<< ACCEPTE params ICI, ave
     }
     itemsContainer.innerHTML = '<p>Chargement des annonces...</p>'; 
 
-    try {
-        let urlToFetch = `${XANO_API_BASE_URL}/${endpoint}`;
-        let paramsForURL = { ...params }; // Copier les params pour ne pas modifier l'original si besoin ailleurs
+    let urlToFetch = `${XANO_API_BASE_URL}/${endpoint}`;
+    let paramsForURL = { ...params }; // Copier les params pour ne pas modifier l'original si besoin ailleurs
 
         // --- MODIFICATION IMPORTANTE POUR LES FILTRES DE TYPE TABLEAU (comme house_type) ---
+// Gestion de house_type
 if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
     if (paramsForURL.house_type.length > 0) {
         if (paramsForURL.house_type.length === 1) {
@@ -80,7 +80,7 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
 }
         // Répétez ce bloc if ci-dessus pour d'autres filtres qui seraient des tableaux et que Xano attend en CSV
 
-          // NOUVEAU : Gestion de city (similaire à house_type)
+    // NOUVEAU : Gestion de city (similaire à house_type)
     if (paramsForURL.city && Array.isArray(paramsForURL.city)) {
         if (paramsForURL.city.length > 0) {
             if (paramsForURL.city.length === 1) {
@@ -111,9 +111,8 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
             urlToFetch += '?' + new URLSearchParams(cleanParamsForURL).toString();
         }
     }
-
         console.log('[NEW_SCRIPT_FETCH] URL finale pour l\'appel fetch:', urlToFetch); // LOG TRÈS IMPORTANT
-
+ 
         try {
         const response = await fetch(urlToFetch);
         if (!response.ok) {
