@@ -314,25 +314,6 @@ document.addEventListener('DOMContentLoaded', function() {
 class XanoClient {
     constructor(config) { this.apiGroupBaseUrl = config.apiGroupBaseUrl; this.authToken = null; }
     setAuthToken(token) { this.authToken = token; }
-    async _request(method, endpoint, paramsOrBody = null, isFormData = false) {
-        const url = `${this.apiGroupBaseUrl}/${endpoint}`;
-        const options = { method: method, headers: {} };
-        if (this.authToken) { options.headers['Authorization'] = `Bearer ${this.authToken}`; }
-        let finalUrl = url;
-        if (method === 'GET' && paramsOrBody) { const queryParams = new URLSearchParams(paramsOrBody).toString(); if (queryParams) finalUrl = `${url}?${queryParams}`; }
-        // MODIFIÉ v8.3: DELETE peut avoir un body JSON pour envoyer les IDs
-        else if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && paramsOrBody) {
-            if (isFormData) { options.body = paramsOrBody; }
-            else { options.headers['Content-Type'] = 'application/json'; options.body = JSON.stringify(paramsOrBody); }
-        }
-        try {
-            const response = await fetch(finalUrl, options);
-            if (response.status === 204 || response.headers.get('content-length') === '0') { if (!response.ok) throw new Error(`Erreur HTTP ${response.status}`); return null; }
-            const responseData = await response.json();
-            if (!response.ok) throw new Error(responseData.message || `Erreur HTTP ${response.status}`);
-            return responseData;
-        } catch (error) { console.error(`Erreur appel ${method} ${endpoint}:`, error); throw error; }
-    }
     get(endpoint, params = null) { return this._request('GET', endpoint, params); }
     post(endpoint, body = null, isFormData = false) { return this._request('POST', endpoint, body, isFormData); }
     put(endpoint, body = null, isFormData = false) { return this._request('PUT', endpoint, body, isFormData); }
@@ -1402,5 +1383,3 @@ function collectFormDataWithFiles(form) {
 // getQueryParam (Identique v8)
 function getQueryParam(param) { const urlParams = new URLSearchParams(window.location.search); return urlParams.get(param); }
 
-// getCookie (Identique v8)
-function getCookie(name) { const nameEQ = name + "="; const ca = document.cookie.split(';'); for (let i = 0; i < ca.length; i++) { let c = ca[i]; while (c.charAt(0) === ' ') c = c.substring(1, c.length); if (c.indexOf(nameEQ) === 0) return decodeURIComponent(c.substring(nameEQ.length, c.length)); } return null; }
