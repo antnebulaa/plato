@@ -53,6 +53,8 @@ function initAuthForms() {
     forms.forEach(form => {
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
+            console.log('[DEBUG] event.preventDefault() appelé pour le formulaire:', form.id || form.getAttribute('data-xano-form')); // Log pour confirmer
+
             const endpoint = form.getAttribute('data-xano-form');
             const method = (form.getAttribute('data-xano-form-method') || 'POST').toUpperCase(); // Devrait être POST
 
