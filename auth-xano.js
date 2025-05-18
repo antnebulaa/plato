@@ -1,220 +1,290 @@
 // auth-xano.js
 
-// --- Classe XanoClient (peut être partagée ou dupliquée/importée depuis votre autre script) ---
-// Assurez-vous que cette classe est disponible. Si elle est dans property-editor-form-v10.js,
-// et que les deux scripts sont chargés sur la même page, elle sera accessible.
-// Sinon, copiez-la ici ou créez un fichier JS séparé pour elle et importez-la.
-/*
-class XanoClient {
-    constructor(config) { this.apiGroupBaseUrl = config.apiGroupBaseUrl; this.authToken = null; }
-    setAuthToken(token) { this.authToken = token; }
-    // ... (méthodes _request, get, post, put, patch, delete) ...
-    // (Référez-vous à votre script property-editor-form-v10.js pour la définition complète)
-}
-*/
-
-// --- Fonctions Utilitaires pour les Cookies (identiques à property-editor-form-v10.js) ---
-function setCookie(name, value, days) {
-    let expires = "";
-    if (days) {
-        const date = new Date();
-        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-        expires = "; expires=" + date.toUTCString();
-    }
-    document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=Lax"; // SameSite=Lax est une bonne pratique
-}
-
-function getCookie(name) {
-    const nameEQ = name + "=";
-    const ca = document.cookie.split(';');
-    for (let i = 0; i < ca.length; i++) {
-        let c = ca[i];
-        while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-        if (c.indexOf(nameEQ) === 0) return decodeURIComponent(c.substring(nameEQ.length, c.length));
-    }
-    return null;
-}
-
-function eraseCookie(name) {
-    document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Lax';
-}
-
-
-// --- Instance XanoClient pour l'Authentification ---
-// Remplacez par l'URL de base de votre groupe d'API Xano
-const authApiBaseUrl = 'https://xwxl-obyg-b3e3.p7.xano.io/api:DbT4FHUS'; // Adaptez ceci !
-const authXanoClient = new XanoClient({ apiGroupBaseUrl: authApiBaseUrl });
-
-
-// --- Logique de gestion des formulaires d'authentification ---
-function initAuthForms() {
-    const forms = document.querySelectorAll('form[data-xano-form^="auth/"]'); // Cible les formulaires commençant par "auth/"
-
-    forms.forEach(form => {
-        form.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            console.log('[DEBUG] event.preventDefault() appelé pour le formulaire:', form.id || form.getAttribute('data-xano-form')); // Log pour confirmer
-
-            const endpoint = form.getAttribute('data-xano-form');
-            const method = (form.getAttribute('data-xano-form-method') || 'POST').toUpperCase(); // Devrait être POST
-
-            const loadingElement = form.querySelector('[data-xano-form-loading]');
-            const errorElement = form.querySelector('[data-xano-form-error]');
-            const submitButton = form.querySelector('button[type="submit"], input[type="submit"]');
-
-            if (errorElement) errorElement.style.display = 'none';
-            if (loadingElement) loadingElement.style.display = 'block';
-            if (submitButton) submitButton.disabled = true;
-
-            // Collecter les données du formulaire
-            // La fonction collectFormDataWithFiles de votre autre script est plus complexe
-            // Pour l'auth, on a généralement que des champs simples, pas de fichiers.
-            const formData = new FormData(form);
-            const formObject = {};
-            formData.forEach((value, key) => {
-                // Si vous utilisez data-xano-field-name, ajustez la collecte ici
-                // Pour l'instant, on suppose que les 'name' des inputs correspondent aux clés attendues par Xano
-                formObject[key] = value;
-            });
-
-            try {
-                let responseData;
-                // Pour signup et login, on s'attend à envoyer un corps JSON, pas FormData directement
-                // XanoClient.post gère la conversion en JSON si isFormData est false (par défaut)
-                if (endpoint === 'auth/signup') {
-                    responseData = await authXanoClient.post(endpoint, formObject);
-                    console.log('Login successful:', responseData);
-                    // Gérer la réponse du signup
-                    console.log('Signup successful:', responseData);
-                    alert('Inscription réussie ! Vous pouvez maintenant vous connecter.');
-                    // Optionnel : Si Xano retourne un token au signup, connectez l'utilisateur directement
-                    if (responseData.authToken) { // Adaptez le nom du champ du token
-                        setCookie('xano_auth_token', responseData.authToken, 7); // Stocke le token pour 7 jours
-                        // Rediriger vers une page de profil ou tableau de bord
-                        window.location.href = '/'; // Adaptez la page de redirection
-                        console.log('[DEBUG] Redirection désactivée temporairement. Token reçu:', responseData.authToken); // Log pour confirmer
-
-                    } else {
-                        // Rediriger vers la page de login
-                        window.location.href = '/signin'; // Adaptez la page de redirection
-                    }
-                } else if (endpoint === 'auth/login') {
-                    responseData = await authXanoClient.post(endpoint, formObject);
-                    // Gérer la réponse du login
-                    console.log('Login successful:', responseData);
-                    if (responseData.authToken) { // Adaptez le nom du champ du token
-                        setCookie('xano_auth_token', responseData.authToken, 7); // Stocke le token pour 7 jours
-                        // Rediriger vers une page de profil ou tableau de bord
-                        window.location.href = '/'; // Adaptez la page de redirection
-                    } else {
-                        throw new Error(responseData.message || 'Token non reçu après connexion.');
-                    }
-                } else {
-                    throw new Error(`Endpoint d'authentification non supporté: ${endpoint}`);
-                }
-
-            } catch (error) {
-                console.error(`Erreur avec ${endpoint}:`, error);
-                if (errorElement) {
-                    errorElement.textContent = error.message || `Une erreur est survenue lors de : ${endpoint}.`;
-                    errorElement.style.display = 'block';
-                }
-            } finally {
-                if (loadingElement) loadingElement.style.display = 'none';
-                if (submitButton) submitButton.disabled = false;
-            }
-        });
-    });
-}
-
-// --- Gestion de la Déconnexion ---
-function handleLogout() {
-    const logoutButton = document.getElementById('logout-button'); // Assurez-vous d'avoir un bouton avec cet ID
-    if (logoutButton) {
-        logoutButton.addEventListener('click', function(e) {
-            e.preventDefault();
-            eraseCookie('xano_auth_token');
-            // Optionnel: appeler un endpoint Xano /auth/logout si vous voulez invalider le token côté serveur
-            // authXanoClient.post('auth/logout').then(...).catch(...);
-            alert('Vous avez été déconnecté.');
-            window.location.href = '/signin'; // Rediriger vers la page de login
-        });
-    }
-}
-
-// --- Vérification de l'état de connexion et protection des routes ---
-async function checkAuthStatusAndProtectRoutes() {
-    const token = getCookie('xano_auth_token');
-    const body = document.body; // Pour ajouter des classes contrôlant la visibilité
-
-    if (token) {
-        authXanoClient.setAuthToken(token); // Appliquer le token au client Xano
-        try {
-            const userData = await authXanoClient.get('auth/me'); // Endpoint pour récupérer les infos utilisateur
-            console.log('Utilisateur connecté:', userData);
-            // L'utilisateur est connecté
-            body.classList.add('user-is-logged-in');
-            body.classList.remove('user-is-logged-out');
-
-            // Afficher les éléments pour utilisateurs connectés et masquer ceux pour non-connectés
-            document.querySelectorAll('.show-if-logged-in').forEach(el => el.style.display = 'block'); // Ou la classe de display que vous utilisez
-            document.querySelectorAll('.hide-if-logged-in').forEach(el => el.style.display = 'none');
-
-
-            // Protection de route : si on est sur login/signup et qu'on est déjà connecté, rediriger
-            if (window.location.pathname === '/login/' || window.location.pathname === '/signup/') { // Adaptez les chemins
-                window.location.href = '/dashboard'; // Adaptez
-            }
-
-        } catch (error) {
-            console.error('Token invalide ou session expirée:', error);
-            eraseCookie('xano_auth_token'); // Supprimer le token invalide
-            authXanoClient.setAuthToken(null);
-            body.classList.add('user-is-logged-out');
-            body.classList.remove('user-is-logged-in');
-            document.querySelectorAll('.show-if-logged-out').forEach(el => el.style.display = 'block');
-            document.querySelectorAll('.hide-if-logged-out').forEach(el => el.style.display = 'none');
-
-            // Protection de route : si on est sur une page protégée et pas connecté, rediriger vers login
-            if (body.hasAttribute('data-requires-auth')) { // Ajoutez cet attribut aux <body> des pages protégées
-                window.location.href = '/login'; // Adaptez
-            }
-        }
-    } else {
-        // L'utilisateur n'est pas connecté
-        body.classList.add('user-is-logged-out');
-        body.classList.remove('user-is-logged-in');
-        document.querySelectorAll('.show-if-logged-out').forEach(el => el.style.display = 'block');
-        document.querySelectorAll('.hide-if-logged-out').forEach(el => el.style.display = 'none');
-
-        // Protection de route
-        if (body.hasAttribute('data-requires-auth')) {
-            window.location.href = '/login'; // Adaptez
-        }
-    }
-}
-
-
-// --- Initialisation au chargement du DOM ---
 document.addEventListener('DOMContentLoaded', function() {
-    // S'assurer que XanoClient est défini (copiez/collez la définition ou importez)
+    console.log("[AUTH_SCRIPT] DOMContentLoaded - Initialisation du système d'authentification Xano.");
+
+    // Vérifier si XanoClient est défini (doit venir de xano-client-utils.js)
     if (typeof XanoClient === 'undefined') {
-        console.error("XanoClient n'est pas défini. Assurez-vous que la classe est incluse.");
-        // Définition de secours (à remplacer par la vraie définition de votre autre script)
-        class XanoClient {
-            constructor(config) { this.apiGroupBaseUrl = config.apiGroupBaseUrl; this.authToken = null; console.warn("XanoClient: Utilisation d'une définition de secours."); }
-            setAuthToken(token) { this.authToken = token; }
-            async _request(method, endpoint, paramsOrBody = null, isFormData = false) { console.error("XanoClient._request non implémenté dans la version de secours"); throw new Error("XanoClient non pleinement implémenté"); }
-            get(endpoint, params = null) { return this._request('GET', endpoint, params); }
-            post(endpoint, body = null, isFormData = false) { return this._request('POST', endpoint, body, isFormData); }
-        }
-        // Collez ici la définition complète de XanoClient de votre autre fichier si vous n'avez pas de système de modules
+        console.error("[AUTH_SCRIPT] ERREUR CRITIQUE: La classe XanoClient n'est pas définie. Assurez-vous que xano-client-utils.js est chargé AVANT auth-xano.js.");
+        return;
+    }
+    if (typeof getCookie !== 'function' || typeof setCookie !== 'function' || typeof eraseCookie !== 'function') {
+        console.error("[AUTH_SCRIPT] ERREUR CRITIQUE: Les fonctions Cookie ne sont pas définies. Assurez-vous que xano-client-utils.js est chargé AVANT auth-xano.js.");
+        return;
     }
 
+    // Configurez ceci avec l'URL de base de votre API Xano pour les endpoints d'authentification
+    const AUTH_XANO_API_BASE_URL = 'https://xwxl-obyg-b3e3.p7.xano.io/api:qom0bt4V'; // ADAPTEZ CETTE URL !
+    const authXanoClient = new XanoClient({ apiGroupBaseUrl: AUTH_XANO_API_BASE_URL });
+ 
+    // IDs de vos éléments HTML (adaptez si nécessaire)
+    const LOGIN_FORM_ID = 'login-form';
+    const LOGIN_BUTTON_ID = 'login-button'; // Doit être type="button"
+    const SIGNUP_FORM_ID = 'signup-form';
+    const SIGNUP_BUTTON_ID = 'signup-button'; // Doit être type="button"
+    const LOGOUT_BUTTON_ID = 'logout-button';
 
-    initAuthForms();
+    // URLs de redirection (adaptez si nécessaire)
+    const REDIRECT_URL_AFTER_LOGIN = '/dashboard'; // Exemple
+    const REDIRECT_URL_AFTER_LOGOUT = '/login';  // Exemple
+    const REDIRECT_URL_IF_ALREADY_LOGGED_IN = '/dashboard'; // Si on visite login/signup étant déjà connecté
+
+    // --- Initialisation du formulaire de Login ---
+    function initLoginForm() {
+        const loginForm = document.getElementById(LOGIN_FORM_ID);
+        const loginButton = document.getElementById(LOGIN_BUTTON_ID);
+
+        if (loginForm && loginButton) {
+            console.log(`[AUTH_SCRIPT] Formulaire de login (#${LOGIN_FORM_ID}) et bouton (#${LOGIN_BUTTON_ID}) trouvés.`);
+            if (loginButton.type !== 'button') {
+                console.warn(`[AUTH_SCRIPT] AVERTISSEMENT: Le bouton de login (#${LOGIN_BUTTON_ID}) devrait être de type="button" pour éviter la soumission native.`);
+            }
+
+            loginButton.addEventListener('click', async function() {
+                console.log('[AUTH_SCRIPT] Clic sur le bouton de login.');
+
+                // Récupérer les éléments de manière robuste
+                const emailInput = loginForm.querySelector('input[name="email"], input[data-xano-field-name="email"]');
+                const passwordInput = loginForm.querySelector('input[name="password"], input[data-xano-field-name="password"]');
+                const loadingElement = loginForm.querySelector('[data-xano-form-loading]');
+                const errorElement = loginForm.querySelector('[data-xano-form-error]');
+
+                if (!emailInput || !passwordInput) {
+                    console.error('[AUTH_SCRIPT] Champs email ou mot de passe non trouvés dans le formulaire de login.');
+                    if (errorElement) {
+                        errorElement.textContent = 'Erreur interne du formulaire (champs manquants).';
+                        errorElement.style.display = 'block';
+                    }
+                    return;
+                }
+
+                const email = emailInput.value;
+                const password = passwordInput.value;
+
+                if (!email || !password) {
+                    if (errorElement) {
+                        errorElement.textContent = 'Veuillez entrer votre email et mot de passe.';
+                        errorElement.style.display = 'block';
+                    }
+                    return;
+                }
+
+                if (errorElement) errorElement.style.display = 'none';
+                if (loadingElement) loadingElement.style.display = 'block';
+                loginButton.disabled = true;
+
+                try {
+                    // Adaptez 'auth/login' si votre endpoint Xano a un nom différent
+                    const responseData = await authXanoClient.post('auth/login', { email, password });
+
+                    if (responseData && responseData.authToken) { // Adaptez 'authToken' au nom réel du champ token dans la réponse Xano
+                        console.log('[AUTH_SCRIPT] Login Xano réussi, token reçu.');
+                        setCookie('xano_auth_token', responseData.authToken, 7); // Stocke pour 7 jours
+                        // Appeler checkAuthStatusAndProtectRoutes pour mettre à jour l'UI immédiatement avant redirection
+                        await checkAuthStatusAndProtectRoutes();
+                        window.location.href = REDIRECT_URL_AFTER_LOGIN;
+                    } else {
+                        throw new Error(responseData.message || 'Token d\'authentification manquant ou réponse invalide de Xano.');
+                    }
+                } catch (error) {
+                    console.error('[AUTH_SCRIPT] Erreur de login Xano:', error);
+                    if (errorElement) {
+                        errorElement.textContent = error.message || 'Échec de la connexion. Vérifiez vos identifiants.';
+                        errorElement.style.display = 'block';
+                    }
+                } finally {
+                    if (loadingElement) loadingElement.style.display = 'none';
+                    loginButton.disabled = false;
+                }
+            });
+        } else {
+            if (document.getElementById(LOGIN_FORM_ID) && !document.getElementById(LOGIN_BUTTON_ID)) {
+                 console.warn(`[AUTH_SCRIPT] Formulaire de login (#${LOGIN_FORM_ID}) trouvé, mais bouton (#${LOGIN_BUTTON_ID}) introuvable.`);
+            }
+            // Pas d'erreur si le formulaire n'est pas sur la page, c'est normal
+        }
+    }
+
+    // --- Initialisation du formulaire de Signup ---
+    function initSignupForm() {
+        const signupForm = document.getElementById(SIGNUP_FORM_ID);
+        const signupButton = document.getElementById(SIGNUP_BUTTON_ID);
+
+        if (signupForm && signupButton) {
+            console.log(`[AUTH_SCRIPT] Formulaire de signup (#${SIGNUP_FORM_ID}) et bouton (#${SIGNUP_BUTTON_ID}) trouvés.`);
+            if (signupButton.type !== 'button') {
+                console.warn(`[AUTH_SCRIPT] AVERTISSEMENT: Le bouton de signup (#${SIGNUP_BUTTON_ID}) devrait être de type="button".`);
+            }
+
+            signupButton.addEventListener('click', async function() {
+                console.log('[AUTH_SCRIPT] Clic sur le bouton de signup.');
+
+                const nameInput = signupForm.querySelector('input[name="name"], input[data-xano-field-name="name"]'); // Optionnel
+                const emailInput = signupForm.querySelector('input[name="email"], input[data-xano-field-name="email"]');
+                const passwordInput = signupForm.querySelector('input[name="password"], input[data-xano-field-name="password"]');
+                const loadingElement = signupForm.querySelector('[data-xano-form-loading]');
+                const errorElement = signupForm.querySelector('[data-xano-form-error]');
+
+                if (!emailInput || !passwordInput) { // nameInput est optionnel
+                    console.error('[AUTH_SCRIPT] Champs email ou password non trouvés dans le formulaire de signup.');
+                    if (errorElement) {
+                        errorElement.textContent = 'Erreur interne du formulaire (champs manquants).';
+                        errorElement.style.display = 'block';
+                    }
+                    return;
+                }
+
+                const name = nameInput ? nameInput.value : undefined;
+                const email = emailInput.value;
+                const password = passwordInput.value;
+
+                if (!email || !password) { // Ajoutez une validation pour le nom si requis
+                    if (errorElement) {
+                        errorElement.textContent = 'Veuillez remplir l\'email et le mot de passe.';
+                        errorElement.style.display = 'block';
+                    }
+                    return;
+                }
+                // Ajoutez ici une validation plus poussée si nécessaire (format email, complexité mdp)
+
+                if (errorElement) errorElement.style.display = 'none';
+                if (loadingElement) loadingElement.style.display = 'block';
+                signupButton.disabled = true;
+
+                try {
+                    const payload = { email, password };
+                    if (name) payload.name = name; // N'ajoute le nom que s'il est fourni
+
+                    // Adaptez 'auth/signup' si votre endpoint Xano a un nom différent
+                    const responseData = await authXanoClient.post('auth/signup', payload);
+                    console.log('[AUTH_SCRIPT] Signup Xano réussi:', responseData);
+
+                    // Décidez si vous voulez connecter l'utilisateur directement après signup
+                    if (responseData && responseData.authToken) { // Si Xano retourne un token au signup
+                        setCookie('xano_auth_token', responseData.authToken, 7);
+                        await checkAuthStatusAndProtectRoutes();
+                        window.location.href = REDIRECT_URL_AFTER_LOGIN; // Ou une page de bienvenue
+                    } else {
+                        // Si Xano ne retourne pas de token (l'utilisateur doit se logger séparément)
+                        alert('Inscription réussie ! Vous pouvez maintenant vous connecter.');
+                        window.location.href = REDIRECT_URL_AFTER_LOGOUT; // Redirige vers la page de login
+                    }
+
+                } catch (error) {
+                    console.error('[AUTH_SCRIPT] Erreur de signup Xano:', error);
+                    if (errorElement) {
+                        errorElement.textContent = error.message || 'Échec de l\'inscription.';
+                        errorElement.style.display = 'block';
+                    }
+                } finally {
+                    if (loadingElement) loadingElement.style.display = 'none';
+                    signupButton.disabled = false;
+                }
+            });
+        } else {
+             if (document.getElementById(SIGNUP_FORM_ID) && !document.getElementById(SIGNUP_BUTTON_ID)) {
+                 console.warn(`[AUTH_SCRIPT] Formulaire de signup (#${SIGNUP_FORM_ID}) trouvé, mais bouton (#${SIGNUP_BUTTON_ID}) introuvable.`);
+            }
+        }
+    }
+
+    // --- Gestion de la Déconnexion ---
+    function handleLogout() {
+        const logoutButton = document.getElementById(LOGOUT_BUTTON_ID);
+        if (logoutButton) {
+            console.log(`[AUTH_SCRIPT] Bouton de déconnexion (#${LOGOUT_BUTTON_ID}) trouvé.`);
+            logoutButton.addEventListener('click', async function(e) {
+                e.preventDefault();
+                console.log('[AUTH_SCRIPT] Clic sur le bouton de déconnexion.');
+                eraseCookie('xano_auth_token');
+                authXanoClient.setAuthToken(null); // Vider le token dans l'instance client
+
+                // Optionnel : appeler un endpoint Xano /auth/logout pour invalider le token côté serveur
+                // try {
+                //     await authXanoClient.post('auth/logout'); // Assurez-vous que cet endpoint existe et est configuré
+                //     console.log('[AUTH_SCRIPT] Token invalidé côté serveur (si endpoint /auth/logout existe).');
+                // } catch (logoutError) {
+                //     console.warn('[AUTH_SCRIPT] Erreur lors de l\'appel à /auth/logout (endpoint optionnel):', logoutError);
+                // }
+
+                // Mettre à jour l'UI et rediriger
+                await checkAuthStatusAndProtectRoutes(); // Met à jour l'UI pour refléter l'état déconnecté
+                window.location.href = REDIRECT_URL_AFTER_LOGOUT;
+            });
+        }
+    }
+
+    // --- Vérification de l'état de connexion et protection des routes ---
+    async function checkAuthStatusAndProtectRoutes() {
+        console.log('[AUTH_SCRIPT] Vérification du statut d\'authentification...');
+        const token = getCookie('xano_auth_token');
+        const body = document.body;
+
+        // Classes pour contrôler la visibilité des éléments (à styler en CSS)
+        const CLASS_LOGGED_IN = 'user-is-logged-in';
+        const CLASS_LOGGED_OUT = 'user-is-logged-out';
+
+        // Sélecteurs pour les éléments à afficher/masquer (ajoutez ces classes à vos éléments dans Webflow)
+        const SHOW_IF_LOGGED_IN_SELECTOR = '.show-if-logged-in';
+        const HIDE_IF_LOGGED_IN_SELECTOR = '.hide-if-logged-in';
+        // Alternativement, vous pouvez utiliser les classes du body pour styler directement
+        // Exemple CSS:
+        // body.user-is-logged-out .show-if-logged-in { display: none !important; }
+        // body.user-is-logged-in .hide-if-logged-in { display: none !important; }
+
+
+        if (token) {
+            authXanoClient.setAuthToken(token);
+            try {
+                // Adaptez 'auth/me' si votre endpoint Xano a un nom différent
+                const userData = await authXanoClient.get('auth/me');
+                if (userData) { // Assurez-vous que userData n'est pas null ou undefined
+                    console.log('[AUTH_SCRIPT] Utilisateur connecté:', userData);
+                    body.classList.add(CLASS_LOGGED_IN);
+                    body.classList.remove(CLASS_LOGGED_OUT);
+
+                    document.querySelectorAll(SHOW_IF_LOGGED_IN_SELECTOR).forEach(el => el.style.display = ''); // Ou votre style d'affichage par défaut
+                    document.querySelectorAll(HIDE_IF_LOGGED_IN_SELECTOR).forEach(el => el.style.display = 'none');
+
+
+                    const currentPagePath = window.location.pathname;
+                    if (currentPagePath === '/login/' || currentPagePath === '/signin/' || currentPagePath === '/signup/') { // Adaptez les chemins
+                        console.log('[AUTH_SCRIPT] Utilisateur connecté sur page login/signup, redirection vers dashboard.');
+                        window.location.href = REDIRECT_URL_IF_ALREADY_LOGGED_IN;
+                    }
+                    return true; // Utilisateur authentifié
+                } else {
+                     // Si auth/me retourne null ou pas de données utilisateur valides malgré un token
+                    throw new Error("Réponse de /auth/me invalide ou utilisateur non trouvé.");
+                }
+            } catch (error) {
+                console.warn('[AUTH_SCRIPT] Token invalide ou session expirée:', error.message);
+                eraseCookie('xano_auth_token');
+                authXanoClient.setAuthToken(null);
+                // Continue pour définir l'état comme déconnecté
+            }
+        }
+
+        // Si pas de token ou si le token était invalide
+        console.log('[AUTH_SCRIPT] Utilisateur non connecté ou token invalide.');
+        body.classList.add(CLASS_LOGGED_OUT);
+        body.classList.remove(CLASS_LOGGED_IN);
+
+        document.querySelectorAll(SHOW_IF_LOGGED_IN_SELECTOR).forEach(el => el.style.display = 'none');
+        document.querySelectorAll(HIDE_IF_LOGGED_IN_SELECTOR).forEach(el => el.style.display = ''); // Ou votre style d'affichage par défaut
+
+        // Protection de route pour les pages nécessitant une authentification
+        // Ajoutez data-requires-auth="true" à la balise <body> des pages concernées dans Webflow
+        if (body.hasAttribute('data-requires-auth') && window.location.pathname !== REDIRECT_URL_AFTER_LOGOUT && !window.location.pathname.endsWith(REDIRECT_URL_AFTER_LOGOUT + '/')) {
+            console.log('[AUTH_SCRIPT] Page protégée, utilisateur non connecté. Redirection vers login.');
+            window.location.href = REDIRECT_URL_AFTER_LOGOUT;
+        }
+        return false; // Utilisateur non authentifié
+    }
+
+    // --- Appel des initialisations ---
+    initLoginForm();
+    initSignupForm();
     handleLogout();
-    checkAuthStatusAndProtectRoutes(); // Appeler cette fonction pour gérer l'état au chargement
-
-    console.log("Système d'authentification Xano initialisé.");
+    checkAuthStatusAndProtectRoutes(); // Vérifier l'état au chargement initial de la page
 });
