@@ -53,7 +53,6 @@ function initAuthForms() {
     forms.forEach(form => {
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
-            e.stopImmediatePropagation();
             console.log('[DEBUG] event.preventDefault() appelé pour le formulaire:', form.id || form.getAttribute('data-xano-form')); // Log pour confirmer
 
             const endpoint = form.getAttribute('data-xano-form');
