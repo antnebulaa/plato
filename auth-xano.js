@@ -42,8 +42,9 @@ function eraseCookie(name) {
 
 // --- Instance XanoClient pour l'Authentification ---
 // Remplacez par l'URL de base de votre groupe d'API Xano
-const authApiBaseUrl = 'https://YOUR_XANO_BASE_URL.xano.io/api:YOUR_API_GROUP'; // Adaptez ceci !
+const authApiBaseUrl = 'https://xwxl-obyg-b3e3.p7.xano.io/api:DbT4FHUS'; // Adaptez ceci !
 const authXanoClient = new XanoClient({ apiGroupBaseUrl: authApiBaseUrl });
+
 
 // --- Logique de gestion des formulaires d'authentification ---
 function initAuthForms() {
