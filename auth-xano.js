@@ -132,7 +132,7 @@ function handleLogout() {
             // Optionnel: appeler un endpoint Xano /auth/logout si vous voulez invalider le token côté serveur
             // authXanoClient.post('auth/logout').then(...).catch(...);
             alert('Vous avez été déconnecté.');
-            window.location.href = '/login'; // Rediriger vers la page de login
+            window.location.href = '/signin'; // Rediriger vers la page de login
         });
     }
 }
