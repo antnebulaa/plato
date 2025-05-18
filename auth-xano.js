@@ -20,8 +20,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // IDs de vos éléments HTML (adaptez si nécessaire)
     const LOGIN_FORM_ID = 'login-form';
     const LOGIN_BUTTON_ID = 'login-button'; // Doit être type="button"
-    const SIGNUP_FORM_ID = 'signup-form';
-    const SIGNUP_BUTTON_ID = 'signup-button'; // Doit être type="button"
     const LOGOUT_BUTTON_ID = 'logout-button';
 
     // URLs de redirection (adaptez si nécessaire)
@@ -30,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const REDIRECT_URL_IF_ALREADY_LOGGED_IN = '/'; // Si on visite login/signup étant déjà connecté
 
     const SIGNUP_FORM_ID = 'signup-form';
-    const SIGNUP_BUTTON_ID = 'signup-button';
+    const SIGNUP_BUTTON_ID = 'signup-button'; // Doit être type="button"
     const SIGNUP_PASSWORD_INPUT_ID = 'signup-password';
     const SIGNUP_CONFIRM_PASSWORD_INPUT_ID = 'signup-confirm-password';
     const TOGGLE_PASSWORD_VISIBILITY_BTN_ID = 'toggle-password-visibility';
@@ -424,14 +422,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- Appel des initialisations ---
-    initLoginForm();
-    initSignupForm();
-    handleLogout();
-    checkAuthStatusAndProtectRoutes(); // Vérifier l'état au chargement initial de la page
-
     // Assurez-vous que ces fonctions sont bien appelées :
-    if (document.getElementById(LOGIN_FORM_ID)) initLoginForm();
-    if (document.getElementById(SIGNUP_FORM_ID)) initSignupForm();
-    if (document.getElementById(LOGOUT_BUTTON_ID)) handleLogout();
-    checkAuthStatusAndProtectRoutes(); // Toujours vérifier le statut
+   // --- Appel des initialisations ---
+      if (document.getElementById(LOGIN_FORM_ID)) {
+           initLoginForm();
+      }
+     if (document.getElementById(SIGNUP_FORM_ID)) {
+           initSignupForm();
+      }
+     if (document.getElementById(LOGOUT_BUTTON_ID)) {
+           handleLogout();
+      }
+         checkAuthStatusAndProtectRoutes(); // Vérifier l'état au chargement initial de la page
+    
 });
