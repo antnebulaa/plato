@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Configurez ceci avec l'URL de base de votre API Xano pour les endpoints d'authentification
-    const AUTH_XANO_API_BASE_URL = 'https://xwxl-obyg-b3e3.p7.xano.io/api:qom0bt4V'; // ADAPTEZ CETTE URL !
+    const AUTH_XANO_API_BASE_URL = 'https://xwxl-obyg-b3e3.p7.xano.io/api:DbT4FHUS'; // ADAPTEZ CETTE URL !
     const authXanoClient = new XanoClient({ apiGroupBaseUrl: AUTH_XANO_API_BASE_URL });
  
     // IDs de vos éléments HTML (adaptez si nécessaire)
