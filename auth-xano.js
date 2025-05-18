@@ -29,6 +29,88 @@ document.addEventListener('DOMContentLoaded', function() {
     const REDIRECT_URL_AFTER_LOGOUT = '/signin';  // Exemple
     const REDIRECT_URL_IF_ALREADY_LOGGED_IN = '/'; // Si on visite login/signup étant déjà connecté
 
+    const SIGNUP_FORM_ID = 'signup-form';
+    const SIGNUP_BUTTON_ID = 'signup-button';
+    const SIGNUP_PASSWORD_INPUT_ID = 'signup-password';
+    const SIGNUP_CONFIRM_PASSWORD_INPUT_ID = 'signup-confirm-password';
+    const TOGGLE_PASSWORD_VISIBILITY_BTN_ID = 'toggle-password-visibility';
+
+    const PASSWORD_STRENGTH_BAR_ID = 'password-strength-bar';
+    const PASSWORD_STRENGTH_TEXT_ID = 'password-strength-text';
+    const PASSWORD_CRITERIA_CONTAINER_ID = 'password-criteria';
+    const CONFIRM_PASSWORD_ERROR_ID = 'confirm-password-error';
+
+     // --- Logique de vérification de la force du mot de passe ---
+    function checkPasswordStrength(password) {
+        const criteria = {
+            length: password.length >= 8,
+            uppercase: /[A-Z]/.test(password),
+            lowercase: /[a-z]/.test(password),
+            special: /[0-9\W_]/.test(password), // Chiffre OU caractère spécial (non-alphanumérique)
+            // Vérifie s'il n'y a PAS trois caractères identiques consécutifs
+            norepeat: !/(.)\1\1/.test(password) // (a)\1\1 -> aaa. Donc !(aaa) est valide.
+        };
+
+        let score = 0;
+        if (criteria.length) score++;
+        if (criteria.uppercase) score++;
+        if (criteria.lowercase) score++;
+        if (criteria.special) score++;
+        if (criteria.norepeat) score++;
+        // Vous pouvez ajouter un critère pour la confirmation du mot de passe ici si vous le souhaitez
+        // ou le gérer séparément.
+
+        let strengthLevel = 'weak';
+        let strengthText = 'Faible';
+
+        if (score <= 2) {
+            strengthLevel = 'weak';
+            strengthText = 'Faible';
+        } else if (score <= 4) {
+            strengthLevel = 'medium';
+            strengthText = 'Moyen';
+        } else if (score >= 5) { // Tous les critères de base
+            strengthLevel = 'strong';
+            strengthText = 'Fort';
+        }
+        return { criteria, strengthLevel, strengthText, score, totalCriteria: Object.keys(criteria).length };
+    }
+
+    function updatePasswordStrengthUI(password) {
+        const strengthResult = checkPasswordStrength(password);
+        const { criteria, strengthLevel, strengthText } = strengthResult;
+
+        const strengthBar = document.getElementById(PASSWORD_STRENGTH_BAR_ID);
+        const strengthTextElement = document.getElementById(PASSWORD_STRENGTH_TEXT_ID);
+        const criteriaContainer = document.getElementById(PASSWORD_CRITERIA_CONTAINER_ID);
+
+        if (strengthBar) {
+            strengthBar.className = `strength-bar ${strengthLevel}`; // Applique la classe de force
+        }
+        if (strengthTextElement) {
+            strengthTextElement.textContent = `Force : ${strengthText}`;
+            strengthTextElement.className = `strength-text ${strengthLevel}`;
+        }
+
+        if (criteriaContainer) {
+            for (const key in criteria) {
+                const criterionElement = criteriaContainer.querySelector(`.criteria-item[data-criterion="${key}"]`);
+                if (criterionElement) {
+                    if (criteria[key]) {
+                        criterionElement.classList.add('valid');
+                        criterionElement.classList.remove('invalid');
+                    } else {
+                        criterionElement.classList.add('invalid');
+                        criterionElement.classList.remove('valid');
+                    }
+                }
+            }
+        }
+        return strengthResult; // Retourne le résultat pour une utilisation éventuelle dans le handler de signup
+    }
+
+
+
     // --- Initialisation du formulaire de Login ---
     function initLoginForm() {
         const loginForm = document.getElementById(LOGIN_FORM_ID);
@@ -105,47 +187,108 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- Initialisation du formulaire de Signup ---
+     // --- Initialisation du formulaire de Signup (MODIFIÉE) ---
     function initSignupForm() {
         const signupForm = document.getElementById(SIGNUP_FORM_ID);
         const signupButton = document.getElementById(SIGNUP_BUTTON_ID);
+        const passwordInput = document.getElementById(SIGNUP_PASSWORD_INPUT_ID);
+        const confirmPasswordInput = document.getElementById(SIGNUP_CONFIRM_PASSWORD_INPUT_ID);
+        const togglePasswordBtn = document.getElementById(TOGGLE_PASSWORD_VISIBILITY_BTN_ID);
+        const confirmPasswordErrorMsg = document.getElementById(CONFIRM_PASSWORD_ERROR_ID);
 
-        if (signupForm && signupButton) {
-            console.log(`[AUTH_SCRIPT] Formulaire de signup (#${SIGNUP_FORM_ID}) et bouton (#${SIGNUP_BUTTON_ID}) trouvés.`);
+        if (signupForm && signupButton && passwordInput) {
+            console.log(`[AUTH_SCRIPT] Formulaire de signup (#${SIGNUP_FORM_ID}), bouton (#${SIGNUP_BUTTON_ID}), et champ mdp trouvés.`);
             if (signupButton.type !== 'button') {
                 console.warn(`[AUTH_SCRIPT] AVERTISSEMENT: Le bouton de signup (#${SIGNUP_BUTTON_ID}) devrait être de type="button".`);
             }
 
+            // Écouteur pour la saisie du mot de passe
+            passwordInput.addEventListener('input', function() {
+                updatePasswordStrengthUI(this.value);
+                if (confirmPasswordInput) validateConfirmPassword(); // Valider la confirmation si le champ mdp change
+            });
+
+            // Écouteur pour la confirmation du mot de passe
+            if (confirmPasswordInput) {
+                confirmPasswordInput.addEventListener('input', validateConfirmPassword);
+            }
+
+            function validateConfirmPassword() {
+                if (passwordInput.value !== confirmPasswordInput.value) {
+                    confirmPasswordErrorMsg.style.display = 'block';
+                    confirmPasswordInput.setCustomValidity("Les mots de passe ne correspondent pas."); // Pour la validation native HTML5
+                    return false;
+                } else {
+                    confirmPasswordErrorMsg.style.display = 'none';
+                    confirmPasswordInput.setCustomValidity("");
+                    return true;
+                }
+            }
+
+
+            // Afficher/Masquer le mot de passe
+            if (togglePasswordBtn) {
+                togglePasswordBtn.addEventListener('click', function() {
+                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    passwordInput.setAttribute('type', type);
+                    // Change l'icône (exemple avec Material Icons)
+                    this.querySelector('.material-icons-outlined').textContent = type === 'password' ? 'visibility' : 'visibility_off';
+                    if(confirmPasswordInput) { // Aussi pour le champ de confirmation si présent
+                        confirmPasswordInput.setAttribute('type', type);
+                    }
+                });
+            }
+
+
             signupButton.addEventListener('click', async function() {
                 console.log('[AUTH_SCRIPT] Clic sur le bouton de signup.');
 
-                const nameInput = signupForm.querySelector('input[name="name"], input[data-xano-field-name="name"]'); // Optionnel
+                const nameInput = signupForm.querySelector('input[name="name"], input[data-xano-field-name="name"]');
                 const emailInput = signupForm.querySelector('input[name="email"], input[data-xano-field-name="email"]');
-                const passwordInput = signupForm.querySelector('input[name="password"], input[data-xano-field-name="password"]');
+                // passwordInput et confirmPasswordInput déjà récupérés
+
                 const loadingElement = signupForm.querySelector('[data-xano-form-loading]');
                 const errorElement = signupForm.querySelector('[data-xano-form-error]');
 
-                if (!emailInput || !passwordInput) { // nameInput est optionnel
-                    console.error('[AUTH_SCRIPT] Champs email ou password non trouvés dans le formulaire de signup.');
+                if (!emailInput || !passwordInput || !confirmPasswordInput) {
+                    console.error('[AUTH_SCRIPT] Champs email, password ou confirm password non trouvés.');
                     if (errorElement) {
-                        errorElement.textContent = 'Erreur interne du formulaire (champs manquants).';
+                        errorElement.textContent = 'Erreur interne du formulaire.';
                         errorElement.style.display = 'block';
                     }
                     return;
                 }
 
-                const name = nameInput ? nameInput.value : undefined;
-                const email = emailInput.value;
-                const password = passwordInput.value;
+                const name = nameInput ? nameInput.value.trim() : undefined;
+                const email = emailInput.value.trim();
+                const password = passwordInput.value; // Pas de trim pour le mot de passe
 
-                if (!email || !password) { // Ajoutez une validation pour le nom si requis
+                // Validation finale avant soumission
+                if (!email || !password || !confirmPasswordInput.value) {
                     if (errorElement) {
-                        errorElement.textContent = 'Veuillez remplir l\'email et le mot de passe.';
+                        errorElement.textContent = 'Veuillez remplir tous les champs requis.';
                         errorElement.style.display = 'block';
                     }
                     return;
                 }
-                // Ajoutez ici une validation plus poussée si nécessaire (format email, complexité mdp)
+
+                if (!validateConfirmPassword()) { // Vérifie que les mots de passe correspondent
+                     if (errorElement && confirmPasswordErrorMsg) { // S'assurer que l'erreur principale est aussi mise à jour
+                        errorElement.textContent = confirmPasswordErrorMsg.textContent;
+                        errorElement.style.display = 'block';
+                    }
+                    return;
+                }
+
+                const strengthCheck = checkPasswordStrength(password);
+                if (strengthCheck.score < 5) { // Ou un autre seuil que vous jugez "acceptable"
+                    if (errorElement) {
+                        errorElement.textContent = 'Le mot de passe ne respecte pas tous les critères de complexité.';
+                        errorElement.style.display = 'block';
+                    }
+                    return;
+                }
+
 
                 if (errorElement) errorElement.style.display = 'none';
                 if (loadingElement) loadingElement.style.display = 'block';
@@ -153,26 +296,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 try {
                     const payload = { email, password };
-                    if (name) payload.name = name; // N'ajoute le nom que s'il est fourni
+                    if (name) payload.name = name;
 
-                    // Adaptez 'auth/signup' si votre endpoint Xano a un nom différent
-                    const responseData = await authXanoClient.post('auth/signup', payload);
+                    const responseData = await authXanoClient.post('auth/signup', payload); // Adaptez l'endpoint
                     console.log('[AUTH_SCRIPT] Signup Xano réussi:', responseData);
 
-                    // Décidez si vous voulez connecter l'utilisateur directement après signup
-                    if (responseData && responseData.authToken) { // Si Xano retourne un token au signup
+                    if (responseData && responseData.authToken) {
                         setCookie('xano_auth_token', responseData.authToken, 7);
                         await checkAuthStatusAndProtectRoutes();
-                        window.location.href = REDIRECT_URL_AFTER_LOGIN; // Ou une page de bienvenue
+                        window.location.href = REDIRECT_URL_AFTER_LOGIN;
+                    } else if (responseData) { // Inscription réussie mais pas de login auto
+                         alert('Inscription réussie ! Vous pouvez maintenant vous connecter.');
+                         window.location.href = REDIRECT_URL_AFTER_LOGOUT; // Page de login
                     } else {
-                        // Si Xano ne retourne pas de token (l'utilisateur doit se logger séparément)
-                        alert('Inscription réussie ! Vous pouvez maintenant vous connecter.');
-                        window.location.href = REDIRECT_URL_AFTER_LOGOUT; // Redirige vers la page de login
+                        throw new Error("Réponse inattendue du serveur après l'inscription.");
                     }
 
                 } catch (error) {
                     console.error('[AUTH_SCRIPT] Erreur de signup Xano:', error);
                     if (errorElement) {
+                        // Xano peut retourner un message spécifique si l'utilisateur existe déjà
                         errorElement.textContent = error.message || 'Échec de l\'inscription.';
                         errorElement.style.display = 'block';
                     }
@@ -182,9 +325,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         } else {
-             if (document.getElementById(SIGNUP_FORM_ID) && !document.getElementById(SIGNUP_BUTTON_ID)) {
-                 console.warn(`[AUTH_SCRIPT] Formulaire de signup (#${SIGNUP_FORM_ID}) trouvé, mais bouton (#${SIGNUP_BUTTON_ID}) introuvable.`);
-            }
+            // ... (logs si formulaire ou bouton non trouvé)
         }
     }
 
@@ -287,4 +428,10 @@ document.addEventListener('DOMContentLoaded', function() {
     initSignupForm();
     handleLogout();
     checkAuthStatusAndProtectRoutes(); // Vérifier l'état au chargement initial de la page
+
+    // Assurez-vous que ces fonctions sont bien appelées :
+    if (document.getElementById(LOGIN_FORM_ID)) initLoginForm();
+    if (document.getElementById(SIGNUP_FORM_ID)) initSignupForm();
+    if (document.getElementById(LOGOUT_BUTTON_ID)) handleLogout();
+    checkAuthStatusAndProtectRoutes(); // Toujours vérifier le statut
 });
