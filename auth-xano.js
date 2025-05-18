@@ -25,9 +25,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const LOGOUT_BUTTON_ID = 'logout-button';
 
     // URLs de redirection (adaptez si nécessaire)
-    const REDIRECT_URL_AFTER_LOGIN = '/dashboard'; // Exemple
-    const REDIRECT_URL_AFTER_LOGOUT = '/login';  // Exemple
-    const REDIRECT_URL_IF_ALREADY_LOGGED_IN = '/dashboard'; // Si on visite login/signup étant déjà connecté
+    const REDIRECT_URL_AFTER_LOGIN = '/'; // Exemple
+    const REDIRECT_URL_AFTER_LOGOUT = '/signin';  // Exemple
+    const REDIRECT_URL_IF_ALREADY_LOGGED_IN = '/'; // Si on visite login/signup étant déjà connecté
 
     // --- Initialisation du formulaire de Login ---
     function initLoginForm() {
