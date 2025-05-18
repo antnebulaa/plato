@@ -81,6 +81,7 @@ function initAuthForms() {
                 // XanoClient.post gère la conversion en JSON si isFormData est false (par défaut)
                 if (endpoint === 'auth/signup') {
                     responseData = await authXanoClient.post(endpoint, formObject);
+                    console.log('Login successful:', responseData);
                     // Gérer la réponse du signup
                     console.log('Signup successful:', responseData);
                     alert('Inscription réussie ! Vous pouvez maintenant vous connecter.');
@@ -89,6 +90,8 @@ function initAuthForms() {
                         setCookie('xano_auth_token', responseData.authToken, 7); // Stocke le token pour 7 jours
                         // Rediriger vers une page de profil ou tableau de bord
                         window.location.href = '/'; // Adaptez la page de redirection
+                        console.log('[DEBUG] Redirection désactivée temporairement. Token reçu:', responseData.authToken); // Log pour confirmer
+
                     } else {
                         // Rediriger vers la page de login
                         window.location.href = '/signin'; // Adaptez la page de redirection
