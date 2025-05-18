@@ -2,12 +2,17 @@
 
 class XanoClient {
     constructor(config) {
+        if (!config || !config.apiGroupBaseUrl) {
+            throw new Error("Configuration XanoClient: apiGroupBaseUrl est requis.");
+        }
         this.apiGroupBaseUrl = config.apiGroupBaseUrl;
         this.authToken = null;
+        console.log(`[XanoClient] Instance créée pour ${this.apiGroupBaseUrl}`);
     }
 
     setAuthToken(token) {
         this.authToken = token;
+        // console.log("[XanoClient] AuthToken appliqué.");
     }
 
     async _request(method, endpoint, paramsOrBody = null, isFormData = false) {
@@ -30,64 +35,52 @@ class XanoClient {
             }
         } else if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && paramsOrBody) {
             if (isFormData) {
-                options.body = paramsOrBody; // FormData est envoyé tel quel
+                options.body = paramsOrBody;
             } else {
                 options.headers['Content-Type'] = 'application/json';
                 options.body = JSON.stringify(paramsOrBody);
             }
         }
 
+        // console.log(`[XanoClient] Requête: ${method} ${finalUrl}`, options.body ? `Body: ${options.body.substring(0,100)}...` : '');
+
         try {
             const response = await fetch(finalUrl, options);
 
-            // Gérer les réponses sans contenu (ex: 204 No Content pour un DELETE réussi)
             if (response.status === 204 || response.headers.get('content-length') === '0') {
                 if (!response.ok) {
-                    // Même sans contenu, un statut non-ok est une erreur
-                    throw new Error(`Erreur HTTP ${response.status}`);
+                    throw new Error(`Erreur HTTP ${response.status} (No Content)`);
                 }
-                return null; // Ou un objet indiquant le succès, ex: { success: true, status: response.status }
+                // console.log(`[XanoClient] Réponse ${response.status} (No Content) pour ${method} ${finalUrl}`);
+                return null;
             }
 
-            const responseData = await response.json();
+            const responseData = await response.json().catch(e => {
+                console.error(`[XanoClient] Impossible de parser la réponse JSON pour ${method} ${finalUrl}. Status: ${response.status}`, e);
+                throw new Error(`Réponse invalide du serveur (status ${response.status}).`);
+            });
 
             if (!response.ok) {
-                // Utiliser le message d'erreur de Xano s'il existe, sinon un message générique
                 const errorMessage = responseData.message || responseData.error || `Erreur HTTP ${response.status}`;
+                // console.error(`[XanoClient] Erreur API pour ${method} ${finalUrl}: ${errorMessage}`, responseData);
                 throw new Error(errorMessage);
             }
+            // console.log(`[XanoClient] Réponse OK pour ${method} ${finalUrl}`, responseData);
             return responseData;
         } catch (error) {
-            console.error(`Erreur lors de l'appel ${method} ${endpoint}:`, error.message);
-            // Re-lancer l'erreur pour que le code appelant puisse la gérer
-            // Vous pourriez vouloir la "wrapper" dans une erreur plus spécifique si besoin
+            console.error(`[XanoClient] Erreur lors de l'appel ${method} ${endpoint}:`, error.message);
             throw error;
         }
     }
 
-    get(endpoint, params = null) {
-        return this._request('GET', endpoint, params);
-    }
-
-    post(endpoint, body = null, isFormData = false) {
-        return this._request('POST', endpoint, body, isFormData);
-    }
-
-    put(endpoint, body = null, isFormData = false) {
-        return this._request('PUT', endpoint, body, isFormData);
-    }
-
-    patch(endpoint, body = null, isFormData = false) {
-        return this._request('PATCH', endpoint, body, isFormData);
-    }
-
-    // La méthode delete peut envoyer un body JSON (selon la config de votre XanoClient)
-    delete(endpoint, body = null) { // Assume JSON body si body est fourni
-        return this._request('DELETE', endpoint, body, false);
-    }
+    get(endpoint, params = null) { return this._request('GET', endpoint, params); }
+    post(endpoint, body = null, isFormData = false) { return this._request('POST', endpoint, body, isFormData); }
+    put(endpoint, body = null, isFormData = false) { return this._request('PUT', endpoint, body, isFormData); }
+    patch(endpoint, body = null, isFormData = false) { return this._request('PATCH', endpoint, body, isFormData); }
+    delete(endpoint, body = null) { return this._request('DELETE', endpoint, body, false); }
 }
 
-// Les fonctions cookie sont nécessaires pour auth-xano.js et potentiellement d'autres scripts
+// Fonctions Cookie
 function setCookie(name, value, days) {
     let expires = "";
     if (days) {
@@ -95,10 +88,10 @@ function setCookie(name, value, days) {
         date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
         expires = "; expires=" + date.toUTCString();
     }
-    // Note: Pour localhost sans HTTPS, 'Secure' ne fonctionnera pas.
-    // Pour la production sur HTTPS, ajoutez '; Secure'
-    // document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=Lax; Secure";
+    // En production sur HTTPS, ajoutez '; Secure'
+    // Pour l'instant, on omet 'Secure' pour faciliter les tests sur localhost si besoin.
     document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=Lax";
+    // console.log(`[Cookie] Cookie "${name}" créé/mis à jour.`);
 }
 
 function getCookie(name) {
@@ -107,18 +100,16 @@ function getCookie(name) {
     for (let i = 0; i < ca.length; i++) {
         let c = ca[i];
         while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-        if (c.indexOf(nameEQ) === 0) return decodeURIComponent(c.substring(nameEQ.length, c.length));
+        if (c.indexOf(nameEQ) === 0) {
+            // console.log(`[Cookie] Cookie "${name}" trouvé.`);
+            return decodeURIComponent(c.substring(nameEQ.length, c.length));
+        }
     }
+    // console.log(`[Cookie] Cookie "${name}" non trouvé.`);
     return null;
 }
 
 function eraseCookie(name) {
-    // Assurez-vous que les options Path et Domain (si utilisées lors de la création) sont les mêmes.
-    // document.cookie = name + '=; Path=/; Domain=.votredomaine.com; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Lax; Secure';
     document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Lax';
+    // console.log(`[Cookie] Cookie "${name}" effacé.`);
 }
-
-// Optionnel : si vous voulez utiliser les imports/exports de modules ES6 (nécessite <script type="module">)
-// export { XanoClient, setCookie, getCookie, eraseCookie };
-// Si vous n'utilisez pas type="module", ces fonctions et la classe seront simplement globales
-// une fois le fichier xano-client-utils.js chargé.
