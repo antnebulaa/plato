@@ -88,10 +88,10 @@ function initAuthForms() {
                     if (responseData.authToken) { // Adaptez le nom du champ du token
                         setCookie('xano_auth_token', responseData.authToken, 7); // Stocke le token pour 7 jours
                         // Rediriger vers une page de profil ou tableau de bord
-                        window.location.href = '/dashboard'; // Adaptez la page de redirection
+                        window.location.href = '/'; // Adaptez la page de redirection
                     } else {
                         // Rediriger vers la page de login
-                        window.location.href = '/login'; // Adaptez la page de redirection
+                        window.location.href = '/signin'; // Adaptez la page de redirection
                     }
                 } else if (endpoint === 'auth/login') {
                     responseData = await authXanoClient.post(endpoint, formObject);
@@ -100,7 +100,7 @@ function initAuthForms() {
                     if (responseData.authToken) { // Adaptez le nom du champ du token
                         setCookie('xano_auth_token', responseData.authToken, 7); // Stocke le token pour 7 jours
                         // Rediriger vers une page de profil ou tableau de bord
-                        window.location.href = '/dashboard'; // Adaptez la page de redirection
+                        window.location.href = '/'; // Adaptez la page de redirection
                     } else {
                         throw new Error(responseData.message || 'Token non reçu après connexion.');
                     }
