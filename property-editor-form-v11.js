@@ -10,7 +10,7 @@
 // 3. Endpoints Xano batch_delete_by_ids et batch_reorder existent et fonctionnent avec les IDs.
  
 
-let xanoClient;
+//let xanoClient;
 let currentSortableInstance = null;
 let modeSelectionActif = false;
 // MODIFIÉ v8 -> v8.3: Contiendra les IDs numériques des photos, pas les paths.
