@@ -137,6 +137,7 @@ function handleGoogleCallback() {
     googleLoginButton.addEventListener('click', handleGoogleLogin);
     googleLoginButton.addEventListener('touchend', handleGoogleLogin);
 
+
      // --- Logique de vérification de la force du mot de passe ---
     function checkPasswordStrength(password) {
         const criteria = {
@@ -274,7 +275,9 @@ function handleGoogleCallback() {
                     if (loadingElement) loadingElement.style.display = 'none';
                     loginButton.disabled = false;
                 }
-            });
+            };
+            loginButton.addEventListener('click', loginHandler);
+            loginButton.addEventListener('touchend', loginHandler);
         } else {
             if (document.getElementById(LOGIN_FORM_ID) && !document.getElementById(LOGIN_BUTTON_ID)) {
                  console.warn(`[AUTH_SCRIPT] Formulaire de login (#${LOGIN_FORM_ID}) trouvé, mais bouton (#${LOGIN_BUTTON_ID}) introuvable.`);
