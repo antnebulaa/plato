@@ -23,6 +23,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const GOOGLE_OAUTH_API_BASE_URL = 'https://xwxl-obyg-b3e3.p7.xano.io/api:Kr4nuSTF';
     const googleAuthXanoClient = new XanoClient({ apiGroupBaseUrl: GOOGLE_OAUTH_API_BASE_URL });
 
+    // --- NOUVEAU : Définir l'URL de callback Xano pour Google ---
+    // C'est l'URL complète de votre endpoint Xano qui gère le retour de Google.
+    // Assurez-vous que cette URL est également configurée comme "URI de redirection autorisé"
+    // dans votre projet Google Cloud Console.
+    const XANO_GOOGLE_CALLBACK_HANDLER_URL = 'https://xwxl-obyg-b3e3.p7.xano.io/api:Kr4nuSTF/oauth/google/continue';
+
+
+
     // IDs de vos éléments HTML (adaptez si nécessaire)
     const LOGIN_FORM_ID = 'login-form';
     const LOGIN_BUTTON_ID = 'login-button'; // Doit être type="button"
@@ -51,7 +59,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (googleLoginButton) {
         console.log('[AUTH_SCRIPT] Bouton de login Google trouvé.');
-        googleLoginButton.addEventListener('click', async function() {
+        googleLoginButton.addEventListener('click', async function(event) {
             event.preventDefault(); 
             console.log('[AUTH_SCRIPT] Clic sur le bouton de login Google.');
             googleLoginButton.disabled = true;
@@ -62,12 +70,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Étape 1: Appeler votre endpoint Xano qui initie le flux OAuth Google
                 // Cet endpoint Xano devrait retourner l'URL d'autorisation Google
                 // Adaptez 'oauth/google/initiate' au nom réel de votre endpoint Xano
-                const response = await googleAuthXanoClient.get('oauth/google/init'); 
+                console.log(`[AUTH_SCRIPT] Appel à Xano /oauth/google/init avec redirect_uri: ${XANO_GOOGLE_CALLBACK_HANDLER_URL}`);
+                const response = await googleAuthXanoClient.get('oauth/google/init', {
+                    redirect_uri: XANO_GOOGLE_CALLBACK_HANDLER_URL
+                });
 
+                console.log('[AUTH_SCRIPT] Réponse de Xano /oauth/google/init:', response); // Log pour voir la réponse
+
+                // Le nom du champ retourné par Xano qui contient l'URL d'autorisation Google
+                // pourrait être 'auth_url', 'authorization_url', 'google_auth_url', etc.
+                // Vérifiez la réponse de Xano. Supposons qu'il s'appelle 'authorization_url'.
                 if (response && response.authorizationUrl) {
                     // Rediriger l'utilisateur vers la page d'autorisation Google
                     window.location.href = response.authorizationUrl;
                 } else {
+                    console.error('[AUTH_SCRIPT] Réponse de Xano /oauth/google/init:', response);
                     throw new Error("URL d'autorisation Google non reçue de Xano.");
                 }
             } catch (error) {
