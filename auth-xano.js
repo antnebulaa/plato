@@ -83,6 +83,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (response && response.authUrl) {
                     // Rediriger l'utilisateur vers la page d'autorisation Google
                     console.log("URL d'autorisation Google:", response.authUrl);
+                    alert("L'URL d'autorisation Google est dans la console. Copiez-la et commentez la ligne window.location.href pour le test.");
                    // window.location.href = response.authUrl;
                 } else {
                     console.error('[AUTH_SCRIPT] Réponse de Xano /oauth/google/init:', response);
