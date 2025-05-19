@@ -387,7 +387,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
                     const currentPagePath = window.location.pathname;
-                    if (currentPagePath === '/login/' || currentPagePath === '/signin/' || currentPagePath === '/signup/') { // Adaptez les chemins
+                    if (currentPagePath === '/signin/' || currentPagePath === '/signin/' || currentPagePath === '/signup/') { // Adaptez les chemins
                         console.log('[AUTH_SCRIPT] Utilisateur connecté sur page login/signup, redirection vers dashboard.');
                         window.location.href = REDIRECT_URL_IF_ALREADY_LOGGED_IN;
                     }
