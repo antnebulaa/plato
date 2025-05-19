@@ -310,17 +310,6 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (initError) { /* ... */ }
 });
 
-// --- Classe XanoClient (Modifiée v8.3 pour DELETE avec body) ---
-class XanoClient {
-   // constructor(config) { this.apiGroupBaseUrl = config.apiGroupBaseUrl; this.authToken = null; }
-  //  setAuthToken(token) { this.authToken = token; }
-  //  get(endpoint, params = null) { return this._request('GET', endpoint, params); }
-  //  post(endpoint, body = null, isFormData = false) { return this._request('POST', endpoint, body, isFormData); }
-  //  put(endpoint, body = null, isFormData = false) { return this._request('PUT', endpoint, body, isFormData); }
-  //  patch(endpoint, body = null, isFormData = false) { return this._request('PATCH', endpoint, body, isFormData); }
-    // MODIFIÉ v8 -> v8.3: La méthode delete peut maintenant envoyer un body JSON
-  //  delete(endpoint, body = null) { return this._request('DELETE', endpoint, body, false); } // false = assume JSON body
-}
 
 // --- Initialisation des Formulaires (Identique v8) ---
 function initXanoForms(xanoClient) {
