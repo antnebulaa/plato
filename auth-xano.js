@@ -134,6 +134,8 @@ function handleGoogleCallback() {
         }
     }
 }
+    googleLoginButton.addEventListener('click', handleGoogleLogin);
+    googleLoginButton.addEventListener('touchend', handleGoogleLogin);
 
      // --- Logique de vérification de la force du mot de passe ---
     function checkPasswordStrength(password) {
@@ -217,15 +219,14 @@ function handleGoogleCallback() {
                 console.warn(`[AUTH_SCRIPT] AVERTISSEMENT: Le bouton de login (#${LOGIN_BUTTON_ID}) devrait être de type="button" pour éviter la soumission native.`);
             }
 
-            loginButton.addEventListener('click', async function() {
-                console.log('[AUTH_SCRIPT] Clic sur le bouton de login.');
-
-                // Récupérer les éléments de manière robuste
-                const emailInput = loginForm.querySelector('input[name="email"], input[data-xano-field-name="email"]');
-                const passwordInput = loginForm.querySelector('input[name="password"], input[data-xano-field-name="password"]');
-                const loadingElement = loginForm.querySelector('[data-xano-form-loading]');
-                const errorElement = loginForm.querySelector('[data-xano-form-error]');
-
+            const loginHandler = async function(e) {
+    e.preventDefault();
+    console.log('[AUTH_SCRIPT] Action sur le bouton de login (click ou touchend).');
+    // Récupérer les éléments de manière robuste
+    const emailInput = loginForm.querySelector('input[name="email"], input[data-xano-field-name="email"]');
+    const passwordInput = loginForm.querySelector('input[name="password"], input[data-xano-field-name="password"]');
+    const loadingElement = loginForm.querySelector('[data-xano-form-loading]');
+    const errorElement = loginForm.querySelector('[data-xano-form-error]');
                 if (!emailInput || !passwordInput) {
                     console.error('[AUTH_SCRIPT] Champs email ou mot de passe non trouvés dans le formulaire de login.');
                     if (errorElement) {
