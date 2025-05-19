@@ -102,16 +102,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 }
 
-    // Créez une nouvelle page dans Webflow, par exemple /auth/google/callback
+    // Créez une nouvelle page dans Webflow, par exemple /auth/google/callback-success
 // Cette page sera celle vers laquelle Xano redirigera après avoir traité le callback de Google.
 // Sur cette page, vous mettrez un script pour récupérer le token.
 function handleGoogleCallback() {
     // Vérifier si nous sommes sur la page de callback et s'il y a un token dans l'URL
     const currentPath = window.location.pathname;
-    // Adaptez '/auth/google/callback_success' à l'URL de redirection vers laquelle
+    // Adaptez '/auth/google/callback-success' à l'URL de redirection vers laquelle
         // VOTRE endpoint Xano `oauth/google/continue` redirige le navigateur
         // après avoir traité le code de Google et généré VOTRE token Xano.
-    if (currentPath.includes('/auth/google/callback_success')) {
+    if (currentPath.includes('/auth/google/callback-success')) {
         console.log('[AUTH_SCRIPT] Sur la page de callback Google.');
         const urlParams = new URLSearchParams(window.location.search);
         const xanoToken = urlParams.get('token'); // Ou le nom de paramètre que Xano utilise
