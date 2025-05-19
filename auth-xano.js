@@ -38,6 +38,76 @@ document.addEventListener('DOMContentLoaded', function() {
     const PASSWORD_CRITERIA_CONTAINER_ID = 'password-criteria';
     const CONFIRM_PASSWORD_ERROR_ID = 'confirm-password-error';
 
+    const GOOGLE_LOGIN_BUTTON_ID = 'google-login-button';
+
+    function initGoogleLogin() {
+    const googleLoginButton = document.getElementById(GOOGLE_LOGIN_BUTTON_ID);
+
+    if (googleLoginButton) {
+        console.log('[AUTH_SCRIPT] Bouton de login Google trouvé.');
+        googleLoginButton.addEventListener('click', async function() {
+            console.log('[AUTH_SCRIPT] Clic sur le bouton de login Google.');
+            googleLoginButton.disabled = true;
+            const loadingElement = document.querySelector('#' + LOGIN_FORM_ID + ' [data-xano-form-loading]'); // Ou un indicateur dédié
+            if (loadingElement) loadingElement.style.display = 'block';
+
+            try {
+                // Étape 1: Appeler votre endpoint Xano qui initie le flux OAuth Google
+                // Cet endpoint Xano devrait retourner l'URL d'autorisation Google
+                // Adaptez 'oauth/google/initiate' au nom réel de votre endpoint Xano
+                const response = await authXanoClient.get('oauth/google/initiate');
+
+                if (response && response.authorizationUrl) {
+                    // Rediriger l'utilisateur vers la page d'autorisation Google
+                    window.location.href = response.authorizationUrl;
+                } else {
+                    throw new Error("URL d'autorisation Google non reçue de Xano.");
+                }
+            } catch (error) {
+                console.error('[AUTH_SCRIPT] Erreur lors de l\'initiation du login Google via Xano:', error);
+                const errorDisplay = document.querySelector('#' + LOGIN_FORM_ID + ' [data-xano-form-error]'); // Ou un afficheur d'erreur dédié
+                if (errorDisplay) {
+                    errorDisplay.textContent = error.message || "Erreur avec la connexion Google.";
+                    errorDisplay.style.display = 'block';
+                }
+                if (loadingElement) loadingElement.style.display = 'none';
+                googleLoginButton.disabled = false;
+            }
+        });
+    }
+}
+
+    // Créez une nouvelle page dans Webflow, par exemple /auth/google/callback
+// Cette page sera celle vers laquelle Xano redirigera après avoir traité le callback de Google.
+// Sur cette page, vous mettrez un script pour récupérer le token.
+function handleGoogleCallback() {
+    // Vérifier si nous sommes sur la page de callback et s'il y a un token dans l'URL
+    const currentPath = window.location.pathname;
+    // Adaptez '/auth/google/callback_success' à l'URL de redirection que Xano utilisera
+    if (currentPath.includes('/auth/google/callback_success')) {
+        console.log('[AUTH_SCRIPT] Sur la page de callback Google.');
+        const urlParams = new URLSearchParams(window.location.search);
+        const xanoToken = urlParams.get('token'); // Ou le nom de paramètre que Xano utilise
+
+        if (xanoToken) {
+            console.log('[AUTH_SCRIPT] Token Xano reçu depuis le callback Google:', xanoToken);
+            setCookie('xano_auth_token', xanoToken, 7);
+            // Optionnel: supprimer les paramètres de l'URL pour nettoyer
+            window.history.replaceState({}, document.title, window.location.pathname);
+            // Rediriger vers la page principale ou le dashboard
+            // Mettre à jour l'état d'authentification avant de rediriger
+            checkAuthStatusAndProtectRoutes().then(() => {
+                 window.location.href = REDIRECT_URL_AFTER_LOGIN;
+            });
+        } else {
+            console.error('[AUTH_SCRIPT] Callback Google mais token Xano manquant dans l\'URL.');
+            // Afficher une erreur à l'utilisateur et le rediriger vers la page de login
+            alert("Une erreur est survenue lors de la connexion avec Google. Veuillez réessayer.");
+            window.location.href = REDIRECT_URL_AFTER_LOGOUT; // Page de login
+        }
+    }
+}
+
      // --- Logique de vérification de la force du mot de passe ---
     function checkPasswordStrength(password) {
         const criteria = {
@@ -424,15 +494,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Appel des initialisations ---
     // Assurez-vous que ces fonctions sont bien appelées :
    // --- Appel des initialisations ---
-      if (document.getElementById(LOGIN_FORM_ID)) {
-           initLoginForm();
-      }
-     if (document.getElementById(SIGNUP_FORM_ID)) {
-           initSignupForm();
-      }
-     if (document.getElementById(LOGOUT_BUTTON_ID)) {
-           handleLogout();
-      }
-         checkAuthStatusAndProtectRoutes(); // Vérifier l'état au chargement initial de la page
+     // --- Appel des initialisations ---
+    if (document.getElementById(LOGIN_FORM_ID)) initLoginForm();
+    if (document.getElementById(SIGNUP_FORM_ID)) initSignupForm();
+    if (document.getElementById(LOGOUT_BUTTON_ID)) handleLogout();
+    if (document.getElementById(GOOGLE_LOGIN_BUTTON_ID)) initGoogleLogin(); // <<< NOUVEL APPEL
+
+    handleGoogleCallback();
+    checkAuthStatusAndProtectRoutes(); // Vérifier l'état au chargement initial de la page
     
 });
