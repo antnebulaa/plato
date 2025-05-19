@@ -13,10 +13,16 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
-    // Configurez ceci avec l'URL de base de votre API Xano pour les endpoints d'authentification
-    const AUTH_XANO_API_BASE_URL = 'https://xwxl-obyg-b3e3.p7.xano.io/api:DbT4FHUS'; // ADAPTEZ CETTE URL !
-    const authXanoClient = new XanoClient({ apiGroupBaseUrl: AUTH_XANO_API_BASE_URL });
- 
+    // --- Client pour l'authentification Email/Password ---
+    const AUTH_EMAIL_API_BASE_URL = 'https://xwxl-obyg-b3e3.p7.xano.io/api:DbT4FHUS';
+    const authEmailXanoClient = new XanoClient({ apiGroupBaseUrl: AUTH_EMAIL_API_BASE_URL });
+    // Renommer l'instance précédente pour plus de clarté (ex: authEmailXanoClient au lieu de authXanoClient)
+    // et utiliser authEmailXanoClient pour initLoginForm, initSignupForm, handleLogout, et la partie /auth/me de checkAuthStatus.
+
+    // --- NOUVEAU : Client pour Google OAuth ---
+    const GOOGLE_OAUTH_API_BASE_URL = 'https://xwxl-obyg-b3e3.p7.xano.io/api:Kr4nuSTF';
+    const googleAuthXanoClient = new XanoClient({ apiGroupBaseUrl: GOOGLE_OAUTH_API_BASE_URL });
+
     // IDs de vos éléments HTML (adaptez si nécessaire)
     const LOGIN_FORM_ID = 'login-form';
     const LOGIN_BUTTON_ID = 'login-button'; // Doit être type="button"
@@ -42,10 +48,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function initGoogleLogin() {
     const googleLoginButton = document.getElementById(GOOGLE_LOGIN_BUTTON_ID);
-
-    if (googleLoginButton) {
+        
+        if (googleLoginButton) {
         console.log('[AUTH_SCRIPT] Bouton de login Google trouvé.');
         googleLoginButton.addEventListener('click', async function() {
+            event.preventDefault(); 
             console.log('[AUTH_SCRIPT] Clic sur le bouton de login Google.');
             googleLoginButton.disabled = true;
             const loadingElement = document.querySelector('#' + LOGIN_FORM_ID + ' [data-xano-form-loading]'); // Ou un indicateur dédié
@@ -55,7 +62,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Étape 1: Appeler votre endpoint Xano qui initie le flux OAuth Google
                 // Cet endpoint Xano devrait retourner l'URL d'autorisation Google
                 // Adaptez 'oauth/google/initiate' au nom réel de votre endpoint Xano
-                const response = await authXanoClient.get('oauth/google/initiate');
+                const response = await googleAuthXanoClient.get('oauth/google/init'); 
 
                 if (response && response.authorizationUrl) {
                     // Rediriger l'utilisateur vers la page d'autorisation Google
@@ -83,7 +90,9 @@ document.addEventListener('DOMContentLoaded', function() {
 function handleGoogleCallback() {
     // Vérifier si nous sommes sur la page de callback et s'il y a un token dans l'URL
     const currentPath = window.location.pathname;
-    // Adaptez '/auth/google/callback_success' à l'URL de redirection que Xano utilisera
+    // Adaptez '/auth/google/callback_success' à l'URL de redirection vers laquelle
+        // VOTRE endpoint Xano `oauth/google/continue` redirige le navigateur
+        // après avoir traité le code de Google et généré VOTRE token Xano.
     if (currentPath.includes('/auth/google/callback_success')) {
         console.log('[AUTH_SCRIPT] Sur la page de callback Google.');
         const urlParams = new URLSearchParams(window.location.search);
@@ -225,7 +234,7 @@ function handleGoogleCallback() {
 
                 try {
                     // Adaptez 'auth/login' si votre endpoint Xano a un nom différent
-                    const responseData = await authXanoClient.post('auth/login', { email, password });
+                    const responseData = await authEmailXanoClient.post('auth/login', { email, password });
 
                     if (responseData && responseData.authToken) { // Adaptez 'authToken' au nom réel du champ token dans la réponse Xano
                         console.log('[AUTH_SCRIPT] Login Xano réussi, token reçu.');
@@ -366,7 +375,7 @@ function handleGoogleCallback() {
                     const payload = { email, password };
                     if (name) payload.name = name;
 
-                    const responseData = await authXanoClient.post('auth/signup', payload); // Adaptez l'endpoint
+                    const responseData = await authEmailXanoClient.post('auth/signup', payload); // Adaptez l'endpoint
                     console.log('[AUTH_SCRIPT] Signup Xano réussi:', responseData);
 
                     if (responseData && responseData.authToken) {
@@ -406,11 +415,11 @@ function handleGoogleCallback() {
                 e.preventDefault();
                 console.log('[AUTH_SCRIPT] Clic sur le bouton de déconnexion.');
                 eraseCookie('xano_auth_token');
-                authXanoClient.setAuthToken(null); // Vider le token dans l'instance client
+                authEmailXanoClient.setAuthToken(null); // Vider le token dans l'instance client
 
                 // Optionnel : appeler un endpoint Xano /auth/logout pour invalider le token côté serveur
                 // try {
-                //     await authXanoClient.post('auth/logout'); // Assurez-vous que cet endpoint existe et est configuré
+                //     await authEmailXanoClient.post('auth/logout'); // Assurez-vous que cet endpoint existe et est configuré
                 //     console.log('[AUTH_SCRIPT] Token invalidé côté serveur (si endpoint /auth/logout existe).');
                 // } catch (logoutError) {
                 //     console.warn('[AUTH_SCRIPT] Erreur lors de l\'appel à /auth/logout (endpoint optionnel):', logoutError);
@@ -443,10 +452,10 @@ function handleGoogleCallback() {
 
 
         if (token) {
-            authXanoClient.setAuthToken(token);
+            authEmailXanoClient.setAuthToken(token);
             try {
                 // Adaptez 'auth/me' si votre endpoint Xano a un nom différent
-                const userData = await authXanoClient.get('auth/me');
+                const userData = await authEmailXanoClient.get('auth/me');
                 if (userData) { // Assurez-vous que userData n'est pas null ou undefined
                     console.log('[AUTH_SCRIPT] Utilisateur connecté:', userData);
                     body.classList.add(CLASS_LOGGED_IN);
@@ -457,7 +466,7 @@ function handleGoogleCallback() {
 
 
                     const currentPagePath = window.location.pathname;
-                    if (currentPagePath === '/signin/' || currentPagePath === '/signin/' || currentPagePath === '/signup/') { // Adaptez les chemins
+                    if (currentPagePath === '/signin/' || currentPagePath === '/signup/') { // Adaptez les chemins
                         console.log('[AUTH_SCRIPT] Utilisateur connecté sur page login/signup, redirection vers dashboard.');
                         window.location.href = REDIRECT_URL_IF_ALREADY_LOGGED_IN;
                     }
@@ -469,7 +478,7 @@ function handleGoogleCallback() {
             } catch (error) {
                 console.warn('[AUTH_SCRIPT] Token invalide ou session expirée:', error.message);
                 eraseCookie('xano_auth_token');
-                authXanoClient.setAuthToken(null);
+                authEmailXanoClient.setAuthToken(null);
                 // Continue pour définir l'état comme déconnecté
             }
         }
@@ -493,7 +502,6 @@ function handleGoogleCallback() {
 
     // --- Appel des initialisations ---
     // Assurez-vous que ces fonctions sont bien appelées :
-   // --- Appel des initialisations ---
      // --- Appel des initialisations ---
     if (document.getElementById(LOGIN_FORM_ID)) initLoginForm();
     if (document.getElementById(SIGNUP_FORM_ID)) initSignupForm();
