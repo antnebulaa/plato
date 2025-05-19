@@ -80,12 +80,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Le nom du champ retourné par Xano qui contient l'URL d'autorisation Google
                 // pourrait être 'auth_url', 'authorization_url', 'google_auth_url', etc.
                 // Vérifiez la réponse de Xano. Supposons qu'il s'appelle 'authorization_url'.
-                if (response && response.authorizationUrl) {
+                if (response && response.authUrl) {
                     // Rediriger l'utilisateur vers la page d'autorisation Google
-                    window.location.href = response.authorizationUrl;
+                    window.location.href = response.authUrl;
                 } else {
                     console.error('[AUTH_SCRIPT] Réponse de Xano /oauth/google/init:', response);
-                    throw new Error("URL d'autorisation Google non reçue de Xano.");
+                    throw new Error("Champ 'authUrl' manquant ou invalide dans la réponse de Xano /oauth/google/init."); // Message d'erreur mis à jour
                 }
             } catch (error) {
                 console.error('[AUTH_SCRIPT] Erreur lors de l\'initiation du login Google via Xano:', error);
