@@ -82,7 +82,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Vérifiez la réponse de Xano. Supposons qu'il s'appelle 'authorization_url'.
                 if (response && response.authUrl) {
                     // Rediriger l'utilisateur vers la page d'autorisation Google
-                    window.location.href = response.authUrl;
+                    console.log("URL d'autorisation Google:", response.authUrl);
+                   // window.location.href = response.authUrl;
                 } else {
                     console.error('[AUTH_SCRIPT] Réponse de Xano /oauth/google/init:', response);
                     throw new Error("Champ 'authUrl' manquant ou invalide dans la réponse de Xano /oauth/google/init."); // Message d'erreur mis à jour
