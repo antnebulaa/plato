@@ -56,14 +56,13 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             // Étape 1: Récupérer la réponse JSON brute de Xano (qui est un tableau)
-            // Cette ligne est probablement votre ligne 58. Elle est correcte.
-            const propertyData = await response.json();
-            console.log('[DETAIL_SCRIPT_FETCH] Réponse brute de Xano:', JSON.stringify(propertyData, null, 2));
+            // Cette ligne est votre ligne 60. Appelons la variable responseDataArray pour plus de clarté.
+            const responseDataArray = await response.json(); // <--- Changement de nom ici pour éviter le conflit
+            console.log('[DETAIL_SCRIPT_FETCH] Réponse brute de Xano (devrait être un tableau):', JSON.stringify(responseDataArray, null, 2));
 
-            // Étape 2: Déclarer 'propertyData' avec 'let' pour pouvoir lui assigner l'objet ensuite.
-            // Xano retourne un tableau, même pour un seul item par ID.
-            // Nous devons prendre le premier objet de ce tableau.
-            let propertyData = null;
+            // Étape 2: Déclarer 'propertyData' avec 'let' et initialiser à null.
+            // C'est votre ligne 66. C'est la SEULE DÉCLARATION de propertyData.
+            let propertyData = null; 
 
             // Étape 3: Extraire le premier objet du tableau (si le tableau existe et n'est pas vide)
             if (Array.isArray(responseDataArray) && responseDataArray.length > 0) {
@@ -72,13 +71,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Maintenant, 'propertyData' contient soit l'objet de l'annonce, soit null.
             // La suite de vos vérifications et appels à bindDataToElement utilisera cette variable 'propertyData'.
-            // La vérification suivante fonctionnera maintenant sur l'objet extrait (ou sur null)
             if (!propertyData || typeof propertyData !== 'object' || Object.keys(propertyData).length === 0) {
                 console.error('[DETAIL_SCRIPT_FETCH] Données de propriété non valides, vides, ou ID non trouvé après extraction du tableau.');
                 detailContainerElement.innerHTML = `<p style="color:orange;">Les données pour cette annonce n'ont pas pu être chargées, sont vides ou l'ID est introuvable.</p>`;
                 return;
             }
-
 
             // Le conteneur principal peut aussi avoir des bindings directs
             bindDataToElement(detailContainerElement, propertyData);
