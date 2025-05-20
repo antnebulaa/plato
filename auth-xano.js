@@ -72,46 +72,54 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function initGoogleLogin() {
     const googleLoginButton = document.getElementById(GOOGLE_LOGIN_BUTTON_ID);
-        
-        if (googleLoginButton) {
+
+    if (googleLoginButton) {
         console.log('[AUTH_SCRIPT] Bouton de login Google trouvé.');
-        googleLoginButton.addEventListener('click', async function(event) {
-            event.preventDefault(); 
-            console.log('[AUTH_SCRIPT] Clic sur le bouton de login Google.');
+
+        let alreadyProcessing = false; // Pour éviter les doubles appels
+
+        async function handleGoogleLogin(event) {
+            event.preventDefault();
+            if (alreadyProcessing) return;
+            alreadyProcessing = true;
+
+            console.log('[AUTH_SCRIPT] Clic/touch sur le bouton de login Google.');
             googleLoginButton.disabled = true;
-            const loadingElement = document.querySelector('#' + LOGIN_FORM_ID + ' [data-xano-form-loading]'); // Ou un indicateur dédié
+            const loadingElement = document.querySelector('#' + LOGIN_FORM_ID + ' [data-xano-form-loading]');
             if (loadingElement) loadingElement.style.display = 'block';
 
             try {
-                 console.log(`[AUTH_SCRIPT] Appel à Xano /oauth/google/init avec redirect_uri: ${WEBFLOW_GOOGLE_CALLBACK_PAGE_URL}`);
-                    const response = await googleAuthXanoClient.get('oauth/google/init', {
-                        redirect_uri: WEBFLOW_GOOGLE_CALLBACK_PAGE_URL // On envoie l'URL de notre page Webflow
+                console.log(`[AUTH_SCRIPT] Appel à Xano /oauth/google/init avec redirect_uri: ${WEBFLOW_GOOGLE_CALLBACK_PAGE_URL}`);
+                const response = await googleAuthXanoClient.get('oauth/google/init', {
+                    redirect_uri: WEBFLOW_GOOGLE_CALLBACK_PAGE_URL
                 });
 
-                console.log('[AUTH_SCRIPT] Réponse de Xano /oauth/google/init:', response); // Log pour voir la réponse
+                console.log('[AUTH_SCRIPT] Réponse de Xano /oauth/google/init:', response);
 
-                // Le nom du champ retourné par Xano qui contient l'URL d'autorisation Google
-                // pourrait être 'auth_url', 'authorization_url', 'google_auth_url', etc.
-                // Vérifiez la réponse de Xano. Supposons qu'il s'appelle 'authorization_url'.
                 if (response && response.authUrl) {
-                   
-                    console.log("URL d'autorisation Google:", response.authUrl); // Xano retourne l'URL Google
-                    window.location.href = response.authUrl; // Rediriger vers Google
+                    console.log("URL d'autorisation Google:", response.authUrl);
+                    window.location.href = response.authUrl;
                 } else {
                     console.error('[AUTH_SCRIPT] Réponse de Xano /oauth/google/init:', response);
-                    throw new Error("Champ 'authUrl' manquant ou invalide dans la réponse de Xano /oauth/google/init."); // Message d'erreur mis à jour
+                    throw new Error("Champ 'authUrl' manquant ou invalide dans la réponse de Xano /oauth/google/init.");
                 }
             } catch (error) {
                 console.error('[AUTH_SCRIPT] Erreur lors de l\'initiation du login Google via Xano:', error);
-                const errorDisplay = document.querySelector('#' + LOGIN_FORM_ID + ' [data-xano-form-error]'); // Ou un afficheur d'erreur dédié
+                const errorDisplay = document.querySelector('#' + LOGIN_FORM_ID + ' [data-xano-form-error]');
                 if (errorDisplay) {
                     errorDisplay.textContent = error.message || "Erreur avec la connexion Google.";
                     errorDisplay.style.display = 'block';
                 }
                 if (loadingElement) loadingElement.style.display = 'none';
                 googleLoginButton.disabled = false;
+            } finally {
+                alreadyProcessing = false;
             }
-        });
+        }
+
+        // On attache la même fonction aux deux événements
+        googleLoginButton.addEventListener('click', handleGoogleLogin, false);
+        googleLoginButton.addEventListener('touchstart', handleGoogleLogin, false);
     }
 }
 
