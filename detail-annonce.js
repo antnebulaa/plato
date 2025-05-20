@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     async function fetchPropertyDetails() {
         console.log(`[DETAIL_SCRIPT_FETCH] Appel pour la propriété ID: ${propertyId}`);
-        detailContainerElement.innerHTML = '<p>Chargement des détails de l\'annonce...</p>';
+        // detailContainerElement.innerHTML = '<p>Chargement des détails de l\'annonce...</p>';//
 
         // Adaptez l'URL de l'endpoint selon votre configuration Xano
         // Option 1: //{id}
