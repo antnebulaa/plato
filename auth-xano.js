@@ -245,8 +245,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Initialisation du formulaire de Login ---
     function initLoginForm() {
-        const loginForm = document.getElementById(LOGIN_FORM_ID);
-        const loginButton = document.getElementById(LOGIN_BUTTON_ID);
+        const loginForm = document.getElementById('login-form');
+        const loginButton = document.getElementById('login-button');
 
         if (loginForm && loginButton) {
             console.log(`[AUTH_SCRIPT] Formulaire de login (#${LOGIN_FORM_ID}) et bouton (#${LOGIN_BUTTON_ID}) trouvés.`);
@@ -312,7 +312,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         } else {
-            if (document.getElementById(LOGIN_FORM_ID) && !document.getElementById(LOGIN_BUTTON_ID)) {
+            if (document.getElementById('') && !document.getElementById('login-button')) {
                  console.warn(`[AUTH_SCRIPT] Formulaire de login (#${LOGIN_FORM_ID}) trouvé, mais bouton (#${LOGIN_BUTTON_ID}) introuvable.`);
             }
             // Pas d'erreur si le formulaire n'est pas sur la page, c'est normal
@@ -557,12 +557,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Appel des initialisations ---
     // Assurez-vous que ces fonctions sont bien appelées :
-     // --- Appel des initialisations ---
     // --- Appel des initialisations ---
-    if (document.getElementById(LOGIN_FORM_ID)) initLoginForm();
+    if (document.getElementById('login-form')) initLoginForm();
     if (document.getElementById(SIGNUP_FORM_ID)) initSignupForm();
     if (document.getElementById(LOGOUT_BUTTON_ID)) handleLogout();
     if (document.getElementById('google-login-button')) initGoogleLogin();
+  
 
     handleGoogleReturnAndCallXanoContinue(); // Gère le retour de Google sur la page de callback
     checkAuthStatusAndProtectRoutes(authEmailXanoClient); // Gère l'état de connexion sur toutes les pages
