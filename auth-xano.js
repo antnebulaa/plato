@@ -23,11 +23,23 @@ document.addEventListener('DOMContentLoaded', function() {
     const GOOGLE_OAUTH_API_BASE_URL = 'https://xwxl-obyg-b3e3.p7.xano.io/api:Kr4nuSTF';
     const googleAuthXanoClient = new XanoClient({ apiGroupBaseUrl: GOOGLE_OAUTH_API_BASE_URL });
 
-    // --- NOUVEAU : Définir l'URL de callback Xano pour Google ---
-    // C'est l'URL complète de votre endpoint Xano qui gère le retour de Google.
-    // Assurez-vous que cette URL est également configurée comme "URI de redirection autorisé"
-    // dans votre projet Google Cloud Console.
-   // const XANO_GOOGLE_CALLBACK_HANDLER_URL = 'https://xwxl-obyg-b3e3.p7.xano.io/api:Kr4nuSTF/oauth/google/continue';
+    // --- URL de la page Webflow qui gérera le retour de Google ---
+    // C'est cette URL que Xano /oauth/google/init utilisera pour dire à Google où rediriger APRÈS l'authentification Google.
+    // C'est aussi cette URL qui doit être listée comme "URI de redirection autorisé" dans Google Cloud Console
+    // si le flux est Client -> Google -> Client (page Webflow) -> Xano.
+    // MAIS, si le flux est Client -> Xano Init -> Google -> Xano Continue -> Client Page Webflow,
+    // alors Xano Init prend l'URL de Xano Continue.
+    //
+    // D'après la logique Wized et notre discussion, Xano /oauth/google/init
+    // prend en INPUT la redirect_uri qui sera utilisée par Google.
+    // Cette redirect_uri doit être VOTRE endpoint Xano /oauth/google/continue.
+    // C'est cet endpoint Xano /oauth/google/continue qui, APRÈS avoir traité le code,
+    // redirigera vers une page de VOTRE site Webflow.
+    
+    // DONC, la variable envoyée à /oauth/google/init est bien l'URL de l'endpoint Xano de callback:
+    const XANO_GOOGLE_CALLBACK_HANDLER_URL = 'https://xwxl-obyg-b3e3.p7.xano.io/api:Kr4nuSTF/oauth/google/continue';
+    
+    // Et l'URL de la page Webflow où le client finalisera (après que Xano /oauth/google/continue ait fait son travail et redirigé)
     const WEBFLOW_GOOGLE_CALLBACK_PAGE_URL = 'https://adriens-sublime-site-ab1222.webflow.io/auth/google-callback'; // NOUVEAU - Créez cette page dans Webflow
 
 
