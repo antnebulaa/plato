@@ -58,10 +58,14 @@ document.addEventListener('DOMContentLoaded', function () {
             const propertyData = await response.json();
             console.log('[DETAIL_SCRIPT_FETCH] Réponse brute de Xano:', JSON.stringify(propertyData, null, 2));
 
-            // Contrairement à la liste, Xano devrait retourner un seul objet directement (pas un tableau, ni imbriqué dans "items")
-            // Si Xano retourne l'objet dans une structure (ex: { result: propertyObject }), adaptez ici:
-            // const itemToDisplay = propertyData.result || propertyData;
+           // Xano retourne un tableau, même pour un seul item par ID.
+            // Nous devons prendre le premier objet de ce tableau.
+            let propertyData = null;
+            if (Array.isArray(responseData) && responseData.length > 0) {
+                propertyData = responseData[0]; // On prend le premier élément
+            }
 
+            // La vérification suivante fonctionnera maintenant sur l'objet extrait (ou sur null)
             if (!propertyData || typeof propertyData !== 'object') {
                 console.error('[DETAIL_SCRIPT_FETCH] Données de propriété non valides reçues de Xano.');
                 detailContainerElement.innerHTML = `<p style="color:orange;">Les données pour cette annonce semblent incorrectes.</p>`;
