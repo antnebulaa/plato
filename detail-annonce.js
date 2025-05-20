@@ -55,22 +55,30 @@ document.addEventListener('DOMContentLoaded', function () {
                 throw new Error(`Erreur HTTP ${response.status}: ${errorData.message || response.statusText}`);
             }
 
+            // Étape 1: Récupérer la réponse JSON brute de Xano (qui est un tableau)
+            // Cette ligne est probablement votre ligne 58. Elle est correcte.
             const propertyData = await response.json();
             console.log('[DETAIL_SCRIPT_FETCH] Réponse brute de Xano:', JSON.stringify(propertyData, null, 2));
 
-           // Xano retourne un tableau, même pour un seul item par ID.
+            // Étape 2: Déclarer 'propertyData' avec 'let' pour pouvoir lui assigner l'objet ensuite.
+            // Xano retourne un tableau, même pour un seul item par ID.
             // Nous devons prendre le premier objet de ce tableau.
             let propertyData = null;
-            if (Array.isArray(responseData) && responseData.length > 0) {
-                propertyData = responseData[0]; // On prend le premier élément
+
+            // Étape 3: Extraire le premier objet du tableau (si le tableau existe et n'est pas vide)
+            if (Array.isArray(responseDataArray) && responseDataArray.length > 0) {
+                propertyData = responseDataArray[0]; // On assigne l'objet à propertyData
             }
 
+            // Maintenant, 'propertyData' contient soit l'objet de l'annonce, soit null.
+            // La suite de vos vérifications et appels à bindDataToElement utilisera cette variable 'propertyData'.
             // La vérification suivante fonctionnera maintenant sur l'objet extrait (ou sur null)
-            if (!propertyData || typeof propertyData !== 'object') {
-                console.error('[DETAIL_SCRIPT_FETCH] Données de propriété non valides reçues de Xano.');
-                detailContainerElement.innerHTML = `<p style="color:orange;">Les données pour cette annonce semblent incorrectes.</p>`;
+            if (!propertyData || typeof propertyData !== 'object' || Object.keys(propertyData).length === 0) {
+                console.error('[DETAIL_SCRIPT_FETCH] Données de propriété non valides, vides, ou ID non trouvé après extraction du tableau.');
+                detailContainerElement.innerHTML = `<p style="color:orange;">Les données pour cette annonce n'ont pas pu être chargées, sont vides ou l'ID est introuvable.</p>`;
                 return;
             }
+
 
             // Le conteneur principal peut aussi avoir des bindings directs
             bindDataToElement(detailContainerElement, propertyData);
