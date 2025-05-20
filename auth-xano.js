@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const XANO_GOOGLE_CALLBACK_HANDLER_URL = 'https://xwxl-obyg-b3e3.p7.xano.io/api:Kr4nuSTF/oauth/google/continue';
     
     // Chemin de la page Webflow vers laquelle Xano redirige APRES avoir traité le callback Google
-    const WEBFLOW_FINAL_CALLBACK_PAGE_PATH = 'https://adriens-sublime-site-ab1222.webflow.io/auth/google/callback-success'; // NOUVEAU - Créez cette page dans Webflow
+    const WEBFLOW_FINAL_CALLBACK_PAGE_PATH = '/auth/google/callback-success'; // NOUVEAU - Créez cette page dans Webflow
 
     // IDs de vos éléments HTML (adaptez si nécessaire)
     const LOGIN_FORM_ID = 'login-form';
