@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // redirigera vers une page de VOTRE site Webflow.
     
     // DONC, la variable envoyée à /oauth/google/init est bien l'URL de l'endpoint Xano de callback:
-    const XANO_GOOGLE_CALLBACK_HANDLER_URL = 'https://xwxl-obyg-b3e3.p7.xano.io/api:Kr4nuSTF/oauth/google/continue';
+    const XANO_GOOGLE_CALLBACK_HANDLER_URL = 'https://adriens-sublime-site-ab1222.webflow.io/';
     
     // Chemin de la page Webflow vers laquelle Xano redirige APRES avoir traité le callback Google
     const WEBFLOW_FINAL_CALLBACK_PAGE_PATH = '/auth/google/callback-success'; // NOUVEAU - Créez cette page dans Webflow
