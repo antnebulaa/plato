@@ -68,10 +68,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const PASSWORD_CRITERIA_CONTAINER_ID = 'password-criteria';
     const CONFIRM_PASSWORD_ERROR_ID = 'confirm-password-error';
 
-    const GOOGLE_LOGIN_BUTTON_ID = 'google-login-button';
+    
 
     function initGoogleLogin() {
-    const googleLoginButton = document.getElementById(GOOGLE_LOGIN_BUTTON_ID);
+    const googleLoginButton = document.getElementById('google-login-button');
 
     if (googleLoginButton) {
         console.log('[AUTH_SCRIPT] Bouton de login Google trouvé.');
@@ -562,7 +562,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById(LOGIN_FORM_ID)) initLoginForm();
     if (document.getElementById(SIGNUP_FORM_ID)) initSignupForm();
     if (document.getElementById(LOGOUT_BUTTON_ID)) handleLogout();
-    if (document.getElementById(GOOGLE_LOGIN_BUTTON_ID)) initGoogleLogin();
+    if (document.getElementById('google-login-button')) initGoogleLogin();
 
     handleGoogleReturnAndCallXanoContinue(); // Gère le retour de Google sur la page de callback
     checkAuthStatusAndProtectRoutes(authEmailXanoClient); // Gère l'état de connexion sur toutes les pages
