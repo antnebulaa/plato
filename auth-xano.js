@@ -27,7 +27,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // C'est l'URL complète de votre endpoint Xano qui gère le retour de Google.
     // Assurez-vous que cette URL est également configurée comme "URI de redirection autorisé"
     // dans votre projet Google Cloud Console.
-    const XANO_GOOGLE_CALLBACK_HANDLER_URL = 'https://xwxl-obyg-b3e3.p7.xano.io/api:Kr4nuSTF/oauth/google/continue';
+   // const XANO_GOOGLE_CALLBACK_HANDLER_URL = 'https://xwxl-obyg-b3e3.p7.xano.io/api:Kr4nuSTF/oauth/google/continue';
+    const WEBFLOW_GOOGLE_CALLBACK_PAGE_URL = 'https://adriens-sublime-site-ab1222.webflow.io/auth/google-callback'; // NOUVEAU - Créez cette page dans Webflow
 
 
 
@@ -72,7 +73,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Adaptez 'oauth/google/initiate' au nom réel de votre endpoint Xano
                 console.log(`[AUTH_SCRIPT] Appel à Xano /oauth/google/init avec redirect_uri: ${XANO_GOOGLE_CALLBACK_HANDLER_URL}`);
                 const response = await googleAuthXanoClient.get('oauth/google/init', {
-                    redirect_uri: XANO_GOOGLE_CALLBACK_HANDLER_URL
+                    redirect_uri: WEBFLOW_GOOGLE_CALLBACK_PAGE_URL // Utiliser la nouvelle constante
                 });
 
                 console.log('[AUTH_SCRIPT] Réponse de Xano /oauth/google/init:', response); // Log pour voir la réponse
@@ -106,31 +107,50 @@ document.addEventListener('DOMContentLoaded', function() {
 // Cette page sera celle vers laquelle Xano redirigera après avoir traité le callback de Google.
 // Sur cette page, vous mettrez un script pour récupérer le token.
 function handleGoogleCallback() {
-    // Vérifier si nous sommes sur la page de callback et s'il y a un token dans l'URL
     const currentPath = window.location.pathname;
-    // Adaptez '/auth/google/callback-success' à l'URL de redirection vers laquelle
-        // VOTRE endpoint Xano `oauth/google/continue` redirige le navigateur
-        // après avoir traité le code de Google et généré VOTRE token Xano.
-    if (currentPath.includes('/auth/google/callback-success')) {
-        console.log('[AUTH_SCRIPT] Sur la page de callback Google.');
-        const urlParams = new URLSearchParams(window.location.search);
-        const xanoToken = urlParams.get('token'); // Ou le nom de paramètre que Xano utilise
 
-        if (xanoToken) {
-            console.log('[AUTH_SCRIPT] Token Xano reçu depuis le callback Google:', xanoToken);
-            setCookie('xano_auth_token', xanoToken, 7);
-            // Optionnel: supprimer les paramètres de l'URL pour nettoyer
-            window.history.replaceState({}, document.title, window.location.pathname);
-            // Rediriger vers la page principale ou le dashboard
-            // Mettre à jour l'état d'authentification avant de rediriger
-            checkAuthStatusAndProtectRoutes().then(() => {
-                 window.location.href = REDIRECT_URL_AFTER_LOGIN;
+    // S'exécute si on est sur la page /auth/google-callback (ou le nom que vous avez choisi)
+    if (currentPath.includes('/auth/google-callback')) { // Adapter au chemin de votre page Webflow de callback
+        console.log('[AUTH_SCRIPT] Sur la page de callback Google (côté client Webflow).');
+        const urlParams = new URLSearchParams(window.location.search);
+        const googleCode = urlParams.get('code'); // Google retourne un 'code'
+
+        if (googleCode) {
+            console.log('[AUTH_SCRIPT] Code Google reçu:', googleCode);
+            // Maintenant, envoyez ce code à votre endpoint Xano /oauth/google/continue
+            // Cet endpoint Xano doit être configuré pour prendre le 'code' et la 'redirect_uri' (qui est WEBFLOW_GOOGLE_CALLBACK_PAGE_URL)
+            // et retourner votre token Xano final.
+
+            // Désactiver les boutons ou afficher un loader global
+            const googleLoginButton = document.getElementById(GOOGLE_LOGIN_BUTTON_ID); // Peut-être pas sur cette page
+            if(googleLoginButton) googleLoginButton.disabled = true;
+            // Affichez un message "Connexion en cours..." sur cette page de callback
+
+            googleAuthXanoClient.get('oauth/google/continue', { // Utilise GET si votre Xano endpoint est GET, sinon POST
+                code: googleCode,
+                redirect_uri: WEBFLOW_GOOGLE_CALLBACK_PAGE_URL // Xano a besoin de savoir quelle redirect_uri a été utilisée pour obtenir le code
+            })
+            .then(async responseData => { // Renommé en responseData pour éviter conflit
+                if (responseData && responseData.token) { // Adaptez 'token' au nom du champ de votre token Xano
+                    console.log('[AUTH_SCRIPT] Token Xano reçu de /oauth/google/continue:', responseData.token);
+                    setCookie('xano_auth_token', responseData.token, 7);
+                    window.history.replaceState({}, document.title, WEBFLOW_GOOGLE_CALLBACK_PAGE_URL); // Nettoyer l'URL
+                    await checkAuthStatusAndProtectRoutes(authEmailXanoClient); // Valider avec le client principal
+                    window.location.href = REDIRECT_URL_AFTER_LOGIN;
+                } else {
+                    throw new Error(responseData.message || 'Token Xano manquant après /oauth/google/continue.');
+                }
+            })
+            .catch(error => {
+                console.error('[AUTH_SCRIPT] Erreur lors de l\'appel à Xano /oauth/google/continue:', error);
+                alert("Erreur lors de la finalisation de la connexion Google: " + error.message);
+                window.location.href = REDIRECT_URL_AFTER_LOGOUT; // Page de login
             });
+
         } else {
-            console.error('[AUTH_SCRIPT] Callback Google mais token Xano manquant dans l\'URL.');
-            // Afficher une erreur à l'utilisateur et le rediriger vers la page de login
-            alert("Une erreur est survenue lors de la connexion avec Google. Veuillez réessayer.");
-            window.location.href = REDIRECT_URL_AFTER_LOGOUT; // Page de login
+            console.error('[AUTH_SCRIPT] Page de callback Google mais "code" manquant dans l\'URL.');
+            alert("Une erreur est survenue (code Google manquant). Veuillez réessayer.");
+            window.location.href = REDIRECT_URL_AFTER_LOGOUT;
         }
     }
 }
