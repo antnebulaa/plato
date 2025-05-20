@@ -36,8 +36,8 @@ document.addEventListener('DOMContentLoaded', function () {
     // Vous pouvez les mettre directement ici, ou dans un fichier "utils.js" que vous chargez
     // dans les deux pages HTML (accueil et détails).
 
-    async function fetchDetails() {
-        console.log(`[DETAIL_SCRIPT_FETCH] Appel pour la propriété ID: ${Id}`);
+    async function fetchPropertyDetails() {
+        console.log(`[DETAIL_SCRIPT_FETCH] Appel pour la propriété ID: ${propertyId}`);
         detailContainerElement.innerHTML = '<p>Chargement des détails de l\'annonce...</p>';
 
         // Adaptez l'URL de l'endpoint selon votre configuration Xano
