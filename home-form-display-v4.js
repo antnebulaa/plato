@@ -1,5 +1,5 @@
 // ==========================================
-// == SCRIPT XANO LISTING - VERSION ÉPURÉE ==
+// == SCRIPT XANO LISTING - VERSION ÉPURÉE V4 ==
 // ==========================================
 document.addEventListener('DOMContentLoaded', function () {
     
@@ -244,7 +244,7 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
 
         if (propertyId !== undefined && propertyId !== null) {
             const anchor = document.createElement('a');
-            anchor.href = `details-annonce.html?id=${propertyId}`; // Adaptez "details-annonce.html" si besoin
+            anchor.href = `annonce?id=${propertyId}`; // Adaptez "details-annonce.html" si besoin
             anchor.style.textDecoration = 'none'; // Optionnel: pour éviter le soulignement par défaut
             anchor.style.color = 'inherit';       // Optionnel: pour hériter la couleur du texte
             anchor.style.display = 'block';       // Ou 'inline-block' ou ce qui convient à votre layout
