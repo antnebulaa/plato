@@ -308,30 +308,29 @@ function bindDataToElement(element, data) {
     }
     // --- FIN NOUVELLE LOGIQUE POUR LE SLIDER D'IMAGES ---
 
-    // Gestion de clés imbriquées simples (ex: user.name ou _property_lease_of_property.0.loyer)
-    let value = data;
-    const keys = dataKey.split('.');
-    for (const keyPart of keys) { // Renommé 'key' en 'keyPart' pour éviter conflit avec 'key' de la boucle précédente
-        if (value && typeof value === 'object' && keyPart in value) {
-            value = value[keyPart];
-        } else {
-            // Clé non trouvée ou donnée intermédiaire non objet
-            // console.warn(`Clé "${dataKey}" (partie "${keyPart}") non trouvée ou chemin invalide dans:`, data); // Peut être verbeux
-            value = undefined; // Marquer comme non trouvé
-            break;
-        }
-    }
+   // === MODIFICATION ICI : Utiliser getNestedValue pour récupérer la valeur ===
+    const value = getNestedValue(data, dataKey); // Appel à getNestedValue
+    // =======================================================================
 
-    // Si la valeur finale est null ou undefined, on peut vouloir afficher une valeur par défaut ou rien
-     const displayValue = value ?? ''; // Affiche une chaîne vide si null/undefined
+    const displayValue = (value === null || value === undefined) ? '' : value;
 
-    // Appliquer la valeur à l'élément
+    // Appliquer la valeur à l'élément (votre code switch existant)
     switch (element.tagName.toLowerCase()) {
         case 'img':
-            // Cette condition est pour s'assurer qu'on ne met pas à jour le src des <img> DANS le slider
-            // si l'élément <img> lui-même avait un data-xano-bind (ce qui n'est pas le cas ici, on le crée dynamiquement)
-            if (!element.closest('.swiper-slide')) { 
-                element.src = displayValue;
+            // ... (votre logique pour img, en s'assurant d'utiliser displayValue si c'est une URL directe,
+            // ou une logique spécifique si dataKey pointe vers un objet image complexe) ...
+            // Pour une image simple dont l'URL est la displayValue :
+            if (!element.closest('.swiper-slide')) { // Pour ne pas interférer avec les images du slider créées dynamiquement
+                 // Si displayValue est bien l'URL de l'image
+                if (typeof displayValue === 'string' && (displayValue.startsWith('http') || displayValue.startsWith('/'))) {
+                    element.src = displayValue;
+                } else if (typeof displayValue === 'object' && displayValue && displayValue.url) {
+                    // Si displayValue est un objet contenant une URL (comme dans votre structure 'images')
+                    element.src = displayValue.url;
+                } else {
+                    // console.warn(`Valeur pour src de <img> non reconnue pour dataKey "${dataKey}":`, displayValue);
+                    element.src = ''; // ou une image placeholder
+                }
             }
             break;
         case 'iframe':
@@ -397,23 +396,16 @@ function bindDataToElement(element, data) {
             element.textContent = displayValue;
     }
 
-    // Gérer les attributs liés (data-xano-bind-attr-*)
+    // Gérer les attributs liés (data-xano-bind-attr-*) (votre code existant)
+    // Important : cette partie doit aussi utiliser getNestedValue pour attrValueKey
     for (const attr of element.attributes) {
         if (attr.name.startsWith('data-xano-bind-attr-')) {
             const attrName = attr.name.replace('data-xano-bind-attr-', '');
             const attrValueKey = attr.value; // La valeur de cet attribut est la clé dans l'objet data
 
-             // Gestion de clés imbriquées pour la valeur de l'attribut
-             let attrValue = data;
-             const attrKeys = attrValueKey.split('.');
-             for (const key of attrKeys) {
-                 if (attrValue && typeof attrValue === 'object' && key in attrValue) {
-                     attrValue = attrValue[key];
-                 } else {
-                     attrValue = undefined;
-                     break;
-                 }
-             }
+            // === MODIFICATION ICI AUSSI : Utiliser getNestedValue ===
+            const attrValue = getNestedValue(data, attrValueKey);
+            // ======================================================
 
             if (attrValue !== undefined) {
                 // Pour les attributs booléens (disabled, checked, selected...),
