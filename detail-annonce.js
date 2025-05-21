@@ -152,6 +152,95 @@ function renderPhotoGrid(allPhotos, annonceDetails) { // annonceDetails est l'ob
 }
 
 
+// Variable globale pour stocker les données de la carte si l'API se charge après les données Xano
+let mapDataToDisplay = null;
+// Drapeau pour savoir si l'API Google Maps est prête
+window.googleMapsApiIsReady = false;
+
+// Cette fonction sera appelée par le script Google Maps une fois chargé (grâce au paramètre 'callback')
+function onGoogleMapsApiReady() {
+    console.log('[MAP_SCRIPT] Google Maps API chargée et prête.');
+    window.googleMapsApiIsReady = true;
+    // Si les données de l'annonce (et donc les coordonnées) ont été chargées AVANT l'API Maps,
+    // on affiche la carte maintenant.
+    if (mapDataToDisplay) {
+        console.log('[MAP_SCRIPT] Données en attente trouvées, initialisation de la carte.');
+        initializeDetailMap(mapDataToDisplay.latitude, mapDataToDisplay.longitude);
+        mapDataToDisplay = null; // Nettoyer après utilisation
+    }
+}
+
+// Fonction principale pour initialiser et afficher la carte
+function initializeDetailMap(latitude, longitude) {
+    const mapElement = document.getElementById('property-location-map');
+
+    if (!mapElement) {
+        console.error("[MAP_SCRIPT] Élément #property-location-map introuvable.");
+        return;
+    }
+
+    // Vérifier si les coordonnées sont valides (nombres)
+    const latNum = parseFloat(latitude);
+    const lngNum = parseFloat(longitude);
+
+    if (isNaN(latNum) || isNaN(lngNum)) {
+        console.warn("[MAP_SCRIPT] Coordonnées latitude/longitude invalides ou manquantes. Carte non affichée.");
+        mapElement.innerHTML = "<p style='text-align:center; padding:20px;'>Localisation approximative non disponible.</p>";
+        return;
+    }
+
+    // --- Ajustement pour une localisation moins précise ---
+    // Option 1: Arrondir les coordonnées à ~3 décimales (environ 100m de précision)
+    const displayLat = parseFloat(latNum.toFixed(3));
+    const displayLng = parseFloat(lngNum.toFixed(3));
+    // Option 2 (plus de flou): Ajouter un petit décalage aléatoire
+    // const offset = 0.002; // Environ 200m
+    // const displayLat = latNum + (Math.random() - 0.5) * offset;
+    // const displayLng = lngNum + (Math.random() - 0.5) * offset;
+
+
+    console.log(`[MAP_SCRIPT] Initialisation de la carte avec Lat: ${displayLat}, Lng: ${displayLng}`);
+
+    try {
+        const map = new google.maps.Map(mapElement, {
+            center: { lat: displayLat, lng: displayLng },
+            zoom: 14, // Un zoom de 14-15 montre un quartier, pas une adresse exacte.
+            disableDefaultUI: true, // Cache la plupart des contrôles
+            zoomControl: true,      // Mais on peut garder le contrôle du zoom
+            streetViewControl: false,
+            mapTypeControl: false,
+            fullscreenControl: false,
+            gestureHandling: 'cooperative' // Recommandé pour l'interaction sur mobile/desktop
+        });
+
+        // Afficher un simple marqueur (sur les coordonnées ajustées)
+        new google.maps.Marker({
+            position: { lat: displayLat, lng: displayLng },
+            map: map,
+            // title: "Zone approximative du logement" // Optionnel
+        });
+
+        // Ou, pour un cercle représentant une zone :
+        /*
+        new google.maps.Circle({
+            strokeColor: '#4A90E2', // Couleur de la bordure du cercle
+            strokeOpacity: 0.7,
+            strokeWeight: 1,
+            fillColor: '#4A90E2', // Couleur de remplissage
+            fillOpacity: 0.20,
+            map: map,
+            center: { lat: displayLat, lng: displayLng },
+            radius: 300 // Rayon en mètres (ajustez selon le niveau de "flou" désiré)
+        });
+        */
+        console.log("[MAP_SCRIPT] Carte initialisée avec succès.");
+
+    } catch (e) {
+        console.error("[MAP_SCRIPT] Erreur lors de l'initialisation de Google Maps:", e);
+        mapElement.innerHTML = "<p style='text-align:center; padding:20px;'>Erreur lors du chargement de la carte.</p>";
+    }
+}
+
     
     async function fetchPropertyDetails() {
         console.log(`[DETAIL_SCRIPT_FETCH] Appel pour la propriété ID: ${propertyId}`);
@@ -210,12 +299,48 @@ function renderPhotoGrid(allPhotos, annonceDetails) { // annonceDetails est l'ob
                 const gridContainer = document.querySelector('.photo-grid-container');
                 if (gridContainer) gridContainer.style.display = 'none';
             }
-            // ========================================
+
+            // === INITIALISATION DE LA GOOGLE MAP ===
+    if (propertyData.geo_location && propertyData.geo_location.data) {
+        const lat = propertyData.geo_location.data.lat;
+        const lng = propertyData.geo_location.data.lng;
+
+        // Vérifier que lat et lng ne sont pas null, undefined ou des chaînes vides
+        if (lat != null && lng != null && String(lat).trim() !== '' && String(lng).trim() !== '') {
+            const numLat = parseFloat(lat);
+            const numLng = parseFloat(lng);
+
+            if (!isNaN(numLat) && !isNaN(numLng)) {
+                if (window.googleMapsApiIsReady) {
+                    // Si l'API est déjà prête, on affiche la carte directement
+                    console.log('[MAP_SCRIPT] API Google Maps prête, affichage direct de la carte.');
+                    initializeDetailMap(numLat, numLng);
+                } else {
+                    // Sinon, on stocke les données pour que la fonction callback 'onGoogleMapsApiReady' les utilise
+                    console.log('[MAP_SCRIPT] API Google Maps non prête, mise en attente des données de carte.');
+                    mapDataToDisplay = { latitude: numLat, longitude: numLng };
+                }
+            } else {
+                console.warn("[MAP_SCRIPT] Latitude ou longitude non numériques après conversion:", lat, lng);
+                const mapElement = document.getElementById('property-location-map');
+                if (mapElement) mapElement.innerHTML = "<p style='text-align:center; padding:20px;'>Localisation invalide.</p>";
+            }
+        } else {
+            console.log("[MAP_SCRIPT] Latitude ou longitude vide ou null dans geo_location.data.");
+            const mapElement = document.getElementById('property-location-map');
+            if (mapElement) mapElement.innerHTML = "<p style='text-align:center; padding:20px;'>Localisation non fournie.</p>";
+        }
+    } else {
+        console.log("[MAP_SCRIPT] Données geo_location non trouvées pour la carte.");
+        const mapElement = document.getElementById('property-location-map');
+        if (mapElement) mapElement.innerHTML = "<p style='text-align:center; padding:20px;'>Localisation non disponible.</p>";
+    }
+    // ======================================
             
             // Initialiser les sliders Swiper s'il y en a sur la page de détail
             // La fonction initializePageSwipers cherchera les éléments .swiper[data-slider-init="true"]
             // `bindDataToElement` devrait avoir mis cet attribut si un slider de photos a été peuplé.
-            initializePageSwipers(detailContainerElement);
+           // initializePageSwipers(detailContainerElement);
 
             console.log('[DETAIL_SCRIPT_FETCH] Affichage des détails terminé.');
 
