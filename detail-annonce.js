@@ -1,6 +1,99 @@
 // ============================================
 // == SCRIPT POUR LA PAGE DE DÉTAIL D'ANNONCE ==
 // ============================================
+
+
+// Variable globale pour stocker les données de la carte si l'API se charge après les données Xano
+let mapDataToDisplay = null;
+// Drapeau pour savoir si l'API Google Maps est prête
+window.googleMapsApiIsReady = false;
+
+// Cette fonction sera appelée par le script Google Maps une fois chargé (grâce au paramètre 'callback')
+function onGoogleMapsApiReady() {
+    console.log('[MAP_SCRIPT] Google Maps API chargée et prête.');
+    window.googleMapsApiIsReady = true;
+    // Si les données de l'annonce (et donc les coordonnées) ont été chargées AVANT l'API Maps,
+    // on affiche la carte maintenant.
+    if (mapDataToDisplay) {
+        console.log('[MAP_SCRIPT] Données en attente trouvées, initialisation de la carte.');
+        initializeDetailMap(mapDataToDisplay.latitude, mapDataToDisplay.longitude);
+        mapDataToDisplay = null; // Nettoyer après utilisation
+    }
+}
+
+// Fonction principale pour initialiser et afficher la carte
+function initializeDetailMap(latitude, longitude) {
+    const mapElement = document.getElementById('property-location-map');
+
+    if (!mapElement) {
+        console.error("[MAP_SCRIPT] Élément #property-location-map introuvable.");
+        return;
+    }
+
+    // Vérifier si les coordonnées sont valides (nombres)
+    const latNum = parseFloat(latitude);
+    const lngNum = parseFloat(longitude);
+
+    if (isNaN(latNum) || isNaN(lngNum)) {
+        console.warn("[MAP_SCRIPT] Coordonnées latitude/longitude invalides ou manquantes. Carte non affichée.");
+        mapElement.innerHTML = "<p style='text-align:center; padding:20px;'>Localisation approximative non disponible.</p>";
+        return;
+    }
+
+    // --- Ajustement pour une localisation moins précise ---
+    // Option 1: Arrondir les coordonnées à ~3 décimales (environ 100m de précision)
+    const displayLat = parseFloat(latNum.toFixed(3));
+    const displayLng = parseFloat(lngNum.toFixed(3));
+    // Option 2 (plus de flou): Ajouter un petit décalage aléatoire
+    // const offset = 0.002; // Environ 200m
+    // const displayLat = latNum + (Math.random() - 0.5) * offset;
+    // const displayLng = lngNum + (Math.random() - 0.5) * offset;
+
+
+    console.log(`[MAP_SCRIPT] Initialisation de la carte avec Lat: ${displayLat}, Lng: ${displayLng}`);
+
+    try {
+        const map = new google.maps.Map(mapElement, {
+            center: { lat: displayLat, lng: displayLng },
+            zoom: 14, // Un zoom de 14-15 montre un quartier, pas une adresse exacte.
+            disableDefaultUI: true, // Cache la plupart des contrôles
+            zoomControl: true,      // Mais on peut garder le contrôle du zoom
+            streetViewControl: false,
+            mapTypeControl: false,
+            fullscreenControl: false,
+            gestureHandling: 'cooperative' // Recommandé pour l'interaction sur mobile/desktop
+        });
+
+        // Afficher un simple marqueur (sur les coordonnées ajustées)
+        new google.maps.Marker({
+            position: { lat: displayLat, lng: displayLng },
+            map: map,
+            // title: "Zone approximative du logement" // Optionnel
+        });
+
+        // Ou, pour un cercle représentant une zone :
+        /*
+        new google.maps.Circle({
+            strokeColor: '#4A90E2', // Couleur de la bordure du cercle
+            strokeOpacity: 0.7,
+            strokeWeight: 1,
+            fillColor: '#4A90E2', // Couleur de remplissage
+            fillOpacity: 0.20,
+            map: map,
+            center: { lat: displayLat, lng: displayLng },
+            radius: 300 // Rayon en mètres (ajustez selon le niveau de "flou" désiré)
+        });
+        */
+        console.log("[MAP_SCRIPT] Carte initialisée avec succès.");
+
+    } catch (e) {
+        console.error("[MAP_SCRIPT] Erreur lors de l'initialisation de Google Maps:", e);
+        mapElement.innerHTML = "<p style='text-align:center; padding:20px;'>Erreur lors du chargement de la carte.</p>";
+    }
+}
+
+
+
 document.addEventListener('DOMContentLoaded', function () {
     console.log('[DETAIL_SCRIPT] DOMContentLoaded');
 
@@ -152,96 +245,6 @@ function renderPhotoGrid(allPhotos, annonceDetails) { // annonceDetails est l'ob
 }
 
 
-// Variable globale pour stocker les données de la carte si l'API se charge après les données Xano
-let mapDataToDisplay = null;
-// Drapeau pour savoir si l'API Google Maps est prête
-window.googleMapsApiIsReady = false;
-
-// Cette fonction sera appelée par le script Google Maps une fois chargé (grâce au paramètre 'callback')
-function onGoogleMapsApiReady() {
-    console.log('[MAP_SCRIPT] Google Maps API chargée et prête.');
-    window.googleMapsApiIsReady = true;
-    // Si les données de l'annonce (et donc les coordonnées) ont été chargées AVANT l'API Maps,
-    // on affiche la carte maintenant.
-    if (mapDataToDisplay) {
-        console.log('[MAP_SCRIPT] Données en attente trouvées, initialisation de la carte.');
-        initializeDetailMap(mapDataToDisplay.latitude, mapDataToDisplay.longitude);
-        mapDataToDisplay = null; // Nettoyer après utilisation
-    }
-}
-
-// Fonction principale pour initialiser et afficher la carte
-function initializeDetailMap(latitude, longitude) {
-    const mapElement = document.getElementById('property-location-map');
-
-    if (!mapElement) {
-        console.error("[MAP_SCRIPT] Élément #property-location-map introuvable.");
-        return;
-    }
-
-    // Vérifier si les coordonnées sont valides (nombres)
-    const latNum = parseFloat(latitude);
-    const lngNum = parseFloat(longitude);
-
-    if (isNaN(latNum) || isNaN(lngNum)) {
-        console.warn("[MAP_SCRIPT] Coordonnées latitude/longitude invalides ou manquantes. Carte non affichée.");
-        mapElement.innerHTML = "<p style='text-align:center; padding:20px;'>Localisation approximative non disponible.</p>";
-        return;
-    }
-
-    // --- Ajustement pour une localisation moins précise ---
-    // Option 1: Arrondir les coordonnées à ~3 décimales (environ 100m de précision)
-    const displayLat = parseFloat(latNum.toFixed(3));
-    const displayLng = parseFloat(lngNum.toFixed(3));
-    // Option 2 (plus de flou): Ajouter un petit décalage aléatoire
-    // const offset = 0.002; // Environ 200m
-    // const displayLat = latNum + (Math.random() - 0.5) * offset;
-    // const displayLng = lngNum + (Math.random() - 0.5) * offset;
-
-
-    console.log(`[MAP_SCRIPT] Initialisation de la carte avec Lat: ${displayLat}, Lng: ${displayLng}`);
-
-    try {
-        const map = new google.maps.Map(mapElement, {
-            center: { lat: displayLat, lng: displayLng },
-            zoom: 14, // Un zoom de 14-15 montre un quartier, pas une adresse exacte.
-            disableDefaultUI: true, // Cache la plupart des contrôles
-            zoomControl: true,      // Mais on peut garder le contrôle du zoom
-            streetViewControl: false,
-            mapTypeControl: false,
-            fullscreenControl: false,
-            gestureHandling: 'cooperative' // Recommandé pour l'interaction sur mobile/desktop
-        });
-
-        // Afficher un simple marqueur (sur les coordonnées ajustées)
-        new google.maps.Marker({
-            position: { lat: displayLat, lng: displayLng },
-            map: map,
-            // title: "Zone approximative du logement" // Optionnel
-        });
-
-        // Ou, pour un cercle représentant une zone :
-        /*
-        new google.maps.Circle({
-            strokeColor: '#4A90E2', // Couleur de la bordure du cercle
-            strokeOpacity: 0.7,
-            strokeWeight: 1,
-            fillColor: '#4A90E2', // Couleur de remplissage
-            fillOpacity: 0.20,
-            map: map,
-            center: { lat: displayLat, lng: displayLng },
-            radius: 300 // Rayon en mètres (ajustez selon le niveau de "flou" désiré)
-        });
-        */
-        console.log("[MAP_SCRIPT] Carte initialisée avec succès.");
-
-    } catch (e) {
-        console.error("[MAP_SCRIPT] Erreur lors de l'initialisation de Google Maps:", e);
-        mapElement.innerHTML = "<p style='text-align:center; padding:20px;'>Erreur lors du chargement de la carte.</p>";
-    }
-}
-
-    
     async function fetchPropertyDetails() {
         console.log(`[DETAIL_SCRIPT_FETCH] Appel pour la propriété ID: ${propertyId}`);
         // detailContainerElement.innerHTML = '<p>Chargement des détails de l\'annonce...</p>';//
