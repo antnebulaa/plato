@@ -31,11 +31,128 @@ document.addEventListener('DOMContentLoaded', function () {
     // ELIDED: bindDataToElement function (identique à celle de home-form-display-v3.js)
     // ELIDED: initializePageSwipers function (identique à celle de home-form-display-v3.js)
     
-    // ASSUREZ-VOUS QUE LES TROIS FONCTIONS CI-DESSUS SONT DÉFINIES ICI.
-    // Pour la lisibilité, je ne les ai pas recopiées, mais elles sont indispensables.
-    // Vous pouvez les mettre directement ici, ou dans un fichier "utils.js" que vous chargez
-    // dans les deux pages HTML (accueil et détails).
+   
 
+
+
+function renderPhotoGrid(allPhotos, annonceDetails) { // annonceDetails est l'objet de l'annonce (ex: propertyData)
+    const gridContainer = document.querySelector('.photo-grid-container'); // Adaptez si votre sélecteur est différent
+
+    if (!gridContainer) {
+        console.error("renderPhotoGrid: Conteneur de grille '.photo-grid-container' non trouvé.");
+        return;
+    }
+
+    if (!allPhotos || !Array.isArray(allPhotos) || allPhotos.length === 0) {
+        console.warn("renderPhotoGrid: Aucune photo à afficher ou données photos non valides.");
+        gridContainer.style.display = 'none'; // Cache la grille si pas de photos
+        return;
+    } else {
+        gridContainer.style.display = ''; // Ou votre style d'affichage par défaut pour la grille (flex, grid, etc.)
+    }
+
+    const displayedPhotoIds = new Set();
+
+    // --- Fonctions utilitaires pour cibler les images et leurs conteneurs ---
+    function getImageUrl(photo) {
+        if (photo && photo.images && Array.isArray(photo.images) && photo.images.length > 0 && photo.images[0].url) {
+            return photo.images[0].url;
+        }
+        console.warn("renderPhotoGrid: URL d'image non trouvée ou structure 'images' incorrecte pour la photo ID:", photo ? photo.id : 'inconnue');
+        return null; // Ou une URL de placeholder
+    }
+
+    function getImageElement(slotName) {
+        return gridContainer.querySelector(`img[data-photo-src="${slotName}"]`);
+    }
+
+    function getSlotElement(slotName) {
+        const imgEl = getImageElement(slotName);
+        return imgEl ? imgEl.closest('[data-grid-slot]') || imgEl.parentElement : null;
+    }
+
+    function displayPhoto(slotName, photo) {
+        const imgElement = getImageElement(slotName);
+        const slotElement = getSlotElement(slotName);
+        const imageUrl = photo ? getImageUrl(photo) : null;
+
+        if (imgElement && imageUrl) {
+            imgElement.src = imageUrl;
+            imgElement.alt = photo.photo_desc || (annonceDetails && annonceDetails.property_title ? `${annonceDetails.property_title} - ${slotName}` : `Photo ${slotName}`);
+            if (slotElement) slotElement.style.display = '';
+            if (photo) displayedPhotoIds.add(photo.id);
+        } else if (slotElement) {
+            console.warn(`renderPhotoGrid: Pas de photo ou URL valide pour le slot "${slotName}". Photo data:`, photo);
+            slotElement.style.display = 'none';
+        } else if (!imgElement && slotName) {
+            console.warn(`renderPhotoGrid: Élément img pour slot "${slotName}" non trouvé.`);
+        }
+    }
+
+    // 1. Trouver et afficher la photo de couverture
+    let coverPhoto = allPhotos.find(p => p.is_cover === true);
+    if (!coverPhoto && allPhotos.length > 0) {
+        coverPhoto = [...allPhotos].sort((a, b) => (new Date(b.created_at).getTime()) - (new Date(a.created_at).getTime()))[0];
+    }
+    displayPhoto("cover", coverPhoto);
+    
+    // 2. Préparer les photos pour les petits slots
+    const photosForSmallSlots = [];
+
+    // a. Photos prioritaires : photo avec photo_order = 1 de chaque pièce (non déjà affichée)
+    const roomPhotosMap = new Map();
+    allPhotos.forEach(p => {
+        // Utiliser "property_photos_rooms_id" comme identifiant de la pièce
+        const roomId = p.property_photos_rooms_id; 
+        if (roomId && !displayedPhotoIds.has(p.id)) {
+            const currentPhotoInMap = roomPhotosMap.get(roomId);
+            if (!currentPhotoInMap ||
+                (p.photo_order === 1 && (currentPhotoInMap.photo_order !== 1 || (new Date(p.created_at).getTime()) > (new Date(currentPhotoInMap.created_at).getTime()))) || // Priorité à photo_order 1, puis la plus récente si plusieurs order 1
+                (p.photo_order !== 1 && currentPhotoInMap.photo_order !== 1 && (p.photo_order || Infinity) < (currentPhotoInMap.photo_order || Infinity)) ||
+                (p.photo_order !== 1 && currentPhotoInMap.photo_order !== 1 && (p.photo_order === currentPhotoInMap.photo_order) && (new Date(p.created_at).getTime()) > (new Date(currentPhotoInMap.created_at).getTime()))
+            ) {
+                roomPhotosMap.set(roomId, p);
+            }
+        }
+    });
+    
+    // Trier les photos de pièces (par exemple, par nom de pièce si disponible, ou ordre de création de la pièce - non implémenté ici)
+    // Pour l'instant, on les prend dans l'ordre où elles sont venues après le filtrage par photo_order
+    const uniqueRoomPhotos = Array.from(roomPhotosMap.values())
+                              // Optionnel: trier les photos de pièces, par ex. par nom de pièce si vous l'aviez, ou par ID de pièce
+                              .sort((a,b) => (a.property_photos_rooms_id || 0) - (b.property_photos_rooms_id || 0)); 
+
+    uniqueRoomPhotos.forEach(p => {
+        if (photosForSmallSlots.length < 4 && !displayedPhotoIds.has(p.id)) {
+            photosForSmallSlots.push(p);
+            displayedPhotoIds.add(p.id);
+        }
+    });
+
+    // b. Photos de fallback : les plus récentes, non déjà affichées, pour combler
+    if (photosForSmallSlots.length < 4) {
+        const fallbackPhotos = [...allPhotos]
+            .filter(p => !displayedPhotoIds.has(p.id))
+            .sort((a, b) => (new Date(b.created_at).getTime()) - (new Date(a.created_at).getTime()));
+
+        fallbackPhotos.forEach(p => {
+            if (photosForSmallSlots.length < 4) {
+                photosForSmallSlots.push(p);
+                displayedPhotoIds.add(p.id);
+            }
+        });
+    }
+
+    // 3. Afficher les photos dans les petits slots
+    for (let i = 0; i < 4; i++) {
+        displayPhoto(`small-${i + 1}`, photosForSmallSlots[i]);
+    }
+
+    console.log("renderPhotoGrid: Affichage de la grille terminé.");
+}
+
+
+    
     async function fetchPropertyDetails() {
         console.log(`[DETAIL_SCRIPT_FETCH] Appel pour la propriété ID: ${propertyId}`);
         // detailContainerElement.innerHTML = '<p>Chargement des détails de l\'annonce...</p>';//
@@ -85,6 +202,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 bindDataToElement(element, propertyData);
             });
             
+            // === NOUVEL APPEL POUR LA GRILLE PHOTO ===
+            if (propertyData._property_photos && Array.isArray(propertyData._property_photos)) {
+                renderPhotoGrid(propertyData._property_photos, propertyData); // On passe les photos et l'objet annonce entier
+            } else {
+                console.warn("Aucun tableau _property_photos valide trouvé dans les données de l'annonce pour la grille.");
+                const gridContainer = document.querySelector('.photo-grid-container');
+                if (gridContainer) gridContainer.style.display = 'none';
+            }
+            // ========================================
+            
             // Initialiser les sliders Swiper s'il y en a sur la page de détail
             // La fonction initializePageSwipers cherchera les éléments .swiper[data-slider-init="true"]
             // `bindDataToElement` devrait avoir mis cet attribut si un slider de photos a été peuplé.
@@ -101,6 +228,12 @@ document.addEventListener('DOMContentLoaded', function () {
     // Lancer la récupération des données pour l'annonce
     fetchPropertyDetails();
 });
+
+
+ // ASSUREZ-VOUS QUE LES TROIS FONCTIONS CI-DESSUS SONT DÉFINIES ICI.
+    // Pour la lisibilité, je ne les ai pas recopiées, mais elles sont indispensables.
+    // Vous pouvez les mettre directement ici, ou dans un fichier "utils.js" que vous chargez
+    // dans les deux pages HTML (accueil et détails).
 
 function getNestedValue(obj, pathString) {
     if (!obj || !pathString || typeof pathString !== 'string') return undefined;
