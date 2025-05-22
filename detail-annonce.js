@@ -72,7 +72,7 @@ function initializeDetailMap(latitude, longitude) {
         });
 
         // Ou, pour un cercle représentant une zone :
-        /*
+        
         new google.maps.Circle({
             strokeColor: '#4A90E2', // Couleur de la bordure du cercle
             strokeOpacity: 0.7,
@@ -83,7 +83,7 @@ function initializeDetailMap(latitude, longitude) {
             center: { lat: displayLat, lng: displayLng },
             radius: 300 // Rayon en mètres (ajustez selon le niveau de "flou" désiré)
         });
-        */
+        
         console.log("[MAP_SCRIPT] Carte initialisée avec succès.");
 
     } catch (e) {
