@@ -65,11 +65,11 @@ function initializeDetailMap(latitude, longitude) {
         });
 
         // Afficher un simple marqueur (sur les coordonnées ajustées)
-        new google.maps.Marker({
-            position: { lat: displayLat, lng: displayLng },
-            map: map,
-            // title: "Zone approximative du logement" // Optionnel
-        });
+        // new google.maps.Marker({
+        //    position: { lat: displayLat, lng: displayLng },
+        //    map: map,
+       //     // title: "Zone approximative du logement" // Optionnel
+       // });
 
         // Ou, pour un cercle représentant une zone :
         
