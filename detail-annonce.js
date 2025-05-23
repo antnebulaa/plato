@@ -8,18 +8,6 @@ let mapDataToDisplay = null;
 // Drapeau pour savoir si l'API Google Maps est prête
 window.googleMapsApiIsReady = false;
 
-// Cette fonction sera appelée par le script Google Maps une fois chargé (grâce au paramètre 'callback')
-function onGoogleMapsApiReady() {
-    console.log('[MAP_SCRIPT] Google Maps API chargée et prête.');
-    window.googleMapsApiIsReady = true;
-    // Si les données de l'annonce (et donc les coordonnées) ont été chargées AVANT l'API Maps,
-    // on affiche la carte maintenant.
-    if (mapDataToDisplay) {
-        console.log('[MAP_SCRIPT] Données en attente trouvées, initialisation de la carte.');
-        initializeDetailMap(mapDataToDisplay.latitude, mapDataToDisplay.longitude);
-        mapDataToDisplay = null; // Nettoyer après utilisation
-    }
-}
 
 // Fonction principale pour initialiser et afficher la carte
 function initializeDetailMap(latitude, longitude) {
