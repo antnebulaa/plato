@@ -295,20 +295,20 @@ function setupSectionNavigation() {
     });
 }
 
-// Appelez setupSectionNavigation() dans votre DOMContentLoaded
-document.addEventListener('DOMContentLoaded', function() {
-    // ... votre code existant ...
-    try {
+ // Appelez setupSectionNavigation() dans votre DOMContentLoaded
+ // document.addEventListener('DOMContentLoaded', function() {
+ //    ... votre code existant ...
+ //    try {
         // ... init xanoClient, forms, etc. ...
-        setupSectionNavigation(); // Ajoutez cet appel
+ //        setupSectionNavigation(); // Ajoutez cet appel
 
-        // Gérer le chargement initial basé sur l'URL
-        const initialSection = getQueryParam('section') || 'general'; // 'general' est un exemple de section par défaut
-        loadAndDisplaySection(initialSection, false); // false pour ne pas réécrire l'URL si elle est déjà correcte
+ //        // Gérer le chargement initial basé sur l'URL
+ //       const initialSection = getQueryParam('section') || 'general'; // 'general' est un exemple de section par défaut
+ //       loadAndDisplaySection(initialSection, false); // false pour ne pas réécrire l'URL si elle est déjà correcte
 
-        console.log("Initialisation avec navigation par section terminée.");
-    } catch (initError) { /* ... */ }
-});
+ //        console.log("Initialisation avec navigation par section terminée.");
+ //    } catch (initError) { /* ... */ }
+ //});
 
 
 // --- Initialisation des Formulaires (Identique v8) ---
@@ -885,25 +885,6 @@ function setupMobileBackButton() {
     }
 }
 // --- FIN DÉFINITIONS ---
-
-
-window.addEventListener('popstate', function(event) {
-    // event.state contient l'objet que vous avez passé à pushState
-    const previousState = event.state;
-    let sectionToLoad = 'general'; // Section par défaut si pas d'état
-
-    if (previousState && previousState.section) {
-        sectionToLoad = previousState.section;
-    } else {
-        // Fallback si pas d'état, lire depuis l'URL actuelle
-        sectionToLoad = getQueryParam('section') || 'general';
-    }
-
-    console.log(`Popstate détecté - Affichage section: ${sectionToLoad}`);
-    // Important: Ne pas mettre à jour l'URL ici (updateUrl = false)
-    // car l'URL a déjà été changée par le navigateur
-    loadAndDisplaySection(sectionToLoad, false);
-});
 
 
 // MODIFIÉ v8 -> v8.3: bindDataToElement gère l'accès au tableau metadata
