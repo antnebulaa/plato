@@ -5,9 +5,14 @@
 
 // Variable globale pour stocker les données de la carte si l'API se charge après les données Xano
 //let mapDataToDisplay = null;
-window.mapDataToDisplay = null; // Attachée à window pour être vraiment globale
+
 // Drapeau pour savoir si l'API Google Maps est prête
-window.googleMapsApiIsReady = false;
+if (typeof window.googleMapsApiIsReady === 'undefined') {
+    window.googleMapsApiIsReady = false; // Initialiser seulement si pas déjà fait par initMap
+}
+if (typeof window.mapDataToDisplay === 'undefined') { // Pareil pour mapDataToDisplay
+     window.mapDataToDisplay = null;
+}
 
 
 // Fonction principale pour initialiser et afficher la carte
