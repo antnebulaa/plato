@@ -5,19 +5,19 @@
 
 // Variable globale pour stocker les données de la carte si l'API se charge après les données Xano
 let mapDataToDisplay = null;
+window.mapDataToDisplay = null; // Attachée à window pour être vraiment globale
 // Drapeau pour savoir si l'API Google Maps est prête
 window.googleMapsApiIsReady = false;
 
 
 // Fonction principale pour initialiser et afficher la carte
 function initializeDetailMap(latitude, longitude) {
+    console.log('[MAP_SCRIPT_DETAIL] Tentative d\'initialisation de la carte de détail.');
     const mapElement = document.getElementById('property-location-map');
-
     if (!mapElement) {
-        console.error("[MAP_SCRIPT] Élément #property-location-map introuvable.");
+        console.error("[MAP_SCRIPT_DETAIL] Élément #property-location-map introuvable.");
         return;
     }
-
     // Vérifier si les coordonnées sont valides (nombres)
     const latNum = parseFloat(latitude);
     const lngNum = parseFloat(longitude);
