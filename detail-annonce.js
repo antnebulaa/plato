@@ -11,7 +11,7 @@ window.googleMapsApiIsReady = false;
 
 
 // Fonction principale pour initialiser et afficher la carte
-window initializeDetailMap(latitude, longitude) {
+window.initializeDetailMap(latitude, longitude) {
     console.log('[MAP_SCRIPT_DETAIL] Tentative d\'initialisation de la carte de détail.');
     const mapElement = document.getElementById('property-location-map');
     if (!mapElement) {
