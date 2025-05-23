@@ -4,7 +4,7 @@
 
 
 // Variable globale pour stocker les données de la carte si l'API se charge après les données Xano
-let mapDataToDisplay = null;
+//let mapDataToDisplay = null;
 window.mapDataToDisplay = null; // Attachée à window pour être vraiment globale
 // Drapeau pour savoir si l'API Google Maps est prête
 window.googleMapsApiIsReady = false;
