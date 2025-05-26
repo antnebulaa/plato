@@ -150,3 +150,11 @@ document.addEventListener('DOMContentLoaded', function () {
     //     fetchUserFavorites().then(initFavoriteButtons); // Re-vérifier les favoris et mettre à jour tous les boutons
     // });
 });
+
+document.addEventListener('annoncesChargeesEtRendues', function(event) {
+    console.log('[FAVORITES_MANAGER] Événement annoncesChargeesEtRendues reçu. Réinitialisation des boutons de favoris.');
+    // On suppose que fetchUserFavorites a déjà été appelé une fois au chargement de la page.
+    // On a juste besoin de mettre à jour les boutons et d'attacher les écouteurs aux nouveaux.
+    // initFavoriteButtons() fait déjà les deux.
+    initFavoriteButtons();
+});
