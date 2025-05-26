@@ -58,6 +58,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // --- 1. GESTION DU CLIC SUR L'ICÔNE "COEUR" D'UNE ANNONCE ---
 
+// Dans favorites-manager.js
 function initPropertyHeartButtons() {
     console.log('[FAVORITES_ALBUM_MANAGER] APPEL DE initPropertyHeartButtons');
     const buttons = document.querySelectorAll('.favorite-btn');
@@ -104,7 +105,6 @@ function initPropertyHeartButtons() {
         }, true); // On garde 'true' pour la phase de capture pour l'instant
     });
 }
-
     // --- 2. OUVERTURE ET REMPLISSAGE DE LA MODALE DE SÉLECTION D'ALBUM ---
     // Dans favorites-manager.js
 
