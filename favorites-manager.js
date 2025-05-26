@@ -57,30 +57,35 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 // --- 1. GESTION DU CLIC SUR L'ICÔNE "COEUR" D'UNE ANNONCE ---
-function initPropertyHeartButtons() {
-    // Ciblez tous vos boutons "coeur" sur les annonces.
-    document.querySelectorAll('.bouton-sauvegarder-annonce').forEach(button => {
-        button.addEventListener('click', function (event) { // Ajoutez 'event' comme paramètre ici
-            
-            // Empêche l'événement de "remonter" aux éléments parents (comme le lien de la carte)
-            event.stopPropagation();
-            event.preventDefault(); // Peut aussi être utile pour empêcher toute action par défaut si le bouton lui-même était un type submit ou dans un lien.
+// Dans favorites-manager.js
 
-            // --- Début de votre logique existante pour ce clic ---
+function initPropertyHeartButtons() {
+    document.querySelectorAll('.favorite-btn').forEach(button => { // MODIFIÉ ICI : '.favorite-btn'
+        button.addEventListener('click', function (event) {
+            console.log('[FAVORITES_ALBUM_MANAGER] Clic sur .favorite-btn DÉTECTÉ.');
+            
+            // Arrêter la propagation IMMÉDIATEMENT
+            event.stopPropagation(); 
+            event.preventDefault(); 
+            console.log('[FAVORITES_ALBUM_MANAGER] Propagation et action par défaut ARRÊTÉES.');
+
             updateAuthToken();
             if (!authToken) {
                 alert("Veuillez vous connecter pour sauvegarder une annonce.");
-                // Peut-être rediriger vers la page de connexion
                 return;
             }
+
             currentPropertyIdToSave = this.dataset.propertyId;
-            if (!currentPropertyIdToSave) {
-                console.error("ID de propriété manquant sur le bouton de sauvegarde.");
+            if (!currentPropertyIdToSave || currentPropertyIdToSave === "[REMPLACER_PAR_ID_ANNONCE]") { // Vérification ajoutée
+                console.error("ID de propriété manquant ou non remplacé sur le bouton (data-property-id). Bouton:", this);
+                alert("Erreur : ID de propriété de l'annonce non trouvé sur ce bouton.");
                 return;
             }
             console.log(`[FAVORITES_ALBUM_MANAGER] Sauvegarde demandée pour property_id: ${currentPropertyIdToSave}`);
-            openAndPopulateSelectAlbumModal();
-            // --- Fin de votre logique existante ---
+            
+            // Appel de la fonction qui va maintenant se concentrer sur le PEUPLEMENT de la modale
+            // (en supposant que Finsweet gère son ouverture/fermeture grâce à fs-modal-element)
+            populateModalWithAlbums(); 
         });
     });
 }
