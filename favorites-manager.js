@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let userAlbums = []; // Pour stocker les albums de l'utilisateur [{id, name_Album, ...}, ...]
 
     // IDs des éléments de votre modale (à adapter)
-    const MODAL_ID = 'votre-id-de-modale'; // L'ID de votre modale principale
+    const MODAL_ID = 'modale-favorites'; // L'ID de votre modale principale
     const MODAL_LISTE_ALBUMS_CONTENEUR_ID = 'modal-liste-albums-conteneur'; // Où la liste des albums sera injectée
     const TEMPLATE_ITEM_ALBUM_MODAL_ID = 'template-item-album-modal'; // Le template d'un item album
     const BTN_OUVRIR_FORM_NOUVEL_ALBUM_ID = 'btn-ouvrir-form-nouvel-album'; // Bouton pour afficher le form
@@ -91,30 +91,50 @@ function initPropertyHeartButtons() {
 }
 
     // --- 2. OUVERTURE ET REMPLISSAGE DE LA MODALE DE SÉLECTION D'ALBUM ---
-    async function openAndPopulateSelectAlbumModal() {
-        if (!modalElement || !messageModalAlbums || !modalListeAlbumsConteneur) {
-            console.error("Éléments de base de la modale non trouvés.");
+    // Dans favorites-manager.js
+
+async function populateModalWithAlbums() {
+    // Assurez-vous que modalElement (obtenu via MODAL_ID), messageModalAlbums, 
+    // et modalListeAlbumsConteneur sont bien initialisés en haut du script.
+    if (!modalElement || !messageModalAlbums || !modalListeAlbumsConteneur) {
+        console.error("Éléments essentiels de la modale des albums non trouvés. Vérifiez les constantes d'ID dans favorites-manager.js (MODAL_ID, etc.).");
+        alert("Erreur : Problème de configuration pour afficher les albums favoris.");
+        return;
+    }
+
+    // Finsweet s'occupe d'afficher/cacher `modalElement`.
+    // Nous nous occupons du contenu.
+    messageModalAlbums.textContent = 'Chargement de vos albums...';
+    messageModalAlbums.style.display = 'block';
+    modalListeAlbumsConteneur.innerHTML = '';
+    if(formNouvelAlbum) formNouvelAlbum.style.display = 'none'; // Si vous avez un formulaire de création d'album
+
+    try {
+        console.log("[FAVORITES_ALBUM_MANAGER] Récupération des albums pour la modale (populateModalWithAlbums).");
+        // favoritesXanoClient et authToken doivent être à jour
+        updateAuthToken(); // S'assurer que le token est frais
+        if (!authToken) {
+             // Ce cas est déjà géré dans initPropertyHeartButtons, mais une double vérification est possible.
+             // Normalement, on n'arrive pas ici si l'utilisateur n'est pas connecté.
+            messageModalAlbums.textContent = "Veuillez vous connecter.";
             return;
         }
 
-        // Afficher votre modale (vous pourriez avoir votre propre système pour cela)
-        modalElement.style.display = 'block'; // Ou votre méthode d'affichage
-        messageModalAlbums.textContent = 'Chargement de vos albums...';
-        messageModalAlbums.style.display = 'block';
-        modalListeAlbumsConteneur.innerHTML = ''; // Vider la liste précédente
-        formNouvelAlbum.style.display = 'none'; // Cacher le formulaire de création au début
+        const albums = await favoritesXanoClient.get('favorites_album'); // GET /favorites_album
+        userAlbums = (Array.isArray(albums)) ? albums : (albums && Array.isArray(albums.items)) ? albums.items : [];
+        console.log(`[FAVORITES_ALBUM_MANAGER] ${userAlbums.length} albums trouvés.`);
+        
+        // renderAlbumListInModal s'occupe d'afficher les albums dans modalListeAlbumsConteneur
+        renderAlbumListInModal(userAlbums); 
 
-        try {
-            console.log("[FAVORITES_ALBUM_MANAGER] Récupération des albums de l'utilisateur.");
-            const albums = await favoritesXanoClient.get('favorites_album'); // GET /favorites_album
-            userAlbums = (Array.isArray(albums)) ? albums : (albums && Array.isArray(albums.items)) ? albums.items : [];
-            console.log(`[FAVORITES_ALBUM_MANAGER] ${userAlbums.length} albums trouvés.`);
-            renderAlbumListInModal(userAlbums);
-        } catch (error) {
-            console.error("[FAVORITES_ALBUM_MANAGER] Erreur lors de la récupération des albums:", error);
-            messageModalAlbums.textContent = "Erreur lors du chargement de vos albums.";
+    } catch (error) {
+        console.error("[FAVORITES_ALBUM_MANAGER] Erreur lors de la récupération des albums pour la modale:", error);
+        messageModalAlbums.textContent = "Erreur lors du chargement de vos albums.";
+         if (error.message.toLowerCase().includes('unauthorized') || error.message.includes('401')) {
+            messageModalAlbums.textContent = "Votre session a peut-être expiré. Veuillez vous reconnecter.";
         }
     }
+}
 
     // --- 3. AFFICHAGE DE LA LISTE DES ALBUMS DANS LA MODALE ---
     function renderAlbumListInModal(albums) {
