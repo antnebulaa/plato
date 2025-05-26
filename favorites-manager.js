@@ -59,15 +59,17 @@ document.addEventListener('DOMContentLoaded', function () {
 // --- 1. GESTION DU CLIC SUR L'ICÔNE "COEUR" D'UNE ANNONCE ---
 // Dans favorites-manager.js
 
+// Dans favorites-manager.js
+
 function initPropertyHeartButtons() {
-    document.querySelectorAll('.favorite-btn').forEach(button => { // MODIFIÉ ICI : '.favorite-btn'
+    document.querySelectorAll('.favorite-btn').forEach(button => {
         button.addEventListener('click', function (event) {
             console.log('[FAVORITES_ALBUM_MANAGER] Clic sur .favorite-btn DÉTECTÉ.');
             
-            // Arrêter la propagation IMMÉDIATEMENT
-            event.stopPropagation(); 
-            event.preventDefault(); 
-            console.log('[FAVORITES_ALBUM_MANAGER] Propagation et action par défaut ARRÊTÉES.');
+            event.stopPropagation(); // Gardez ceci pour arrêter la redirection
+            // event.preventDefault(); // <<<< METTEZ CETTE LIGNE EN COMMENTAIRE OU SUPPRIMEZ-LA
+
+            console.log('[FAVORITES_ALBUM_MANAGER] Propagation de l\'événement ARRÊTÉE.');
 
             updateAuthToken();
             if (!authToken) {
@@ -76,15 +78,13 @@ function initPropertyHeartButtons() {
             }
 
             currentPropertyIdToSave = this.dataset.propertyId;
-            if (!currentPropertyIdToSave || currentPropertyIdToSave === "[REMPLACER_PAR_ID_ANNONCE]") { // Vérification ajoutée
+            if (!currentPropertyIdToSave || currentPropertyIdToSave === "[REMPLACER_PAR_ID_ANNONCE]") {
                 console.error("ID de propriété manquant ou non remplacé sur le bouton (data-property-id). Bouton:", this);
                 alert("Erreur : ID de propriété de l'annonce non trouvé sur ce bouton.");
                 return;
             }
             console.log(`[FAVORITES_ALBUM_MANAGER] Sauvegarde demandée pour property_id: ${currentPropertyIdToSave}`);
             
-            // Appel de la fonction qui va maintenant se concentrer sur le PEUPLEMENT de la modale
-            // (en supposant que Finsweet gère son ouverture/fermeture grâce à fs-modal-element)
             populateModalWithAlbums(); 
         });
     });
