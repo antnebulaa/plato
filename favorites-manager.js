@@ -57,45 +57,51 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 // --- 1. GESTION DU CLIC SUR L'ICÔNE "COEUR" D'UNE ANNONCE ---
-// Dans favorites-manager.js
 
-// Dans favorites-manager.js
-
-// Dans favorites-manager.js
 function initPropertyHeartButtons() {
     console.log('[FAVORITES_ALBUM_MANAGER] APPEL DE initPropertyHeartButtons');
-    const buttons = document.querySelectorAll('.favorite-btn'); // On cible bien '.favorite-btn'
+    const buttons = document.querySelectorAll('.favorite-btn');
     console.log(`[FAVORITES_ALBUM_MANAGER] Trouvé ${buttons.length} bouton(s) avec la classe .favorite-btn`);
 
     if (buttons.length === 0) {
-        console.warn("[FAVORITES_ALBUM_MANAGER] AUCUN bouton .favorite-btn trouvé. Vérifiez la classe dans votre HTML et le timing d'appel de initPropertyHeartButtons.");
+        console.warn("[FAVORITES_ALBUM_MANAGER] AUCUN bouton .favorite-btn trouvé.");
         return;
     }
 
     buttons.forEach(button => {
-        const propertyIdFromButton = button.dataset.propertyId; // Récupérer l'ID pour le log
+        const propertyIdFromButton = button.dataset.propertyId;
         console.log(`[FAVORITES_ALBUM_MANAGER] Attachement de l'écouteur au bouton pour property_id: ${propertyIdFromButton}`, button);
 
-        // On va essayer d'attacher l'écouteur en phase de CAPTURE (true en troisième argument)
-        // pour qu'il se déclenche AVANT la phase de "bubbling" (remontée)
         button.addEventListener('click', function (event) {
-            console.log(`[FAVORITES_ALBUM_MANAGER] CLIC DÉTECTÉ sur .favorite-btn (property_id: ${this.dataset.propertyId})! Tentative d'arrêt complet.`);
-            
-            event.preventDefault();          // On remet preventDefault pour ce test maximal
+            console.log(`[FAVORITES_ALBUM_MANAGER] CLIC DÉTECTÉ sur .favorite-btn (property_id: ${this.dataset.propertyId})`);
+
+            event.preventDefault();          // Gardons-le pour l'instant
             event.stopPropagation();         // Essentiel
-            event.stopImmediatePropagation(); // Empêche même les autres écouteurs SUR CE MÊME BOUTON de se déclencher après celui-ci
+            event.stopImmediatePropagation(); // Gardons-le aussi si la modale s'est ouverte avec
 
-            console.log('[FAVORITES_ALBUM_MANAGER] Toutes les propagations et actions par défaut devraient être stoppées.');
-            
-            // Alerte pour un retour visuel immédiat que notre code s'est exécuté
-            alert('Clic intercepté par favorites-manager.js ! Propagation stoppée. La modale Finsweet devrait (ou non) s\'ouvrir. Pas de redirection attendue.'); 
-            
-            // Pour ce test, on ne fait RIEN d'autre (pas de populateModalWithAlbums, etc.)
-            // On veut juste voir si on peut arrêter la redirection.
-            
-            return false; // Ancienne méthode pour aussi tenter d'arrêter le comportement par défaut
+            console.log('[FAVORITES_ALBUM_MANAGER] Propagation et actions par défaut stoppées.');
 
-        }, true); // <<<< Notez le 'true' ici pour la phase de capture
+            // === Logique pour peupler la modale (remplace l'alerte) ===
+            updateAuthToken();
+            if (!authToken) {
+                alert("Veuillez vous connecter pour sauvegarder une annonce.");
+                // Peut-être que Finsweet a une méthode pour fermer la modale si elle s'est ouverte ?
+                // Ou afficher un message de connexion dans la modale.
+                return;
+            }
+
+            currentPropertyIdToSave = this.dataset.propertyId;
+            if (!currentPropertyIdToSave || currentPropertyIdToSave === "[REMPLACER_PAR_ID_ANNONCE]") {
+                console.error("ID de propriété manquant ou non remplacé sur le bouton (data-property-id). Bouton:", this);
+                alert("Erreur : ID de propriété de l'annonce non trouvé sur ce bouton.");
+                return;
+            }
+            console.log(`[FAVORITES_ALBUM_MANAGER] Sauvegarde demandée pour property_id: ${currentPropertyIdToSave}`);
+
+            populateModalWithAlbums(); // Appel pour peupler la modale que Finsweet a ouverte
+            // =======================================================
+
+        }, true); // On garde 'true' pour la phase de capture pour l'instant
     });
 }
 
