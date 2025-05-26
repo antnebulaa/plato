@@ -78,7 +78,7 @@ function initPropertyHeartButtons() {
 
             event.preventDefault();          // Gardons-le pour l'instant
             event.stopPropagation();         // Essentiel
-            event.stopImmediatePropagation(); // Gardons-le aussi si la modale s'est ouverte avec
+            //event.stopImmediatePropagation(); // Gardons-le aussi si la modale s'est ouverte avec
 
             console.log('[FAVORITES_ALBUM_MANAGER] Propagation et actions par défaut stoppées.');
 
