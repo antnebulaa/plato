@@ -182,42 +182,66 @@ async function populateModalWithAlbums() {
 
 
     // --- 3. AFFICHAGE DE LA LISTE DES ALBUMS DANS LA MODALE ---
-    function renderAlbumListInModal(albums) {
-        if (!modalListeAlbumsConteneur || !messageModalAlbums) return;
-        modalListeAlbumsConteneur.innerHTML = ''; // Vider
+    // Dans favorites-manager.js
+function renderAlbumListInModal(albums) {
+    if (!modalListeAlbumsConteneur) { // Simplification du garde-fou initial
+        console.error("MODAL_LISTE_ALBUMS_CONTENEUR_ID non trouvé.");
+        return;
+    }
+    // messageModalAlbums est utilisé plus loin, sa vérification peut rester là.
+    
+    modalListeAlbumsConteneur.innerHTML = ''; // Vider
 
-        if (!templateItemAlbumModal) {
-             messageModalAlbums.textContent = "Erreur : Template pour item d'album non trouvé.";
-             console.error("TEMPLATE_ITEM_ALBUM_MODAL_ID non trouvé dans le DOM.");
-             return;
-        }
+    if (!templateItemAlbumModal) {
+        if (messageModalAlbums) messageModalAlbums.textContent = "Erreur : Template pour item d'album non trouvé.";
+        console.error("TEMPLATE_ITEM_ALBUM_MODAL_ID non trouvé dans le DOM.");
+        return;
+    }
 
-        if (albums.length === 0) {
+    if (albums.length === 0) {
+        if (messageModalAlbums) {
             messageModalAlbums.textContent = "Vous n'avez aucun album. Créez-en un !";
             messageModalAlbums.style.display = 'block';
-        } else {
-            messageModalAlbums.style.display = 'none'; // Cacher le message s'il y a des albums
-            albums.forEach(album => {
-                const clone = templateItemAlbumModal.cloneNode(true);
-                clone.removeAttribute('id');
-                clone.style.display = ''; // Rendre visible
-
-                // Remplir le nom de l'album (adaptez le sélecteur si besoin)
-                const nameElement = clone.querySelector('[data-album-name]');
-                if (nameElement) {
-                    nameElement.textContent = album.name_Album || 'Album sans nom';
-                }
-                // Stocker l'ID de l'album sur l'élément pour le récupérer au clic
-                clone.dataset.albumId = album.id;
-
-                clone.addEventListener('click', async function () {
-                    const albumId = this.dataset.albumId;
-                    await savePropertyToAlbum(currentPropertyIdToSave, albumId);
-                });
-                modalListeAlbumsConteneur.appendChild(clone);
-            });
         }
+         // Afficher le bouton de création d'album même s'il n'y a pas d'albums
+        if(btnOuvrirFormNouvelAlbum) btnOuvrirFormNouvelAlbum.style.display = ''; // Ou 'block', etc.
+    } else {
+        if (messageModalAlbums) messageModalAlbums.style.display = 'none'; // Cacher le message s'il y a des albums
+        if(btnOuvrirFormNouvelAlbum) btnOuvrirFormNouvelAlbum.style.display = ''; // S'assurer qu'il est visible
+
+        albums.forEach(album => {
+            const clone = templateItemAlbumModal.cloneNode(true);
+            clone.removeAttribute('id'); // Important
+
+            // === MODIFICATION IMPORTANTE ICI ===
+            // Si votre template est caché avec display:none, rendez le clone visible.
+            // Choisissez le type de display qui convient à vos items d'album.
+            // 'block' est un bon point de départ pour des items en liste.
+            clone.style.display = 'block'; 
+            // Si vous utilisez Flexbox pour la liste, ce pourrait être 'flex'.
+            // Si le template était caché par une classe spécifique (ex: 'is-hidden'),
+            // vous feriez : clone.classList.remove('is-hidden'); ET vous assureriez son display.
+            // === FIN DE LA MODIFICATION IMPORTANTE ===
+
+            const nameElement = clone.querySelector('[data-album-name]');
+            if (nameElement) {
+                nameElement.textContent = album.name_Album || 'Album sans nom';
+            }
+            clone.dataset.albumId = album.id;
+
+            clone.addEventListener('click', async function () {
+                const albumId = this.dataset.albumId;
+                // On ne ferme plus la modale ici, on la laisse ouverte pour que l'utilisateur puisse
+                // voir l'action et éventuellement interagir avec le bouton "enregistré" ou
+                // la fermer lui-même. La fermeture est gérée par Finsweet ou une action utilisateur.
+                await savePropertyToAlbum(currentPropertyIdToSave, albumId); 
+                // Après sauvegarde, on pourrait vouloir rafraîchir l'état du bouton coeur sur la page principale,
+                // ou afficher un état "enregistré" dans la modale pour cet album.
+            });
+            modalListeAlbumsConteneur.appendChild(clone);
+        });
     }
+}
 
     // --- 4. SAUVEGARDER L'ANNONCE DANS UN ALBUM SPÉCIFIQUE ---
     async function savePropertyToAlbum(propertyId, albumId) {
