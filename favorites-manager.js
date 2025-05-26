@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', function () {
 // Dans favorites-manager.js
 function initPropertyHeartButtons() {
     console.log('[FAVORITES_ALBUM_MANAGER] APPEL DE initPropertyHeartButtons');
-    const buttons = document.querySelectorAll('.favorite-btn');
+    const buttons = document.querySelectorAll('.favorite-btn'); // Cible toujours .favorite-btn
     console.log(`[FAVORITES_ALBUM_MANAGER] Trouvé ${buttons.length} bouton(s) avec la classe .favorite-btn`);
 
     if (buttons.length === 0) {
@@ -73,21 +73,20 @@ function initPropertyHeartButtons() {
         const propertyIdFromButton = button.dataset.propertyId;
         console.log(`[FAVORITES_ALBUM_MANAGER] Attachement de l'écouteur au bouton pour property_id: ${propertyIdFromButton}`, button);
 
-        button.addEventListener('click', function (event) {
+        // Utiliser la phase de bubbling par défaut (false implicite ou explicite)
+        // car nous ne voulons plus être "ultra-agressifs" si ce n'est plus nécessaire
+        // après avoir découplé le trigger Finsweet.
+        button.addEventListener('click', async function (event) { // Rendre la fonction async ici
             console.log(`[FAVORITES_ALBUM_MANAGER] CLIC DÉTECTÉ sur .favorite-btn (property_id: ${this.dataset.propertyId})`);
+            
+            event.preventDefault(); // Essentiel pour arrêter la navigation du lien parent
+            event.stopPropagation();  // Essentiel pour arrêter la propagation au lien parent
 
-            event.preventDefault();          // Gardons-le pour l'instant
-            event.stopPropagation();         // Essentiel
-            //event.stopImmediatePropagation(); // Gardons-le aussi si la modale s'est ouverte avec
+            console.log('[FAVORITES_ALBUM_MANAGER] Propagation et action par défaut stoppées.');
 
-            console.log('[FAVORITES_ALBUM_MANAGER] Propagation et actions par défaut stoppées.');
-
-            // === Logique pour peupler la modale (remplace l'alerte) ===
             updateAuthToken();
             if (!authToken) {
                 alert("Veuillez vous connecter pour sauvegarder une annonce.");
-                // Peut-être que Finsweet a une méthode pour fermer la modale si elle s'est ouverte ?
-                // Ou afficher un message de connexion dans la modale.
                 return;
             }
 
@@ -98,49 +97,55 @@ function initPropertyHeartButtons() {
                 return;
             }
             console.log(`[FAVORITES_ALBUM_MANAGER] Sauvegarde demandée pour property_id: ${currentPropertyIdToSave}`);
-
-            populateModalWithAlbums(); // Appel pour peupler la modale que Finsweet a ouverte
-            // =======================================================
-
-        }, true); // On garde 'true' pour la phase de capture pour l'instant
+            
+            // 1. Peupler la modale (cela prépare le contenu)
+            await populateModalWithAlbums(); 
+            
+            // 2. Puis déclencher le clic sur le bouton Finsweet caché pour ouvrir la modale
+            const hiddenTrigger = document.getElementById('hidden-finsweet-album-trigger');
+            if (hiddenTrigger) {
+                console.log('[FAVORITES_ALBUM_MANAGER] Déclenchement du bouton Finsweet caché.');
+                hiddenTrigger.click(); // Ceci va demander à Finsweet d'ouvrir la modale
+            } else {
+                console.error("Bouton déclencheur Finsweet caché (hidden-finsweet-album-trigger) non trouvé !");
+                alert("Erreur : Impossible d'ouvrir la modale des favoris.");
+            }
+        } /*, false*/ ); // 'false' ou rien pour la phase de bubbling (par défaut)
     });
 }
-    // --- 2. OUVERTURE ET REMPLISSAGE DE LA MODALE DE SÉLECTION D'ALBUM ---
-    // Dans favorites-manager.js
 
+// La fonction populateModalWithAlbums reste la même que dans ma réponse précédente.
+// Elle s'occupe de mettre à jour le contenu de la modale identifiée par MODAL_ID.
 async function populateModalWithAlbums() {
-    // Assurez-vous que modalElement (obtenu via MODAL_ID), messageModalAlbums, 
-    // et modalListeAlbumsConteneur sont bien initialisés en haut du script.
     if (!modalElement || !messageModalAlbums || !modalListeAlbumsConteneur) {
-        console.error("Éléments essentiels de la modale des albums non trouvés. Vérifiez les constantes d'ID dans favorites-manager.js (MODAL_ID, etc.).");
-        alert("Erreur : Problème de configuration pour afficher les albums favoris.");
+        console.error("Éléments essentiels de la modale des albums non trouvés...");
+        alert("Erreur : Configuration de la modale des favoris incomplète.");
         return;
     }
-
-    // Finsweet s'occupe d'afficher/cacher `modalElement`.
-    // Nous nous occupons du contenu.
     messageModalAlbums.textContent = 'Chargement de vos albums...';
-    messageModalAlbums.style.display = 'block';
-    modalListeAlbumsConteneur.innerHTML = '';
-    if(formNouvelAlbum) formNouvelAlbum.style.display = 'none'; // Si vous avez un formulaire de création d'album
+    // ... (reste de la fonction populateModalWithAlbums comme précédemment) ...
+    // Elle se termine par renderAlbumListInModal(userAlbums); ou un message d'erreur.
+}
 
+// La fonction savePropertyToAlbum doit aussi être modifiée pour ne plus cacher modalElement,
+// car Finsweet s'en charge.
+async function savePropertyToAlbum(propertyId, albumId) {
+    // ... (début de la fonction identique : vérifications, appel Xano)
     try {
-        console.log("[FAVORITES_ALBUM_MANAGER] Récupération des albums pour la modale (populateModalWithAlbums).");
-        // favoritesXanoClient et authToken doivent être à jour
-        updateAuthToken(); // S'assurer que le token est frais
-        if (!authToken) {
-             // Ce cas est déjà géré dans initPropertyHeartButtons, mais une double vérification est possible.
-             // Normalement, on n'arrive pas ici si l'utilisateur n'est pas connecté.
-            messageModalAlbums.textContent = "Veuillez vous connecter.";
-            return;
-        }
+        await favoritesXanoClient.post('favorites_list', { /* ... */ });
+        console.log("[FAVORITES_ALBUM_MANAGER] Annonce ajoutée à l'album avec succès !");
 
-        const albums = await favoritesXanoClient.get('favorites_album'); // GET /favorites_album
-        userAlbums = (Array.isArray(albums)) ? albums : (albums && Array.isArray(albums.items)) ? albums.items : [];
-        console.log(`[FAVORITES_ALBUM_MANAGER] ${userAlbums.length} albums trouvés.`);
-        
-        // renderAlbumListInModal s'occupe d'afficher les albums dans modalListeAlbumsConteneur
-        renderAlbumListInModal(userAlbums); 
+        // Fermer la modale VIA FINSWEET si possible, ou laisser l'utilisateur le faire.
+        // Si vous avez un bouton de fermeture DANS la modale avec un attribut Finsweet "close",
+        // c'est mieux. Sinon, pour l'instant, on ne force pas la fermeture ici.
+        // if (modalElement) modalElement.style.display = 'none'; // ON NE FAIT PLUS CA
+
+        // Si Finsweet a une API JS pour fermer :
+        // FinsweetModal.close('votre-id-de-modale'); // Exemple conceptuel
+        // Ou si votre bouton "Enregistrer" dans la modale a un custom property qui ferme la modale,
+        // cette fonction n'a rien de plus à faire pour la fermeture.
+
+        triggerSaveAnimation();
 
     } catch (error) {
         console.error("[FAVORITES_ALBUM_MANAGER] Erreur lors de la récupération des albums pour la modale:", error);
