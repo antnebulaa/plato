@@ -141,77 +141,110 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderFavoritesInModal() {
-        if (!favoritesModalListContainer) return;
-        updateAuthToken();
-        if (!authToken) { // Double vérification
-             favoritesModalListContainer.innerHTML = '<p>Veuillez vous connecter pour voir vos favoris.</p>';
-             return;
-        }
-
-        favoritesModalListContainer.innerHTML = ''; // Vider le contenu précédent
-
-        if (userFavoritesDetails.length === 0) {
-            favoritesModalListContainer.innerHTML = '<p>Vous n\'avez pas encore d\'annonces en favoris.</p>';
-            return;
-        }
-
-        const ul = document.createElement('ul');
-        ul.className = 'favorites-list'; // Pour le style
-
-        userFavoritesDetails.forEach(favDetail => {
-            // favDetail devrait contenir les infos de l'annonce (titre, image, etc.)
-            // grâce à votre endpoint Xano modifié (Option 1)
-            const li = document.createElement('li');
-            li.className = 'favorite-item-modal';
-            // Adaptez ceci à la structure de données que Xano vous renvoie pour 'favDetail'
-            // et aux informations que vous voulez afficher.
-            // Assurez-vous que 'favDetail.property_title', 'favDetail.property_main_image_url', etc. existent.
-            // Le 'favDetail.id' ici est l'ID de l'annonce (property_id), ou l'ID de l'enregistrement favori.
-            // Si vous utilisez property_id pour le lien, c'est mieux.
-            const propertyTitle = favDetail.property_title || 'Titre non disponible';
-            const propertyImageUrl = favDetail.property_main_image_url || 'chemin/vers/image/par/defaut.png';
-            const propertyLink = `annonce?id=${favDetail.property_id}`; // Lien vers la page de l'annonce
-
-            li.innerHTML = `
-                <a href="${propertyLink}" class="favorite-item-link">
-                    <img src="${propertyImageUrl}" alt="${propertyTitle}" class="favorite-item-image" width="80" height="60">
-                    <div class="favorite-item-info">
-                        <h4>${propertyTitle}</h4>
-                        ${favDetail.property_price ? `<p>Prix : ${favDetail.property_price} €</p>` : ''}
-                    </div>
-                </a>
-                <button class="remove-from-favorites-modal-btn" data-property-id="${favDetail.property_id}" title="Retirer des favoris">×</button>
-            `;
-            ul.appendChild(li);
-
-            // Attacher l'événement pour le bouton de suppression dans la modale
-            const removeBtn = li.querySelector('.remove-from-favorites-modal-btn');
-            if (removeBtn) {
-                removeBtn.addEventListener('click', async function() {
-                    const propertyIdToRemove = this.dataset.propertyId;
-                    console.log(`[FAVORITES_MANAGER] Suppression depuis modale pour property_id: ${propertyIdToRemove}`);
-                    // On simule un clic sur un bouton "coeur" pour réutiliser la logique toggleFavorite
-                    // Mais il faut un vrai bouton "coeur" (même caché) ou appeler une fonction dédiée.
-                    // Pour simplifier ici, on appelle directement la suppression.
-                    this.disabled = true;
-                    try {
-                        await favoritesXanoClient.delete(`favorites_album_by_property/${propertyIdToRemove}`);
-                        userFavoritePropertyIds.delete(propertyIdToRemove);
-                        userFavoritesDetails = userFavoritesDetails.filter(fav => fav.property_id !== propertyIdToRemove);
-                        
-                        // Mettre à jour l'UI de la modale et des boutons "coeur" sur la page
-                        renderFavoritesInModal(); // Re-render la liste dans la modale
-                        updateFavoriteButtonsUI(); // Mettre à jour les coeurs sur la page
-                    } catch (error) {
-                        console.error("Erreur suppression depuis modale:", error);
-                        alert("Erreur lors de la suppression du favori.");
-                        this.disabled = false;
-                    }
-                });
-            }
-        });
-        favoritesModalListContainer.appendChild(ul);
+    if (!favoritesModalListContainer) {
+        console.error("Conteneur de la liste des favoris dans la modale non trouvé !");
+        return;
     }
+    updateAuthToken();
+    if (!authToken) {
+        favoritesModalListContainer.innerHTML = '<p>Veuillez vous connecter pour voir vos favoris.</p>';
+        return;
+    }
+
+    favoritesModalListContainer.innerHTML = ''; // Vider le contenu précédent
+
+    const templateFavoriModal = document.getElementById('template-album-favori-modal'); // L'ID de VOTRE template HTML
+
+    if (!templateFavoriModal) {
+        favoritesModalListContainer.innerHTML = '<p style="color:red;">Erreur de configuration : Template pour les favoris introuvable.</p>';
+        console.error("Template 'template-album-favori-modal' non trouvé !");
+        return;
+    }
+
+    if (userFavoritesDetails.length === 0) {
+        favoritesModalListContainer.innerHTML = '<p>Vous n\'avez pas encore d\'annonces en favoris.</p>';
+        return;
+    }
+
+    userFavoritesDetails.forEach(favDetail => {
+        const clone = templateFavoriModal.cloneNode(true);
+        clone.removeAttribute('id'); // Enlever l'ID du clone pour éviter les doublons
+        clone.style.display = ''; // Rendre le clone visible (ou retirez la classe qui le cache)
+
+        // Peupler le clone avec les données
+        // Image
+        const imgElement = clone.querySelector('[data-fav-bind="image"]');
+        if (imgElement && favDetail.property_main_image_url) {
+            imgElement.src = favDetail.property_main_image_url;
+            imgElement.alt = favDetail.property_title || 'Image de l\'annonce favorite';
+        } else if (imgElement) {
+            imgElement.style.display = 'none'; // Cacher si pas d'image
+        }
+
+        // Titre
+        const titleElement = clone.querySelector('[data-fav-bind="title"]');
+        if (titleElement) {
+            titleElement.textContent = favDetail.property_title || 'Titre non disponible';
+        }
+
+        // Prix (exemple)
+        const priceElement = clone.querySelector('[data-fav-bind="price"]');
+        if (priceElement) {
+            if (favDetail.property_price) {
+                priceElement.textContent = `${favDetail.property_price} €`;
+                priceElement.style.display = '';
+            } else {
+                priceElement.style.display = 'none'; // Cacher si pas de prix
+            }
+        }
+        
+        // Lien (si le clone entier doit être un lien)
+        // Si vous voulez que toute la "carte" du favori soit cliquable :
+        const propertyLink = `annonce?id=${favDetail.property_id}`;
+        const linkWrapper = clone.querySelector('[data-fav-bind="link-wrapper"]'); // Ex: une div à l'intérieur de votre template
+        if (linkWrapper) { // Si vous avez un wrapper spécifique pour le lien
+            const anchor = document.createElement('a');
+            anchor.href = propertyLink;
+            // Transférez le contenu du linkWrapper dans l'ancre
+            while(linkWrapper.firstChild) {
+                anchor.appendChild(linkWrapper.firstChild);
+            }
+            linkWrapper.appendChild(anchor);
+            // Appliquez des styles à l'ancre pour qu'elle se comporte comme un bloc
+            anchor.style.display = 'block';
+            anchor.style.textDecoration = 'none';
+            anchor.style.color = 'inherit';
+
+        } else if (clone.tagName === 'A') { // Si le clone lui-même (le template) est une balise <a>
+            clone.href = propertyLink;
+        }
+        // Sinon, vous pouvez avoir un simple bouton/lien "Voir l'annonce" avec data-fav-bind="details-link"
+
+        // Bouton "Retirer des favoris" DANS LA MODALE
+        const removeBtnModal = clone.querySelector('.bouton-retirer-favori-modal'); // Utilisez la classe que vous avez définie
+        if (removeBtnModal && favDetail.property_id) {
+            removeBtnModal.dataset.propertyId = favDetail.property_id; // Important pour savoir quoi retirer
+            removeBtnModal.addEventListener('click', async function(event) {
+                event.stopPropagation(); // Empêche le clic de se propager si le bouton est dans un lien
+                const propertyIdToRemove = this.dataset.propertyId;
+                this.disabled = true;
+                try {
+                    await favoritesXanoClient.delete(`favorites_album_by_property/${propertyIdToRemove}`);
+                    userFavoritePropertyIds.delete(propertyIdToRemove);
+                    userFavoritesDetails = userFavoritesDetails.filter(fav => fav.property_id !== propertyIdToRemove);
+                    
+                    renderFavoritesInModal(); // Re-render la liste dans la modale
+                    updateFavoriteButtonsUI(); // Mettre à jour les coeurs sur la page principale
+                } catch (error) {
+                    console.error("Erreur suppression depuis modale:", error);
+                    alert("Erreur lors de la suppression du favori.");
+                    this.disabled = false;
+                }
+            });
+        }
+        favoritesModalListContainer.appendChild(clone);
+    });
+}
 
 
     // --- Initialisation ---
