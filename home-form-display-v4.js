@@ -202,32 +202,72 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
     }
 
     const fragment = document.createDocumentFragment();
-    items.forEach(itemData => {
-        // Déclarez propertyId UNE SEULE FOIS ici :
-        const propertyId = getNestedValue(itemData, 'id'); // Ou le chemin correct vers l'ID de votre propriété
+    items.forEach(itemData => { // DÉBUT DE LA BOUCLE items.forEach
+        const propertyId = getNestedValue(itemData, 'id'); 
 
         let clone;
         if (templateNode.tagName !== 'TEMPLATE') {
             clone = templateNode.cloneNode(true);
-            clone.style.display = '';
-            clone.removeAttribute('id');
+            clone.style.display = ''; // Rendre visible
+            clone.removeAttribute('id'); // Éviter les IDs dupliqués
         } else {
             console.error("Le template est une balise <template>, la logique de clonage doit être ajustée si ce n'est pas un div.");
             return; 
         }
 
         // --- DÉBUT SECTION FAVORIS ---
-        const favoriteButton = clone.querySelector('bouton-sauvegarder-annonce');
-        // Utilisez la variable propertyId déjà déclarée :
+        // Assurez-vous que le sélecteur ici est correct pour trouver le bouton dans votre template.
+        // Si 'bouton-sauvegarder-annonce' est une CLASSE, il faut un point devant : '.bouton-sauvegarder-annonce'
+        const favoriteButton = clone.querySelector('.bouton-sauvegarder-annonce'); // J'ai ajouté le '.' pour une classe
+        
         if (favoriteButton && propertyId !== undefined && propertyId !== null) {
             favoriteButton.dataset.propertyId = propertyId.toString();
         } else {
-            if (!favoriteButton) console.warn("[RENDER_FAVORIS] Bouton bouton-sauvegarder-annonce non trouvé dans le template pour l'item:", itemData);
+            if (!favoriteButton) console.warn("[RENDER_FAVORIS] Bouton .bouton-sauvegarder-annonce non trouvé dans le template pour l'item:", itemData);
             if (propertyId === undefined || propertyId === null) console.warn("[RENDER_FAVORIS] ID de propriété non trouvé pour l'item:", itemData);
         }
         // --- FIN SECTION FAVORIS ---
 
-    });
+        // --- DÉBUT DE LA SECTION DE BINDING (RÉINTÉGRÉE) ---
+        // Ces fonctions doivent être définies globalement ou accessibles dans cette portée.
+        // Elles étaient présentes dans votre fichier original en dehors du DOMContentLoaded.
+        if (typeof bindDataToElement === 'function') {
+            bindDataToElement(clone, itemData); 
+            clone.querySelectorAll('*').forEach(descendantElement => {
+                bindDataToElement(descendantElement, itemData);
+            });
+        } else {
+            console.warn("La fonction bindDataToElement n'est pas définie.");
+        }
+        // --- FIN DE LA SECTION DE BINDING ---
+            
+        // --- CRÉATION DU LIEN VERS LA PAGE DE DÉTAIL (RÉINTÉGRÉE) ---
+        if (propertyId !== undefined && propertyId !== null) {
+            const anchor = document.createElement('a');
+            anchor.href = `annonce?id=${propertyId}`; // Adaptez si besoin
+            anchor.style.textDecoration = 'none';
+            anchor.style.color = 'inherit';
+            anchor.style.display = 'block'; 
+            
+            anchor.appendChild(clone); // Met le clone (la carte) DANS le lien
+            fragment.appendChild(anchor); // Ajoute le lien (avec la carte dedans) au fragment
+        } else {
+            console.warn("[NEW_SCRIPT_RENDER] Propriété sans ID valide, lien de détail non créé pour:", itemData);
+            fragment.appendChild(clone); // Si pas d'ID, ajoute le clone directement (sans lien)
+        }
+        // --- FIN DE LA CRÉATION DU LIEN ---
+    }); // FIN DE LA BOUCLE items.forEach
+        
+    container.appendChild(fragment); // Ajoute tous les items préparés au conteneur
+    console.log("[NOM_DE_VOTRE_FONCTION_RENDER] Items ajoutés au DOM."); 
+    
+    if (typeof initializePageSwipers === 'function') {
+        initializePageSwipers(container);
+    }
+    
+    document.dispatchEvent(new CustomEvent('annoncesChargeesEtRendues', { detail: { container: container } }));
+    console.log("[NOM_DE_VOTRE_FONCTION_RENDER] Terminé.");
+}
         
     container.appendChild(fragment);
     console.log("[NOM_DE_VOTRE_FONCTION_RENDER] Items ajoutés au DOM."); // Remplacez par le nom de votre fonction si ce n'est pas renderAnnouncements
@@ -241,61 +281,6 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
     document.dispatchEvent(new CustomEvent('annoncesChargeesEtRendues', { detail: { container: container } }));
 
     console.log("[NOM_DE_VOTRE_FONCTION_RENDER] Terminé, initialisation Swiper demandée."); // Adaptez le log si besoin
-}
-
-
-              // --- DÉBUT DE LA SECTION DE BINDING MODIFIÉE ---
-    // On va appeler VOTRE fonction bindDataToElement (celle de home-form-display-v2-2.txt)
-    // pour le clone entier et pour chacun de ses enfants qui pourraient avoir des bindings.
-    // Votre fonction bindDataToElement est assez intelligente pour vérifier les attributs
-    // data-xano-bind et data-xano-bind-attr-* sur l'élément qu'on lui passe.
-
-    // 1. Appeler pour le clone lui-même (si l'élément racine de votre template peut avoir des bindings)
-    bindDataToElement(clone, itemData); 
-
-    // 2. Appeler pour tous les descendants directs et indirects.
-    //    bindDataToElement vérifiera sur chaque élément s'il y a quelque chose à lier.
-    clone.querySelectorAll('*').forEach(descendantElement => {
-        bindDataToElement(descendantElement, itemData);
-    });
-    // --- FIN DE LA SECTION DE BINDING MODIFIÉE ---
-            
-      // --- NOUVELLE PARTIE : Créer le lien vers la page de détail ---
-        const propertyId = getNestedValue(itemData, 'id'); // IMPORTANT: Assurez-vous que 'id' est le bon champ
-                                                          // contenant l'identifiant unique de votre propriété.
-                                                          // Cela peut être 'id', '_id', 'property_id', etc.
-                                                          // Vérifiez la structure de vos données 'itemData'.
-
-        if (propertyId !== undefined && propertyId !== null) {
-            const anchor = document.createElement('a');
-            anchor.href = `annonce?id=${propertyId}`; // Adaptez "details-annonce.html" si besoin
-            anchor.style.textDecoration = 'none'; // Optionnel: pour éviter le soulignement par défaut
-            anchor.style.color = 'inherit';       // Optionnel: pour hériter la couleur du texte
-            anchor.style.display = 'block';       // Ou 'inline-block' ou ce qui convient à votre layout
-                                                  // pour que l'ancre prenne la taille de son contenu (le clone)
-
-            // Si le 'clone' (votre carte d'annonce) a des classes CSS spécifiques
-            // qui définissent sa mise en page (ex: display flex, grid), vous pourriez
-            // vouloir que l'ancre se comporte de manière neutre ou hérite de ces styles.
-            // Souvent, donner `display: contents;` à l'ancre peut aider si `clone` est un conteneur flex/grid.
-            // Sinon, `display: block;` est un bon point de départ.
-            
-            // Transférer les classes du clone à l'ancre pour maintenir le style
-            // clone.classList.forEach(cls => anchor.classList.add(cls)); // Optionnel mais peut être utile
-
-            anchor.appendChild(clone); // Met le 'clone' (la carte de l'annonce) à l'intérieur du lien
-            fragment.appendChild(anchor);
-        } else {
-            console.warn("[NEW_SCRIPT_RENDER] Propriété sans ID valide, lien de détail non créé pour:", itemData);
-            fragment.appendChild(clone); // Si pas d'ID, ajouter le clone sans lien (ou gérer l'erreur)
-        }
-        // --- FIN DE LA NOUVELLE PARTIE ---
-        });
-        
-    container.appendChild(fragment);
-    console.log("[NOM_DE_VOTRE_FONCTION_RENDER] Items ajoutés au DOM."); // Remplacez par le nom de votre fonction si ce n'est pas renderAnnouncements
-    initializePageSwipers(container);
-    console.log("[NOM_DE_VOTRE_FONCTION_RENDER] Terminé, initialisation Swiper demandée.");
 }
 
     // --- Lancer la récupération des données ---
