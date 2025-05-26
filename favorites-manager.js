@@ -179,34 +179,7 @@ async function populateModalWithAlbums() {
     }
 }
 
-// La fonction savePropertyToAlbum doit aussi être modifiée pour ne plus cacher modalElement,
-// car Finsweet s'en charge.
-async function savePropertyToAlbum(propertyId, albumId) {
-    // ... (début de la fonction identique : vérifications, appel Xano)
-    try {
-        await favoritesXanoClient.post('favorites_list', { /* ... */ });
-        console.log("[FAVORITES_ALBUM_MANAGER] Annonce ajoutée à l'album avec succès !");
 
-        // Fermer la modale VIA FINSWEET si possible, ou laisser l'utilisateur le faire.
-        // Si vous avez un bouton de fermeture DANS la modale avec un attribut Finsweet "close",
-        // c'est mieux. Sinon, pour l'instant, on ne force pas la fermeture ici.
-        // if (modalElement) modalElement.style.display = 'none'; // ON NE FAIT PLUS CA
-
-        // Si Finsweet a une API JS pour fermer :
-        // FinsweetModal.close('votre-id-de-modale'); // Exemple conceptuel
-        // Ou si votre bouton "Enregistrer" dans la modale a un custom property qui ferme la modale,
-        // cette fonction n'a rien de plus à faire pour la fermeture.
-
-        triggerSaveAnimation();
-
-    } catch (error) {
-        console.error("[FAVORITES_ALBUM_MANAGER] Erreur lors de la récupération des albums pour la modale:", error);
-        messageModalAlbums.textContent = "Erreur lors du chargement de vos albums.";
-         if (error.message.toLowerCase().includes('unauthorized') || error.message.includes('401')) {
-            messageModalAlbums.textContent = "Votre session a peut-être expiré. Veuillez vous reconnecter.";
-        }
-    }
-}
 
     // --- 3. AFFICHAGE DE LA LISTE DES ALBUMS DANS LA MODALE ---
     function renderAlbumListInModal(albums) {
@@ -301,12 +274,13 @@ async function savePropertyToAlbum(propertyId, albumId) {
                     description_album: descAlbum
                 });
                 console.log("[FAVORITES_ALBUM_MANAGER] Nouvel album créé avec succès !");
-                if (inputNomNouvelAlbum) inputNomNouvelAlbum.value = ''; // Vider les champs
-                if (inputDescNouvelAlbum) inputDescNouvelAlbum.value = '';
-                formNouvelAlbum.style.display = 'none'; // Cacher le formulaire
-                // Recharger la liste des albums dans la modale pour afficher le nouveau
-                await openAndPopulateSelectAlbumModal();
-            } catch (error) {
+    if (inputNomNouvelAlbum) inputNomNouvelAlbum.value = ''; 
+    if (inputDescNouvelAlbum) inputDescNouvelAlbum.value = '';
+    formNouvelAlbum.style.display = 'none'; 
+    // Recharger la liste des albums dans la modale pour afficher le nouveau
+    // await openAndPopulateSelectAlbumModal(); // << ANCIENNE LIGNE À CHANGER
+    await populateModalWithAlbums(); // << NOUVELLE LIGNE CORRECTE
+} catch (error) {
                 console.error("[FAVORITES_ALBUM_MANAGER] Erreur lors de la création de l'album:", error);
                 alert(`Erreur : ${error.message || "Impossible de créer l'album."}`);
             } finally {
