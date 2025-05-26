@@ -56,30 +56,34 @@ document.addEventListener('DOMContentLoaded', function () {
         // Ne pas bloquer tout le script, car les boutons "coeur" sur les annonces doivent toujours fonctionner pour ouvrir la modale.
     }
 
+// --- 1. GESTION DU CLIC SUR L'ICÔNE "COEUR" D'UNE ANNONCE ---
+function initPropertyHeartButtons() {
+    // Ciblez tous vos boutons "coeur" sur les annonces.
+    document.querySelectorAll('.bouton-sauvegarder-annonce').forEach(button => {
+        button.addEventListener('click', function (event) { // Ajoutez 'event' comme paramètre ici
+            
+            // Empêche l'événement de "remonter" aux éléments parents (comme le lien de la carte)
+            event.stopPropagation();
+            event.preventDefault(); // Peut aussi être utile pour empêcher toute action par défaut si le bouton lui-même était un type submit ou dans un lien.
 
-    // --- 1. GESTION DU CLIC SUR L'ICÔNE "COEUR" D'UNE ANNONCE ---
-    function initPropertyHeartButtons() {
-        // Ciblez tous vos boutons "coeur" sur les annonces.
-        // Ils doivent avoir une classe commune, par exemple "bouton-sauvegarder-annonce"
-        // et un attribut `data-property-id` avec l'ID de l'annonce.
-        document.querySelectorAll('.bouton-sauvegarder-annonce').forEach(button => {
-            button.addEventListener('click', function () {
-                updateAuthToken();
-                if (!authToken) {
-                    alert("Veuillez vous connecter pour sauvegarder une annonce.");
-                    // Peut-être rediriger vers la page de connexion
-                    return;
-                }
-                currentPropertyIdToSave = this.dataset.propertyId;
-                if (!currentPropertyIdToSave) {
-                    console.error("ID de propriété manquant sur le bouton de sauvegarde.");
-                    return;
-                }
-                console.log(`[FAVORITES_ALBUM_MANAGER] Sauvegarde demandée pour property_id: ${currentPropertyIdToSave}`);
-                openAndPopulateSelectAlbumModal();
-            });
+            // --- Début de votre logique existante pour ce clic ---
+            updateAuthToken();
+            if (!authToken) {
+                alert("Veuillez vous connecter pour sauvegarder une annonce.");
+                // Peut-être rediriger vers la page de connexion
+                return;
+            }
+            currentPropertyIdToSave = this.dataset.propertyId;
+            if (!currentPropertyIdToSave) {
+                console.error("ID de propriété manquant sur le bouton de sauvegarde.");
+                return;
+            }
+            console.log(`[FAVORITES_ALBUM_MANAGER] Sauvegarde demandée pour property_id: ${currentPropertyIdToSave}`);
+            openAndPopulateSelectAlbumModal();
+            // --- Fin de votre logique existante ---
         });
-    }
+    });
+}
 
     // --- 2. OUVERTURE ET REMPLISSAGE DE LA MODALE DE SÉLECTION D'ALBUM ---
     async function openAndPopulateSelectAlbumModal() {
