@@ -269,20 +269,7 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
     console.log("[NOM_DE_VOTRE_FONCTION_RENDER] Terminé.");
 }
         
-    container.appendChild(fragment);
-    console.log("[NOM_DE_VOTRE_FONCTION_RENDER] Items ajoutés au DOM."); // Remplacez par le nom de votre fonction si ce n'est pas renderAnnouncements
-    
-    // Assurez-vous que initializePageSwipers est définie ou commentez cette ligne si ce n'est pas le cas
-    if (typeof initializePageSwipers === 'function') {
-        initializePageSwipers(container);
-    }
-    
-    // Émettre l'événement pour favorites-manager.js (si vous utilisez cette approche)
-    document.dispatchEvent(new CustomEvent('annoncesChargeesEtRendues', { detail: { container: container } }));
-
-    console.log("[NOM_DE_VOTRE_FONCTION_RENDER] Terminé, initialisation Swiper demandée."); // Adaptez le log si besoin
-}
-
+  
     // --- Lancer la récupération des données ---
     fetchAnnouncements();
 
