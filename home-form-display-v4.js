@@ -193,45 +193,78 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
     container.innerHTML = ''; // Nettoyer le conteneur avant d'ajouter
 
     if (items.length === 0) {
-        // Afficher le message si aucun item n'est trouvé
-        const emptyEl = document.createElement('div'); // Ou le type d'élément que vous voulez
-        emptyEl.className = 'empty-state-message'; // Ajoutez une classe pour le style
-        emptyEl.innerHTML = `<p style="padding:20px; text-align:center;">${noDataMessage}</p>`; // Votre message
+        const emptyEl = document.createElement('div');
+        emptyEl.className = 'empty-state-message';
+        emptyEl.innerHTML = `<p style="padding:20px; text-align:center;">${noDataMessage}</p>`;
         container.appendChild(emptyEl);
         console.log("[NEW_SCRIPT_RENDER] Aucun item à afficher, message d'état vide ajouté.");
         return;
     }
 
-
-        const fragment = document.createDocumentFragment();
+    const fragment = document.createDocumentFragment();
     items.forEach(itemData => {
+        // Déclarez propertyId UNE SEULE FOIS ici :
+        const propertyId = getNestedValue(itemData, 'id'); // Ou le chemin correct vers l'ID de votre propriété
+
         let clone;
-        // Si templateNode est l'élément avec id="annonce-item-template"
-        // et qu'il n'est pas une balise <template> HTML5
         if (templateNode.tagName !== 'TEMPLATE') {
             clone = templateNode.cloneNode(true);
-            clone.style.display = ''; // IMPORTANT: Rend le clone visible
-            clone.removeAttribute('id'); // IMPORTANT: Supprime l'ID pour éviter les doublons
+            clone.style.display = '';
+            clone.removeAttribute('id');
         } else {
-            // Si vous utilisiez une vraie balise <template>, la logique serait un peu différente
-            // clone = templateNode.content.firstElementChild.cloneNode(true);
-            // Mais avec un div comme template, la méthode ci-dessus est bonne.
             console.error("Le template est une balise <template>, la logique de clonage doit être ajustée si ce n'est pas un div.");
-            return; // Ou gérer ce cas
+            return; 
         }
 
         // --- DÉBUT SECTION FAVORIS ---
-    const favoriteButton = clone.querySelector('.favorite-btn'); // Ciblez le bouton dans le clone
-    const propertyId = getNestedValue(itemData, 'id'); // Ou le chemin correct vers l'ID de votre propriété
+        const favoriteButton = clone.querySelector('.favorite-btn');
+        // Utilisez la variable propertyId déjà déclarée :
+        if (favoriteButton && propertyId !== undefined && propertyId !== null) {
+            favoriteButton.dataset.propertyId = propertyId.toString();
+        } else {
+            if (!favoriteButton) console.warn("[RENDER_FAVORIS] Bouton .favorite-btn non trouvé dans le template pour l'item:", itemData);
+            if (propertyId === undefined || propertyId === null) console.warn("[RENDER_FAVORIS] ID de propriété non trouvé pour l'item:", itemData);
+        }
+        // --- FIN SECTION FAVORIS ---
 
-    if (favoriteButton && propertyId !== undefined && propertyId !== null) {
-        favoriteButton.dataset.propertyId = propertyId.toString(); // Assurez-vous que c'est une chaîne
-        // Le texte et l'état 'favorited' seront gérés par favorites-manager.js
-    } else {
-        if (!favoriteButton) console.warn("[RENDER_FAVORIS] Bouton .favorite-btn non trouvé dans le template pour l'item:", itemData);
-        if (propertyId === undefined || propertyId === null) console.warn("[RENDER_FAVORIS] ID de propriété non trouvé pour l'item:", itemData);
+        // --- DÉBUT DE LA SECTION DE BINDING MODIFIÉE ---
+        bindDataToElement(clone, itemData);
+        clone.querySelectorAll('*').forEach(descendantElement => {
+            bindDataToElement(descendantElement, itemData);
+        });
+        // --- FIN DE LA SECTION DE BINDING MODIFIÉE ---
+            
+        // --- NOUVELLE PARTIE : Créer le lien vers la page de détail ---
+        // Utilisez la variable propertyId déjà déclarée :
+        if (propertyId !== undefined && propertyId !== null) {
+            const anchor = document.createElement('a');
+            anchor.href = `annonce?id=${propertyId}`; // Adaptez "details-annonce.html" si besoin
+            anchor.style.textDecoration = 'none';
+            anchor.style.color = 'inherit';
+            anchor.style.display = 'block';
+            
+            anchor.appendChild(clone);
+            fragment.appendChild(anchor);
+        } else {
+            console.warn("[NEW_SCRIPT_RENDER] Propriété sans ID valide, lien de détail non créé pour:", itemData);
+            fragment.appendChild(clone);
+        }
+        // --- FIN DE LA NOUVELLE PARTIE ---
+    });
+        
+    container.appendChild(fragment);
+    console.log("[NOM_DE_VOTRE_FONCTION_RENDER] Items ajoutés au DOM."); // Remplacez par le nom de votre fonction si ce n'est pas renderAnnouncements
+    
+    // Assurez-vous que initializePageSwipers est définie ou commentez cette ligne si ce n'est pas le cas
+    if (typeof initializePageSwipers === 'function') {
+        initializePageSwipers(container);
     }
-    // --- FIN SECTION FAVORIS ---
+    
+    // Émettre l'événement pour favorites-manager.js (si vous utilisez cette approche)
+    document.dispatchEvent(new CustomEvent('annoncesChargeesEtRendues', { detail: { container: container } }));
+
+    console.log("[NOM_DE_VOTRE_FONCTION_RENDER] Terminé, initialisation Swiper demandée."); // Adaptez le log si besoin
+}
 
 
               // --- DÉBUT DE LA SECTION DE BINDING MODIFIÉE ---
