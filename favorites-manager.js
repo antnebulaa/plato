@@ -217,7 +217,7 @@ function renderAlbumListInModal(albums) {
             // Si votre template est caché avec display:none, rendez le clone visible.
             // Choisissez le type de display qui convient à vos items d'album.
             // 'block' est un bon point de départ pour des items en liste.
-            clone.style.display = 'block'; 
+            clone.style.display = 'flex'; 
             // Si vous utilisez Flexbox pour la liste, ce pourrait être 'flex'.
             // Si le template était caché par une classe spécifique (ex: 'is-hidden'),
             // vous feriez : clone.classList.remove('is-hidden'); ET vous assureriez son display.
