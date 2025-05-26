@@ -227,29 +227,6 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
         }
         // --- FIN SECTION FAVORIS ---
 
-        // --- DÉBUT DE LA SECTION DE BINDING MODIFIÉE ---
-        bindDataToElement(clone, itemData);
-        clone.querySelectorAll('*').forEach(descendantElement => {
-            bindDataToElement(descendantElement, itemData);
-        });
-        // --- FIN DE LA SECTION DE BINDING MODIFIÉE ---
-            
-        // --- NOUVELLE PARTIE : Créer le lien vers la page de détail ---
-        // Utilisez la variable propertyId déjà déclarée :
-        if (propertyId !== undefined && propertyId !== null) {
-            const anchor = document.createElement('a');
-            anchor.href = `annonce?id=${propertyId}`; // Adaptez "details-annonce.html" si besoin
-            anchor.style.textDecoration = 'none';
-            anchor.style.color = 'inherit';
-            anchor.style.display = 'block';
-            
-            anchor.appendChild(clone);
-            fragment.appendChild(anchor);
-        } else {
-            console.warn("[NEW_SCRIPT_RENDER] Propriété sans ID valide, lien de détail non créé pour:", itemData);
-            fragment.appendChild(clone);
-        }
-        // --- FIN DE LA NOUVELLE PARTIE ---
     });
         
     container.appendChild(fragment);
