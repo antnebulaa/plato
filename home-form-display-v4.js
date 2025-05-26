@@ -218,12 +218,12 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
         // --- DÉBUT SECTION FAVORIS ---
         // Assurez-vous que le sélecteur ici est correct pour trouver le bouton dans votre template.
         // Si 'bouton-sauvegarder-annonce' est une CLASSE, il faut un point devant : '.bouton-sauvegarder-annonce'
-        const favoriteButton = clone.querySelector('.bouton-sauvegarder-annonce'); // J'ai ajouté le '.' pour une classe
+        const favoriteButton = clone.querySelector('.favorite-btn'); // J'ai ajouté le '.' pour une classe
         
         if (favoriteButton && propertyId !== undefined && propertyId !== null) {
             favoriteButton.dataset.propertyId = propertyId.toString();
         } else {
-            if (!favoriteButton) console.warn("[RENDER_FAVORIS] Bouton .bouton-sauvegarder-annonce non trouvé dans le template pour l'item:", itemData);
+            if (!favoriteButton) console.warn("[RENDER_FAVORIS] Bouton .favorite-btn non trouvé dans le template pour l'item:", itemData);
             if (propertyId === undefined || propertyId === null) console.warn("[RENDER_FAVORIS] ID de propriété non trouvé pour l'item:", itemData);
         }
         // --- FIN SECTION FAVORIS ---
