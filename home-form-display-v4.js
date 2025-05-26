@@ -220,6 +220,20 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
             return; // Ou gérer ce cas
         }
 
+        // --- DÉBUT SECTION FAVORIS ---
+    const favoriteButton = clone.querySelector('.favorite-btn'); // Ciblez le bouton dans le clone
+    const propertyId = getNestedValue(itemData, 'id'); // Ou le chemin correct vers l'ID de votre propriété
+
+    if (favoriteButton && propertyId !== undefined && propertyId !== null) {
+        favoriteButton.dataset.propertyId = propertyId.toString(); // Assurez-vous que c'est une chaîne
+        // Le texte et l'état 'favorited' seront gérés par favorites-manager.js
+    } else {
+        if (!favoriteButton) console.warn("[RENDER_FAVORIS] Bouton .favorite-btn non trouvé dans le template pour l'item:", itemData);
+        if (propertyId === undefined || propertyId === null) console.warn("[RENDER_FAVORIS] ID de propriété non trouvé pour l'item:", itemData);
+    }
+    // --- FIN SECTION FAVORIS ---
+
+
               // --- DÉBUT DE LA SECTION DE BINDING MODIFIÉE ---
     // On va appeler VOTRE fonction bindDataToElement (celle de home-form-display-v2-2.txt)
     // pour le clone entier et pour chacun de ses enfants qui pourraient avoir des bindings.
