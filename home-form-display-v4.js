@@ -217,12 +217,12 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
         }
 
         // --- DÉBUT SECTION FAVORIS ---
-        const favoriteButton = clone.querySelector('.favorite-btn');
+        const favoriteButton = clone.querySelector('bouton-sauvegarder-annonce');
         // Utilisez la variable propertyId déjà déclarée :
         if (favoriteButton && propertyId !== undefined && propertyId !== null) {
             favoriteButton.dataset.propertyId = propertyId.toString();
         } else {
-            if (!favoriteButton) console.warn("[RENDER_FAVORIS] Bouton .favorite-btn non trouvé dans le template pour l'item:", itemData);
+            if (!favoriteButton) console.warn("[RENDER_FAVORIS] Bouton bouton-sauvegarder-annonce non trouvé dans le template pour l'item:", itemData);
             if (propertyId === undefined || propertyId === null) console.warn("[RENDER_FAVORIS] ID de propriété non trouvé pour l'item:", itemData);
         }
         // --- FIN SECTION FAVORIS ---
