@@ -1,270 +1,275 @@
-// favorites-manager.js (version étendue)
+// favorites-manager.js (entièrement revu pour la logique d'albums)
 document.addEventListener('DOMContentLoaded', function () {
-    console.log('[FAVORITES_MANAGER] DOMContentLoaded - Initialisation du système de favoris.');
+    console.log('[FAVORITES_ALBUM_MANAGER] DOMContentLoaded.');
 
-    if (typeof XanoClient === 'undefined') { /* ... erreur ... */ return; }
-    if (typeof getCookie !== 'function') { /* ... erreur ... */ return; }
+    // Vérifications XanoClient et getCookie (essentielles)
+    if (typeof XanoClient === 'undefined') {
+        console.error("[FAVORITES_ALBUM_MANAGER] ERREUR CRITIQUE: XanoClient non défini.");
+        return;
+    }
+    if (typeof getCookie !== 'function') {
+        console.error("[FAVORITES_ALBUM_MANAGER] ERREUR CRITIQUE: getCookie non défini.");
+        return;
+    }
 
-    const FAVORITES_API_BASE_URL = 'https://xwxl-obyg-b3e3.p7.xano.io/api:7u3_oKu9';
+    const FAVORITES_API_BASE_URL = 'https://xwxl-obyg-b3e3.p7.xano.io/api:7u3_oKu9'; // URL de votre groupe d'API favoris
     const favoritesXanoClient = new XanoClient({ apiGroupBaseUrl: FAVORITES_API_BASE_URL });
-    let authToken = getCookie('xano_auth_token'); // Déclarer avec let pour la réaffectation potentielle
+    let authToken = getCookie('xano_auth_token');
 
-    function updateAuthToken() { // Fonction pour mettre à jour le token si nécessaire (ex: après connexion/déconnexion)
+    function updateAuthToken() {
         authToken = getCookie('xano_auth_token');
         if (authToken) {
             favoritesXanoClient.setAuthToken(authToken);
         } else {
-            favoritesXanoClient.setAuthToken(null); // Important de le vider
+            favoritesXanoClient.setAuthToken(null);
         }
     }
     updateAuthToken(); // Appel initial
 
-    let userFavoritePropertyIds = new Set(); // Pour les boutons "coeur"
-    let userFavoritesDetails = []; // Pour la modale
+    let currentPropertyIdToSave = null; // Stocke l'ID de l'annonce en cours de sauvegarde
+    let userAlbums = []; // Pour stocker les albums de l'utilisateur [{id, name_Album, ...}, ...]
 
-    async function fetchUserFavorites(fetchDetails = false) {
-        updateAuthToken(); // S'assurer que le token est à jour
-        if (!authToken) {
-            userFavoritePropertyIds = new Set();
-            userFavoritesDetails = [];
-            updateFavoriteButtonsUI(); // Mettre à jour les boutons "coeur" même si déconnecté
-            return; // Ne pas essayer de fetch si pas de token
-        }
+    // IDs des éléments de votre modale (à adapter)
+    const MODAL_ID = 'votre-id-de-modale'; // L'ID de votre modale principale
+    const MODAL_LISTE_ALBUMS_CONTENEUR_ID = 'modal-liste-albums-conteneur'; // Où la liste des albums sera injectée
+    const TEMPLATE_ITEM_ALBUM_MODAL_ID = 'template-item-album-modal'; // Le template d'un item album
+    const BTN_OUVRIR_FORM_NOUVEL_ALBUM_ID = 'btn-ouvrir-form-nouvel-album'; // Bouton pour afficher le form
+    const FORM_NOUVEL_ALBUM_ID = 'form-nouvel-album'; // Le formulaire de création
+    const INPUT_NOM_NOUVEL_ALBUM_ID = 'input-nom-nouvel-album';
+    const INPUT_DESC_NOUVEL_ALBUM_ID = 'input-desc-nouvel-album'; // Optionnel
+    const BTN_SUBMIT_NOUVEL_ALBUM_ID = 'btn-submit-nouvel-album';
+    const MESSAGE_MODAL_ALBUMS_ID = 'message-modal-albums'; // Pour "Chargement", "Aucun album"
 
-        console.log('[FAVORITES_MANAGER] Récupération des favoris de l\'utilisateur...');
-        try {
-            // Cet endpoint devrait retourner les détails si fetchDetails = true
-            // ou au moins les property_id.
-            // Idéalement, Xano retourne: [{ property_id: "1", title: "Super appart", image_url: "..."}]
-            const favoritesData = await favoritesXanoClient.get('favorites_album');
+    const modalElement = document.getElementById(MODAL_ID);
+    const modalListeAlbumsConteneur = document.getElementById(MODAL_LISTE_ALBUMS_CONTENEUR_ID);
+    const templateItemAlbumModal = document.getElementById(TEMPLATE_ITEM_ALBUM_MODAL_ID);
+    const btnOuvrirFormNouvelAlbum = document.getElementById(BTN_OUVRIR_FORM_NOUVEL_ALBUM_ID);
+    const formNouvelAlbum = document.getElementById(FORM_NOUVEL_ALBUM_ID);
+    const inputNomNouvelAlbum = document.getElementById(INPUT_NOM_NOUVEL_ALBUM_ID);
+    const inputDescNouvelAlbum = document.getElementById(INPUT_DESC_NOUVEL_ALBUM_ID);
+    const btnSubmitNouvelAlbum = document.getElementById(BTN_SUBMIT_NOUVEL_ALBUM_ID);
+    const messageModalAlbums = document.getElementById(MESSAGE_MODAL_ALBUMS_ID);
 
-            if (favoritesData && Array.isArray(favoritesData)) {
-                userFavoritesDetails = favoritesData; // Stocker tous les détails
-                userFavoritePropertyIds = new Set(favoritesData.map(fav => fav.property_id)); // Mettre à jour l'ensemble des IDs
-            } else if (favoritesData && favoritesData.items && Array.isArray(favoritesData.items)) {
-                // Si Xano enveloppe dans un objet { items: [...] }
-                userFavoritesDetails = favoritesData.items;
-                userFavoritePropertyIds = new Set(favoritesData.items.map(fav => fav.property_id));
-            } else {
-                console.warn('[FAVORITES_MANAGER] Réponse inattendue de /favorites_album:', favoritesData);
-                userFavoritePropertyIds = new Set();
-                userFavoritesDetails = [];
-            }
-            console.log('[FAVORITES_MANAGER] Favoris (IDs) récupérés:', userFavoritePropertyIds);
-            console.log('[FAVORITES_MANAGER] Favoris (Détails) récupérés:', userFavoritesDetails.length + " éléments.");
-            updateFavoriteButtonsUI();
-
-        } catch (error) {
-            console.error('[FAVORITES_MANAGER] Erreur lors de la récupération des favoris:', error);
-            userFavoritePropertyIds = new Set();
-            userFavoritesDetails = [];
-            updateFavoriteButtonsUI();
-        }
+    // Vérification que les éléments de la modale existent (sauf le template qui est optionnel au début)
+    if (!modalElement || !modalListeAlbumsConteneur || !btnOuvrirFormNouvelAlbum || !formNouvelAlbum || !inputNomNouvelAlbum || !btnSubmitNouvelAlbum || !messageModalAlbums) {
+        console.warn('[FAVORITES_ALBUM_MANAGER] Un ou plusieurs éléments de la modale sont introuvables. Vérifiez les IDs.');
+        // Ne pas bloquer tout le script, car les boutons "coeur" sur les annonces doivent toujours fonctionner pour ouvrir la modale.
     }
 
-    function updateFavoriteButtonsUI() { /* ... comme avant ... */ }
-    async function toggleFavorite(propertyId, buttonElement) { /* ... comme avant ... */
-        // Assurez-vous d'appeler fetchUserFavorites(true) à la fin en cas de succès
-        // pour que userFavoritesDetails soit à jour si la modale est ouverte ensuite.
-        // try { ... if (isFavorited) { ... } else { ... }
-        //    await fetchUserFavorites(true); // Re-fetch tous les détails
-        //    updateFavoriteButtonsUI(); // Ceci est déjà appelé si fetchUserFavorites l'appelle
-        // } catch { ... } finally { ... }
-        // OU plus simple : mettre à jour localement userFavoritesDetails si vous avez l'info de l'item
-        // OU laisser la modale re-fetcher quand elle s'ouvre.
-        // Pour toggleFavorite, il suffit de mettre à jour userFavoritePropertyIds et l'UI des boutons.
-        // La modale se chargera de son propre fetch.
-        try {
-            // ... (logique d'ajout/suppression avec POST/DELETE) ...
-            if (isFavorited) { // Si on vient de le supprimer
-                await favoritesXanoClient.delete(`favorites_album_by_property/${propertyId}`);
-                userFavoritePropertyIds.delete(propertyId);
-                // Optionnel: mettre à jour userFavoritesDetails si on veut éviter un re-fetch complet pour la modale
-                userFavoritesDetails = userFavoritesDetails.filter(fav => fav.property_id !== propertyId);
-            } else { // Si on vient de l'ajouter
-                // IMPORTANT: La réponse du POST devrait idéalement contenir les détails de l'item favori
-                // pour pouvoir l'ajouter à userFavoritesDetails sans re-fetch.
-                // Sinon, on devra marquer userFavoritesDetails comme "stale" et forcer un re-fetch.
-                const addedFavoriteDetails = await favoritesXanoClient.post('favorites_album', { property_id: propertyId });
-                userFavoritePropertyIds.add(propertyId);
-                if(addedFavoriteDetails && addedFavoriteDetails.property_id) { // Si Xano retourne les détails de l'item ajouté (idéal)
-                    userFavoritesDetails.push(addedFavoriteDetails); // Assurez vous que le format correspond
-                } else {
-                    // Si Xano ne retourne pas les détails, il faudra rafraîchir userFavoritesDetails
-                    // la prochaine fois que la modale s'ouvre, ou faire un fetchUserFavorites(true) ici.
-                    // Pour l'instant, on ne fait que mettre à jour les IDs.
+
+    // --- 1. GESTION DU CLIC SUR L'ICÔNE "COEUR" D'UNE ANNONCE ---
+    function initPropertyHeartButtons() {
+        // Ciblez tous vos boutons "coeur" sur les annonces.
+        // Ils doivent avoir une classe commune, par exemple "bouton-sauvegarder-annonce"
+        // et un attribut `data-property-id` avec l'ID de l'annonce.
+        document.querySelectorAll('.bouton-sauvegarder-annonce').forEach(button => {
+            button.addEventListener('click', function () {
+                updateAuthToken();
+                if (!authToken) {
+                    alert("Veuillez vous connecter pour sauvegarder une annonce.");
+                    // Peut-être rediriger vers la page de connexion
+                    return;
                 }
-            }
-            updateFavoriteButtonsUI();
-        } catch (error) {
-             console.error('[FAVORITES_MANAGER] Erreur lors de la modification du favori:', error);
-             alert(`Erreur lors de la mise à jour des favoris: ${error.message}`);
-             // Annuler le changement d'état local si l'API échoue
-             // (cette partie de la logique doit être robuste)
-             updateFavoriteButtonsUI(); // S'assurer que l'UI reflète l'état réel
-        } finally {
-            buttonElement.disabled = false;
-        }
-    }
-
-    function initFavoriteButtons() { /* ... comme avant ... */ }
-
-    // --- NOUVEAU: Gestion de la Modale des Favoris ---
-    // Supposons que votre modale a un conteneur avec l'ID 'favorites-modal-list'
-    // et que vous avez un bouton pour ouvrir la modale avec l'ID 'open-favorites-modal-button'
-
-    const openModalButton = document.getElementById('open-favorites-modal-button'); // Adaptez cet ID
-    const favoritesModalListContainer = document.getElementById('favorites-modal-list'); // Adaptez cet ID
-
-    if (openModalButton && favoritesModalListContainer) {
-        openModalButton.addEventListener('click', async () => {
-            console.log('[FAVORITES_MANAGER] Ouverture de la modale des favoris demandée.');
-            updateAuthToken(); // S'assurer que le token est à jour avant de fetch
-            if (!authToken) {
-                alert("Veuillez vous connecter pour voir vos favoris.");
-                // Peut-être fermer la modale ou afficher un message de connexion dans la modale
-                favoritesModalListContainer.innerHTML = '<p>Veuillez vous connecter pour voir vos favoris.</p>';
-                // Logique pour afficher votre modale ici... puis return.
-                // exemple: document.getElementById('votre-modale-id').style.display = 'block';
-                return;
-            }
-
-            // Afficher un indicateur de chargement dans la modale
-            favoritesModalListContainer.innerHTML = '<p>Chargement de vos favoris...</p>';
-            // Logique pour afficher votre modale ici (si ce n'est pas déjà fait par votre système)
-            // exemple: document.getElementById('votre-modale-id').style.display = 'block';
-
-            await fetchUserFavorites(true); // S'assurer que userFavoritesDetails est à jour
-
-            renderFavoritesInModal();
+                currentPropertyIdToSave = this.dataset.propertyId;
+                if (!currentPropertyIdToSave) {
+                    console.error("ID de propriété manquant sur le bouton de sauvegarde.");
+                    return;
+                }
+                console.log(`[FAVORITES_ALBUM_MANAGER] Sauvegarde demandée pour property_id: ${currentPropertyIdToSave}`);
+                openAndPopulateSelectAlbumModal();
+            });
         });
     }
 
-    function renderFavoritesInModal() {
-    if (!favoritesModalListContainer) {
-        console.error("Conteneur de la liste des favoris dans la modale non trouvé !");
-        return;
-    }
-    updateAuthToken();
-    if (!authToken) {
-        favoritesModalListContainer.innerHTML = '<p>Veuillez vous connecter pour voir vos favoris.</p>';
-        return;
-    }
-
-    favoritesModalListContainer.innerHTML = ''; // Vider le contenu précédent
-
-    const templateFavoriModal = document.getElementById('template-album-favori-modal'); // L'ID de VOTRE template HTML
-
-    if (!templateFavoriModal) {
-        favoritesModalListContainer.innerHTML = '<p style="color:red;">Erreur de configuration : Template pour les favoris introuvable.</p>';
-        console.error("Template 'template-album-favori-modal' non trouvé !");
-        return;
-    }
-
-    if (userFavoritesDetails.length === 0) {
-        favoritesModalListContainer.innerHTML = '<p>Vous n\'avez pas encore d\'annonces en favoris.</p>';
-        return;
-    }
-
-    userFavoritesDetails.forEach(favDetail => {
-        const clone = templateFavoriModal.cloneNode(true);
-        clone.removeAttribute('id'); // Enlever l'ID du clone pour éviter les doublons
-        clone.style.display = ''; // Rendre le clone visible (ou retirez la classe qui le cache)
-
-        // Peupler le clone avec les données
-        // Image
-        const imgElement = clone.querySelector('[data-fav-bind="image"]');
-        if (imgElement && favDetail.property_main_image_url) {
-            imgElement.src = favDetail.property_main_image_url;
-            imgElement.alt = favDetail.property_title || 'Image de l\'annonce favorite';
-        } else if (imgElement) {
-            imgElement.style.display = 'none'; // Cacher si pas d'image
+    // --- 2. OUVERTURE ET REMPLISSAGE DE LA MODALE DE SÉLECTION D'ALBUM ---
+    async function openAndPopulateSelectAlbumModal() {
+        if (!modalElement || !messageModalAlbums || !modalListeAlbumsConteneur) {
+            console.error("Éléments de base de la modale non trouvés.");
+            return;
         }
 
-        // Titre
-        const titleElement = clone.querySelector('[data-fav-bind="title"]');
-        if (titleElement) {
-            titleElement.textContent = favDetail.property_title || 'Titre non disponible';
+        // Afficher votre modale (vous pourriez avoir votre propre système pour cela)
+        modalElement.style.display = 'block'; // Ou votre méthode d'affichage
+        messageModalAlbums.textContent = 'Chargement de vos albums...';
+        messageModalAlbums.style.display = 'block';
+        modalListeAlbumsConteneur.innerHTML = ''; // Vider la liste précédente
+        formNouvelAlbum.style.display = 'none'; // Cacher le formulaire de création au début
+
+        try {
+            console.log("[FAVORITES_ALBUM_MANAGER] Récupération des albums de l'utilisateur.");
+            const albums = await favoritesXanoClient.get('favorites_album'); // GET /favorites_album
+            userAlbums = (Array.isArray(albums)) ? albums : (albums && Array.isArray(albums.items)) ? albums.items : [];
+            console.log(`[FAVORITES_ALBUM_MANAGER] ${userAlbums.length} albums trouvés.`);
+            renderAlbumListInModal(userAlbums);
+        } catch (error) {
+            console.error("[FAVORITES_ALBUM_MANAGER] Erreur lors de la récupération des albums:", error);
+            messageModalAlbums.textContent = "Erreur lors du chargement de vos albums.";
+        }
+    }
+
+    // --- 3. AFFICHAGE DE LA LISTE DES ALBUMS DANS LA MODALE ---
+    function renderAlbumListInModal(albums) {
+        if (!modalListeAlbumsConteneur || !messageModalAlbums) return;
+        modalListeAlbumsConteneur.innerHTML = ''; // Vider
+
+        if (!templateItemAlbumModal) {
+             messageModalAlbums.textContent = "Erreur : Template pour item d'album non trouvé.";
+             console.error("TEMPLATE_ITEM_ALBUM_MODAL_ID non trouvé dans le DOM.");
+             return;
         }
 
-        // Prix (exemple)
-        const priceElement = clone.querySelector('[data-fav-bind="price"]');
-        if (priceElement) {
-            if (favDetail.property_price) {
-                priceElement.textContent = `${favDetail.property_price} €`;
-                priceElement.style.display = '';
-            } else {
-                priceElement.style.display = 'none'; // Cacher si pas de prix
-            }
-        }
-        
-        // Lien (si le clone entier doit être un lien)
-        // Si vous voulez que toute la "carte" du favori soit cliquable :
-        const propertyLink = `annonce?id=${favDetail.property_id}`;
-        const linkWrapper = clone.querySelector('[data-fav-bind="link-wrapper"]'); // Ex: une div à l'intérieur de votre template
-        if (linkWrapper) { // Si vous avez un wrapper spécifique pour le lien
-            const anchor = document.createElement('a');
-            anchor.href = propertyLink;
-            // Transférez le contenu du linkWrapper dans l'ancre
-            while(linkWrapper.firstChild) {
-                anchor.appendChild(linkWrapper.firstChild);
-            }
-            linkWrapper.appendChild(anchor);
-            // Appliquez des styles à l'ancre pour qu'elle se comporte comme un bloc
-            anchor.style.display = 'block';
-            anchor.style.textDecoration = 'none';
-            anchor.style.color = 'inherit';
+        if (albums.length === 0) {
+            messageModalAlbums.textContent = "Vous n'avez aucun album. Créez-en un !";
+            messageModalAlbums.style.display = 'block';
+        } else {
+            messageModalAlbums.style.display = 'none'; // Cacher le message s'il y a des albums
+            albums.forEach(album => {
+                const clone = templateItemAlbumModal.cloneNode(true);
+                clone.removeAttribute('id');
+                clone.style.display = ''; // Rendre visible
 
-        } else if (clone.tagName === 'A') { // Si le clone lui-même (le template) est une balise <a>
-            clone.href = propertyLink;
-        }
-        // Sinon, vous pouvez avoir un simple bouton/lien "Voir l'annonce" avec data-fav-bind="details-link"
-
-        // Bouton "Retirer des favoris" DANS LA MODALE
-        const removeBtnModal = clone.querySelector('.bouton-retirer-favori-modal'); // Utilisez la classe que vous avez définie
-        if (removeBtnModal && favDetail.property_id) {
-            removeBtnModal.dataset.propertyId = favDetail.property_id; // Important pour savoir quoi retirer
-            removeBtnModal.addEventListener('click', async function(event) {
-                event.stopPropagation(); // Empêche le clic de se propager si le bouton est dans un lien
-                const propertyIdToRemove = this.dataset.propertyId;
-                this.disabled = true;
-                try {
-                    await favoritesXanoClient.delete(`favorites_album_by_property/${propertyIdToRemove}`);
-                    userFavoritePropertyIds.delete(propertyIdToRemove);
-                    userFavoritesDetails = userFavoritesDetails.filter(fav => fav.property_id !== propertyIdToRemove);
-                    
-                    renderFavoritesInModal(); // Re-render la liste dans la modale
-                    updateFavoriteButtonsUI(); // Mettre à jour les coeurs sur la page principale
-                } catch (error) {
-                    console.error("Erreur suppression depuis modale:", error);
-                    alert("Erreur lors de la suppression du favori.");
-                    this.disabled = false;
+                // Remplir le nom de l'album (adaptez le sélecteur si besoin)
+                const nameElement = clone.querySelector('[data-album-name]');
+                if (nameElement) {
+                    nameElement.textContent = album.name_Album || 'Album sans nom';
                 }
+                // Stocker l'ID de l'album sur l'élément pour le récupérer au clic
+                clone.dataset.albumId = album.id;
+
+                clone.addEventListener('click', async function () {
+                    const albumId = this.dataset.albumId;
+                    await savePropertyToAlbum(currentPropertyIdToSave, albumId);
+                });
+                modalListeAlbumsConteneur.appendChild(clone);
             });
         }
-        favoritesModalListContainer.appendChild(clone);
-    });
-}
+    }
 
+    // --- 4. SAUVEGARDER L'ANNONCE DANS UN ALBUM SPÉCIFIQUE ---
+    async function savePropertyToAlbum(propertyId, albumId) {
+        if (!propertyId || !albumId) {
+            console.error("ID de propriété ou d'album manquant pour la sauvegarde.");
+            return;
+        }
+        console.log(`[FAVORITES_ALBUM_MANAGER] Ajout de property_id ${propertyId} à album_id ${albumId}`);
+        try {
+            // POST à /favorites_list avec favorites_album_id et property_id
+            await favoritesXanoClient.post('favorites_list', {
+                favorites_album_id: parseInt(albumId), // Assurez-vous que les types correspondent à Xano
+                property_id: parseInt(propertyId)
+            });
+            console.log("[FAVORITES_ALBUM_MANAGER] Annonce ajoutée à l'album avec succès !");
 
-    // --- Initialisation ---
-    fetchUserFavorites(true).then(() => { // true pour charger les détails dès le début si l'utilisateur est connecté
-        initFavoriteButtons();
-    });
+            // Fermer la modale (votre logique)
+            if (modalElement) modalElement.style.display = 'none';
+            // Déclencher l'animation de confirmation
+            triggerSaveAnimation();
 
-    // Gestion du re-fetch et de la réinitialisation si l'état d'authentification change
-    // Écoutez un événement personnalisé que auth-xano.js pourrait déclencher après connexion/déconnexion
-    document.addEventListener('authStateChanged', function() {
-        console.log('[FAVORITES_MANAGER] État d\'authentification changé. Re-vérification des favoris.');
-        updateAuthToken(); // Mettre à jour le token
-        fetchUserFavorites(true).then(() => {
-            initFavoriteButtons();
-            // Si la modale est visible et doit être mise à jour :
-            // if (document.getElementById('votre-modale-id').style.display === 'block' && favoritesModalListContainer) {
-            //     renderFavoritesInModal();
-            // }
+        } catch (error) {
+            console.error("[FAVORITES_ALBUM_MANAGER] Erreur lors de l'ajout de l'annonce à l'album:", error);
+            alert(`Erreur : ${error.message || "Impossible d'ajouter l'annonce à l'album."}`);
+        }
+    }
+
+    // --- 5. GESTION DE LA CRÉATION D'UN NOUVEL ALBUM ---
+    if (btnOuvrirFormNouvelAlbum && formNouvelAlbum) {
+        btnOuvrirFormNouvelAlbum.addEventListener('click', () => {
+            formNouvelAlbum.style.display = 'block'; // Afficher le formulaire
+            if (inputNomNouvelAlbum) inputNomNouvelAlbum.focus();
         });
+    }
+
+    if (formNouvelAlbum && btnSubmitNouvelAlbum && inputNomNouvelAlbum) {
+        // Utilisation de l'événement 'submit' sur le formulaire est préférable
+        // pour gérer la soumission par la touche Entrée aussi.
+        formNouvelAlbum.addEventListener('submit', async function(event) {
+            event.preventDefault(); // Empêcher la soumission native du formulaire
+            const nomAlbum = inputNomNouvelAlbum.value.trim();
+            const descAlbum = inputDescNouvelAlbum ? inputDescNouvelAlbum.value.trim() : ""; // Champ description optionnel
+
+            if (!nomAlbum) {
+                alert("Veuillez entrer un nom pour le nouvel album.");
+                return;
+            }
+            console.log(`[FAVORITES_ALBUM_MANAGER] Création d'un nouvel album: ${nomAlbum}`);
+            btnSubmitNouvelAlbum.disabled = true;
+            try {
+                // POST à /favorites_album avec name_Album et description_album
+                await favoritesXanoClient.post('favorites_album', {
+                    name_Album: nomAlbum,
+                    description_album: descAlbum
+                });
+                console.log("[FAVORITES_ALBUM_MANAGER] Nouvel album créé avec succès !");
+                if (inputNomNouvelAlbum) inputNomNouvelAlbum.value = ''; // Vider les champs
+                if (inputDescNouvelAlbum) inputDescNouvelAlbum.value = '';
+                formNouvelAlbum.style.display = 'none'; // Cacher le formulaire
+                // Recharger la liste des albums dans la modale pour afficher le nouveau
+                await openAndPopulateSelectAlbumModal();
+            } catch (error) {
+                console.error("[FAVORITES_ALBUM_MANAGER] Erreur lors de la création de l'album:", error);
+                alert(`Erreur : ${error.message || "Impossible de créer l'album."}`);
+            } finally {
+                btnSubmitNouvelAlbum.disabled = false;
+            }
+        });
+    }
+
+
+    // --- 6. ANIMATION DE CONFIRMATION (Exemple simple) ---
+    function triggerSaveAnimation() {
+        let animationElement = document.getElementById('save-confirmation-animation');
+        if (!animationElement) {
+            animationElement = document.createElement('div');
+            animationElement.id = 'save-confirmation-animation';
+            animationElement.textContent = 'Enregistré ! ✅';
+            Object.assign(animationElement.style, {
+                position: 'fixed',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                padding: '20px 40px',
+                backgroundColor: 'rgba(0,0,0,0.7)',
+                color: 'white',
+                borderRadius: '8px',
+                zIndex: '10000',
+                fontSize: '20px',
+                opacity: '0',
+                transition: 'opacity 0.5s ease-in-out, transform 0.3s ease-out'
+            });
+            document.body.appendChild(animationElement);
+        }
+
+        // Animation d'apparition
+        setTimeout(() => {
+            animationElement.style.opacity = '1';
+            animationElement.style.transform = 'translate(-50%, -50%) scale(1.1)';
+        }, 50); // Léger délai pour que la transition CSS s'applique
+
+        // Animation de disparition
+        setTimeout(() => {
+            animationElement.style.opacity = '0';
+            animationElement.style.transform = 'translate(-50%, -50%) scale(0.9)';
+        }, 2000); // Disparaît après 2 secondes
+         setTimeout(() => { // S'assurer que la transition est terminée avant de remettre le scale
+            if(animationElement) animationElement.style.transform = 'translate(-50%, -50%) scale(1)';
+        }, 2550);
+    }
+
+    // --- INITIALISATION ---
+    initPropertyHeartButtons(); // Attacher les écouteurs aux coeurs des annonces
+
+    // Écouter les changements d'état d'authentification pour mettre à jour le token
+    document.addEventListener('authStateChanged', function() {
+        console.log('[FAVORITES_ALBUM_MANAGER] État d\'authentification changé.');
+        updateAuthToken();
+        // Si l'utilisateur se déconnecte alors que la modale est ouverte, il faudrait la gérer.
+        // Pour l'instant, le token sera juste mis à jour.
     });
 
-    document.addEventListener('annoncesChargeesEtRendues', function(event) { /* ... comme avant ... */ });
+    // Au cas où des annonces sont chargées dynamiquement après le DOMContentLoaded
+    document.addEventListener('annoncesChargeesEtRendues', function() {
+        console.log('[FAVORITES_ALBUM_MANAGER] Nouvelles annonces chargées, réinitialisation des boutons coeur.');
+        initPropertyHeartButtons();
+    });
+
 });
