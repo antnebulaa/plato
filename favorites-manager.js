@@ -117,14 +117,66 @@ function initPropertyHeartButtons() {
 // La fonction populateModalWithAlbums reste la même que dans ma réponse précédente.
 // Elle s'occupe de mettre à jour le contenu de la modale identifiée par MODAL_ID.
 async function populateModalWithAlbums() {
-    if (!modalElement || !messageModalAlbums || !modalListeAlbumsConteneur) {
-        console.error("Éléments essentiels de la modale des albums non trouvés...");
-        alert("Erreur : Configuration de la modale des favoris incomplète.");
-        return;
+    console.log("[FAVORITES_ALBUM_MANAGER] Entrée dans populateModalWithAlbums.");
+
+    // Vérification des éléments essentiels de la modale
+    if (!modalElement) { // modalElement est défini en haut du script via getElementById(MODAL_ID)
+        console.error("[FAVORITES_ALBUM_MANAGER] ERREUR CRITIQUE: L'élément principal de la modale (MODAL_ID: '" + MODAL_ID + "') est introuvable ! Le contenu ne peut pas être chargé.");
+        // alert("Erreur de configuration : la modale principale des favoris est introuvable."); // Vous pouvez décommenter l'alerte si besoin
+        return; // Arrêt si la modale principale n'est pas trouvée
     }
-    messageModalAlbums.textContent = 'Chargement de vos albums...';
-    // ... (reste de la fonction populateModalWithAlbums comme précédemment) ...
-    // Elle se termine par renderAlbumListInModal(userAlbums); ou un message d'erreur.
+    if (!modalListeAlbumsConteneur) {
+        console.error("[FAVORITES_ALBUM_MANAGER] ERREUR CRITIQUE: Le conteneur de liste d'albums (MODAL_LISTE_ALBUMS_CONTENEUR_ID: '" + MODAL_LISTE_ALBUMS_CONTENEUR_ID + "') est introuvable dans la modale !");
+        if (messageModalAlbums) messageModalAlbums.textContent = "Erreur de configuration interne de la modale."; else console.error("[FAVORITES_ALBUM_MANAGER] messageModalAlbums est aussi introuvable.");
+        return; // Arrêt si le conteneur de liste n'est pas trouvé
+    }
+    if (!messageModalAlbums) {
+        console.warn("[FAVORITES_ALBUM_MANAGER] AVERTISSEMENT: L'élément pour les messages (MESSAGE_MODAL_ALBUMS_ID: '" + MESSAGE_MODAL_ALBUMS_ID + "') est introuvable.");
+        // Ce n'est pas bloquant, mais les messages de chargement/erreur ne s'afficheront pas.
+    }
+
+    // Afficher le message de chargement
+    if (messageModalAlbums) {
+        messageModalAlbums.textContent = 'Chargement de vos albums...';
+        messageModalAlbums.style.display = 'block';
+    }
+    modalListeAlbumsConteneur.innerHTML = ''; // Vider la liste au cas où
+    if(formNouvelAlbum) formNouvelAlbum.style.display = 'none'; // Cacher le formulaire de création
+
+    // Vérification du token d'authentification
+    updateAuthToken(); // S'assurer que authToken est à jour
+    console.log("[FAVORITES_ALBUM_MANAGER] populateModalWithAlbums: Valeur de authToken après updateAuthToken():", authToken ? "Token Présent" : "Token ABSENT ou NULL");
+
+    if (!authToken) {
+        console.warn("[FAVORITES_ALBUM_MANAGER] populateModalWithAlbums: authToken est ABSENT. Arrêt de la récupération des albums. L'utilisateur doit être connecté.");
+        if (messageModalAlbums) messageModalAlbums.textContent = "Veuillez vous connecter pour voir vos albums.";
+        if(btnOuvrirFormNouvelAlbum) btnOuvrirFormNouvelAlbum.style.display = 'none'; // Cacher le bouton de création si non connecté
+        return; // Arrêt si pas de token
+    } else {
+        // Si connecté, le bouton de création d'album devrait être géré par la logique d'affichage (renderAlbumListInModal)
+        if(btnOuvrirFormNouvelAlbum) btnOuvrirFormNouvelAlbum.style.display = ''; // Ou le style par défaut
+    }
+
+    // Si on arrive ici, les éléments de la modale sont trouvés ET authToken est présent.
+    try {
+        console.log("[FAVORITES_ALBUM_MANAGER] Tentative de récupération des albums depuis Xano (GET /favorites_album)...");
+        const albumsResponse = await favoritesXanoClient.get('favorites_album'); 
+        console.log("[FAVORITES_ALBUM_MANAGER] Réponse BRUTE de Xano pour GET /favorites_album:", JSON.stringify(albumsResponse)); // Log de la réponse brute
+
+        userAlbums = (Array.isArray(albumsResponse)) ? albumsResponse : (albumsResponse && Array.isArray(albumsResponse.items)) ? albumsResponse.items : [];
+        console.log(`[FAVORITES_ALBUM_MANAGER] ${userAlbums.length} albums traités après parsing de la réponse.`);
+        
+        renderAlbumListInModal(userAlbums); // Appel pour afficher les albums
+
+    } catch (error) {
+        console.error("[FAVORITES_ALBUM_MANAGER] ERREUR lors de l'appel à Xano pour GET /favorites_album:", error);
+        if (messageModalAlbums) {
+            messageModalAlbums.textContent = "Erreur lors du chargement de vos albums.";
+            if (error.message && (error.message.toLowerCase().includes('unauthorized') || error.message.includes('401'))) {
+                messageModalAlbums.textContent = "Votre session a peut-être expiré ou une authentification est requise. Veuillez vous reconnecter.";
+            }
+        }
+    }
 }
 
 // La fonction savePropertyToAlbum doit aussi être modifiée pour ne plus cacher modalElement,
