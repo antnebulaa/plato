@@ -63,7 +63,6 @@ document.addEventListener('DOMContentLoaded', function () {
         { name: 'btnOuvrirFormNouvelAlbum', el: btnOuvrirFormNouvelAlbum, id: BTN_OUVRIR_FORM_NOUVEL_ALBUM_ID },
         { name: 'formNouvelAlbum', el: formNouvelAlbum, id: FORM_NOUVEL_ALBUM_ID },
         { name: 'inputNomNouvelAlbum', el: inputNomNouvelAlbum, id: INPUT_NOM_NOUVEL_ALBUM_ID },
-        // inputDescNouvelAlbum est optionnel, on ne le vérifie pas de manière bloquante ici
         { name: 'btnSubmitNouvelAlbum', el: btnSubmitNouvelAlbum, id: BTN_SUBMIT_NOUVEL_ALBUM_ID },
         { name: 'messageModalAlbums', el: messageModalAlbums, id: MESSAGE_MODAL_ALBUMS_ID },
         { name: 'btnRetourListeAlbums', el: btnRetourListeAlbums, id: BTN_RETOUR_LISTE_ALBUMS_ID }
@@ -82,7 +81,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (!allElementsFoundCheck) {
         console.error("[FAVORITES_ALBUM_MANAGER] Au moins un élément clé est manquant lors de l'initialisation. Le script risque de ne pas fonctionner correctement. Veuillez vérifier les erreurs ci-dessus.");
-        // return; // Décommenter pour arrêter le script si des éléments critiques sont manquants.
     }
 
 
@@ -134,33 +132,50 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function initPropertyHeartButtons() {
+        console.log('[FAVORITES_ALBUM_MANAGER] Initialisation des boutons favoris (initPropertyHeartButtons)...');
         const buttons = document.querySelectorAll('.favorite-btn');
-        buttons.forEach(button => {
+        console.log(`[FAVORITES_ALBUM_MANAGER] ${buttons.length} bouton(s) avec la classe .favorite-btn trouvés sur la page.`);
+
+        buttons.forEach((button, index) => {
+            // Log l'état de data-property-id pour chaque bouton trouvé AVANT de cloner ou d'attacher l'écouteur
+            console.log(`[FAVORITES_ALBUM_MANAGER] Bouton #${index}:`, button, `data-property-id: "${button.dataset.propertyId}"`);
+
             const newButton = button.cloneNode(true);
             if (button.parentNode) {
                 button.parentNode.replaceChild(newButton, button);
+            } else {
+                console.warn(`[FAVORITES_ALBUM_MANAGER] Bouton #${index} n'a pas de parent. L'écouteur sera attaché à l'original, risque de doublons si appelé plusieurs fois.`);
             }
+            
             const targetButton = newButton.parentNode ? newButton : button;
+            
             targetButton.addEventListener('click', async function (event) {
                 event.preventDefault(); 
                 event.stopPropagation();
+                
+                const clickedPropertyId = this.dataset.propertyId; // 'this' est targetButton
+                console.log('[FAVORITES_ALBUM_MANAGER] Clic sur .favorite-btn. ID Propriété extrait du bouton:', clickedPropertyId, 'Bouton cliqué:', this);
+
+                if (!clickedPropertyId || clickedPropertyId.trim() === "" || clickedPropertyId === "[REMPLACER_PAR_ID_ANNONCE]") {
+                    console.error("ID d'annonce manquant, vide, ou placeholder sur le bouton cliqué. Action annulée.", this);
+                    alert("Une erreur est survenue : l'identifiant de l'annonce est manquant sur ce bouton.");
+                    return;
+                }
+
                 updateAuthToken();
                 if (!authToken) {
                     alert("Veuillez vous connecter pour gérer vos favoris.");
                     return;
                 }
-                const clickedPropertyId = this.dataset.propertyId;
-                if (!clickedPropertyId || clickedPropertyId === "[REMPLACER_PAR_ID_ANNONCE]") {
-                    console.error("ID d'annonce manquant ou invalide sur le bouton.");
-                    return;
-                }
+                
                 if (this.classList.contains('is-favorited')) {
                     const favoritesListId = this.dataset.favoritesListId;
                     const albumName = this.dataset.albumName || 'cet album';
                     if (favoritesListId) {
                         await removePropertyFromAlbum(favoritesListId, clickedPropertyId, albumName);
                     } else {
-                        await fetchAndStoreUserFavoriteItems();
+                        console.error("favoritesListId manquant pour la suppression, tentative de resynchronisation.");
+                        await fetchAndStoreUserFavoriteItems(); // Pour essayer de corriger l'état du bouton
                     }
                 } else {
                     currentPropertyIdToSave = clickedPropertyId;
@@ -177,10 +192,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
         });
-        updateAllHeartButtonsUI();
+        updateAllHeartButtonsUI(); // Mettre à jour l'UI après avoir (ré)attaché les écouteurs
     }
 
     function showModalView(viewIdToShow) {
+        // Les logs existants ici sont utiles
         console.log('[showModalView] Appelée avec viewIdToShow:', viewIdToShow);
         console.log('[showModalView] modalViewAlbumList:', modalViewAlbumList);
         console.log('[showModalView] modalViewCreateAlbum:', modalViewCreateAlbum);
@@ -189,16 +205,14 @@ document.addEventListener('DOMContentLoaded', function () {
             if (viewIdToShow === MODAL_VIEW_ALBUM_LIST_ID) {
                 modalViewAlbumList.style.display = 'block';
                 modalViewCreateAlbum.style.display = 'none';
-                console.log('[showModalView] Affichage de la liste des albums.');
             } else if (viewIdToShow === MODAL_VIEW_CREATE_ALBUM_ID) {
                 modalViewAlbumList.style.display = 'none';
                 modalViewCreateAlbum.style.display = 'block';
-                console.log('[showModalView] Affichage du formulaire de création d\'album.');
                 if(inputNomNouvelAlbum) inputNomNouvelAlbum.focus();
                 if(btnSubmitNouvelAlbum && inputNomNouvelAlbum) btnSubmitNouvelAlbum.disabled = !inputNomNouvelAlbum.value.trim();
             }
         } else {
-            console.error("[FAVORITES_ALBUM_MANAGER] ERREUR DANS SHOWMODALVIEW: `modalViewAlbumList` ou `modalViewCreateAlbum` est null. La navigation interne de la modale échouera. Vérifiez les IDs HTML et leur présence au chargement du DOM.");
+            console.error("[FAVORITES_ALBUM_MANAGER] ERREUR DANS SHOWMODALVIEW: `modalViewAlbumList` ou `modalViewCreateAlbum` est null.");
         }
     }
 
@@ -470,3 +484,4 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     console.log("[FAVORITES_ALBUM_MANAGER] Script initialisé.");
 });
+</scri
