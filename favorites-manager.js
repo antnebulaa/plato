@@ -484,4 +484,4 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     console.log("[FAVORITES_ALBUM_MANAGER] Script initialisé.");
 });
-</scri
+
