@@ -307,7 +307,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     albumName: albumName || (userAlbums.find(a => a.id === newFavoriteEntry.favorites_album_id)?.name_Album) || 'cet album'
                 });
                 updateAllHeartButtonsUI();
-                triggerSaveAnimation(`Enregistré dans "${albumName || DEFAULT_ALBUM_NAME}" ! ✅`);
+                triggerSaveAnimation(`Enregistré dans ${albumName || DEFAULT_ALBUM_NAME}`);
                 const closeButton = modalElement ? modalElement.querySelector('[fs-modal-element="close"]') : null;
                 if (closeButton) {
                      closeButton.click(); 
@@ -326,7 +326,7 @@ document.addEventListener('DOMContentLoaded', function () {
             await favoritesXanoClient.delete(`favorites_list/${favoritesListId}`);
             userFavoriteItems.delete(propertyId.toString());
             updateAllHeartButtonsUI();
-            triggerSaveAnimation(`Supprimé de "${albumName}" 👋`);
+            triggerSaveAnimation(`Supprimé de ${albumName}`);
         } catch (error) {
             console.error("Erreur suppression annonce:", error);
             alert(`Erreur : ${error.message || "Impossible de supprimer de l'album."}`);
@@ -436,11 +436,11 @@ document.addEventListener('DOMContentLoaded', function () {
             animationElement = document.createElement('div');
             animationElement.id = 'save-confirmation-animation';
             Object.assign(animationElement.style, {
-                position: 'fixed', top: '50%', left: '50%',
+                position: 'fixed', top: '1rem', left: '50%',
                 transform: 'translate(-50%, -50%) scale(0.9)',
-                padding: '20px 40px', backgroundColor: 'rgba(40, 40, 40, 0.85)', 
-                color: 'white', borderRadius: '12px', zIndex: '10001', 
-                fontSize: '18px', opacity: '0',
+                padding: '1rem 2rem', backgroundColor: 'rgba(35, 35, 34, 100)', 
+                color: 'white', borderRadius: '1rem', zIndex: '10001', 
+                fontSize: '1rem', opacity: '0',
                 transition: 'opacity 0.3s ease-out, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)', 
                 boxShadow: '0 8px 20px rgba(0,0,0,0.2)', textAlign: 'center'
             });
