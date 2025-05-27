@@ -291,7 +291,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     albumName: albumName || 'cet album'
                 });
                 updateAllHeartButtonsUI();
-                triggerSaveAnimation(`Enregistré dans "${albumName || DEFAULT_ALBUM_NAME}" ! ✅`);
+                triggerSaveAnimation(`Enregistré dans ${albumName || DEFAULT_ALBUM_NAME}`);
                 currentPropertyIdToSave = null;
                 currentPropertyPhotoUrlToDisplay = null;
                 const closeButton = modalElement ? modalElement.querySelector('[fs-modal-element="close"]') : null;
@@ -310,7 +310,7 @@ document.addEventListener('DOMContentLoaded', function () {
             await favoritesXanoClient.delete(`favorites_list/${favoritesListId}`);
             userFavoriteItems.delete(propertyId.toString());
             updateAllHeartButtonsUI();
-            triggerSaveAnimation(`Supprimé de "${albumName}" 👋`);
+            triggerSaveAnimation(`Supprimé de ${albumName}`);
         } catch (error) {
             console.error("Erreur dans removePropertyFromAlbum:", error);
             alert(`Erreur suppression: ${error.message}`);
@@ -360,7 +360,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         console.log(`[FAVORITES_ALBUM_MANAGER] Album "${createdAlbum.name_Album}" créé. Aucune annonce en attente.`);
                         await populateModalWithAlbums(); 
                         showModalView(MODAL_VIEW_ALBUM_LIST_ID);
-                        triggerSaveAnimation(`Album "${createdAlbum.name_Album}" créé !`); 
+                        triggerSaveAnimation(`Album ${createdAlbum.name_Album} créé`); 
                     }
                     inputNomNouvelAlbum.value = ''; 
                     if (inputDescNouvelAlbum) inputDescNouvelAlbum.value = '';
@@ -408,10 +408,10 @@ document.addEventListener('DOMContentLoaded', function () {
             el = document.createElement('div');
             el.id = 'save-confirmation-animation';
             Object.assign(el.style, {
-                position: 'fixed', top: '50%', left: '50%',
-                transform: 'translate(-50%, -50%) scale(0.9)',
-                padding: '20px 40px', backgroundColor: 'rgba(40, 40, 40, 0.85)', 
-                color: 'white', borderRadius: '12px', zIndex: '10001', 
+                position: 'fixed', top: '1rem', left: '50%',
+                transform: 'translate(-10%, -10%) scale(0.9)',
+                padding: '20px 40px', backgroundColor: 'rgba(35, 35, 35, 100)', 
+                color: 'white', borderRadius: '1rem', zIndex: '10001', 
                 fontSize: '18px', opacity: '0',
                 transition: 'opacity 0.3s ease-out, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)', 
                 boxShadow: '0 8px 20px rgba(0,0,0,0.2)', textAlign: 'center'
