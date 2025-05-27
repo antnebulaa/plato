@@ -243,8 +243,8 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
 
 
         // --- DÉBUT DE LA SECTION À MODIFIER/AJOUTER ---
-        const favoriteButton = clone.querySelector('.favorite-btn'); // Trouvez votre bouton favori
-        const propertyId = itemData.id; // Ou comment vous accédez à l'ID de la propriété
+       
+        
 
         if (favoriteButton && propertyId !== undefined && propertyId !== null) {
             favoriteButton.dataset.propertyId = propertyId.toString();
