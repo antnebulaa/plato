@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             console.log('[FAVORITES_ALBUM_MANAGER] Récupération de tous les items favoris de l\'utilisateur...');
             // Assurez-vous que cet endpoint Xano retourne bien id (de favorites_list), property_id, favorites_album_id, name_Album
-            const favoriteEntries = await favoritesXanoClient.get('user_favorite_entries'); // Adaptez le nom de l'endpoint
+            const favoriteEntries = await favoritesXanoClient.get('favorites_list'); // Adaptez le nom de l'endpoint
 
             userFavoriteItems.clear();
             if (favoriteEntries && Array.isArray(favoriteEntries)) {
@@ -284,7 +284,7 @@ function renderAlbumListInModal(albums) {
                 // On ne ferme plus la modale ici, on la laisse ouverte pour que l'utilisateur puisse
                 // voir l'action et éventuellement interagir avec le bouton "enregistré" ou
                 // la fermer lui-même. La fermeture est gérée par Finsweet ou une action utilisateur.
-                await savePropertyToAlbum(currentPropertyIdToSave, albumId); 
+                await (currentPropertyIdToSave, albumId); 
                 // Après sauvegarde, on pourrait vouloir rafraîchir l'état du bouton coeur sur la page principale,
                 // ou afficher un état "enregistré" dans la modale pour cet album.
             });
@@ -293,56 +293,60 @@ function renderAlbumListInModal(albums) {
     }
 }
 
-    // --- 4. SAUVEGARDER L'ANNONCE DANS UN ALBUM SPÉCIFIQUE ---
-    async function savePropertyToAlbum(propertyId, albumId) {
-        if (!propertyId || !albumId) {
-            console.error("ID de propriété ou d'album manquant pour la sauvegarde.");
-            return;
-        }
-        console.log(`[FAVORITES_ALBUM_MANAGER] Ajout de property_id ${propertyId} à album_id ${albumId}`);
-        try {
-            // POST à /favorites_list avec favorites_album_id et property_id
-            await favoritesXanoClient.post('favorites_list', {
-                favorites_album_id: parseInt(albumId), // Assurez-vous que les types correspondent à Xano
-                property_id: parseInt(propertyId)
-            });
-            
-            console.log("[FAVORITES_ALBUM_MANAGER] Annonce ajoutée à l'album avec succès !");
-            
-             try {
-            // L'endpoint POST /favorites_list DOIT retourner l'entrée créée avec son ID et les détails
-            const newFavoriteEntry = await favoritesXanoClient.post('favorites_list', {
-                favorites_album_id: parseInt(albumId),
-                property_id: parseInt(propertyId)
-            });
+ // REMPLACEZ VOTRE FONCTION savePropertyToAlbum EXISTANTE PAR CELLE-CI :
+// (Cette fonction se trouve normalement après renderAlbumListInModal et avant removePropertyFromAlbum)
 
-            if (newFavoriteEntry && newFavoriteEntry.id && newFavoriteEntry.property_id && newFavoriteEntry.favorites_album_id) {
-                console.log("[FAVORITES_ALBUM_MANAGER] Annonce ajoutée à l'album avec succès via Xano:", newFavoriteEntry);
-                // Mettre à jour notre store local
-                userFavoriteItems.set(newFavoriteEntry.property_id.toString(), {
-                    favoritesListId: newFavoriteEntry.id,
-                    albumId: newFavoriteEntry.favorites_album_id,
-                    albumName: newFavoriteEntry.name_Album || (userAlbums.find(a => a.id === newFavoriteEntry.favorites_album_id) || {}).name_Album || 'Album' // Essayer de trouver le nom de l'album
-                });
-                updateAllHeartButtonsUI(); // Mettre à jour tous les boutons coeur
-
-            // Fermer la modale (votre logique)
-            if (modalElement) modalElement.style.display = 'none';
-            // Déclencher l'animation de confirmation
-            triggerSaveAnimation();
-
-        triggerSaveAnimation("Enregistré ! ✅"); // Animation de confirmation d'ajout
-
-            } else {
-                throw new Error("La réponse de Xano pour POST /favorites_list n'a pas retourné les informations attendues.");
-            }
-
-        } catch (error) {
-            console.error("[FAVORITES_ALBUM_MANAGER] Erreur lors de l'ajout de l'annonce à l'album:", error);
-            alert(`Erreur : ${error.message || "Impossible d'ajouter l'annonce à l'album."}`);
-        }
-    } 
+async function savePropertyToAlbum(propertyId, albumId) {
+    if (!propertyId || !albumId) {
+        console.error("[FAVORITES_ALBUM_MANAGER] ID de propriété ou d'album manquant pour la sauvegarde.");
+        return; // Arrêt si IDs manquants
     }
+    console.log(`[FAVORITES_ALBUM_MANAGER] Tentative d'ajout de property_id ${propertyId} à album_id ${albumId}`);
+
+    try {
+        // L'endpoint POST /favorites_list doit retourner l'entrée créée
+        // avec son 'id' (de favorites_list), 'property_id', 'favorites_album_id',
+        // et idéalement 'name_Album' (via un addon dans Xano).
+        const newFavoriteEntry = await favoritesXanoClient.post('favorites_list', {
+            favorites_album_id: parseInt(albumId),
+            property_id: parseInt(propertyId)
+        });
+
+        if (newFavoriteEntry && newFavoriteEntry.id && newFavoriteEntry.property_id && typeof newFavoriteEntry.favorites_album_id !== 'undefined') {
+            console.log("[FAVORITES_ALBUM_MANAGER] Annonce ajoutée à l'album avec succès via Xano:", newFavoriteEntry);
+
+            // Mettre à jour notre 'store' local userFavoriteItems
+            const albumData = userAlbums.find(a => a.id === newFavoriteEntry.favorites_album_id);
+            const albumNameForResult = (newFavoriteEntry.name_Album || (albumData ? albumData.name_Album : 'cet album'));
+
+            userFavoriteItems.set(newFavoriteEntry.property_id.toString(), {
+                favoritesListId: newFavoriteEntry.id,
+                albumId: newFavoriteEntry.favorites_album_id,
+                albumName: albumNameForResult
+            });
+
+            updateAllHeartButtonsUI(); // Mettre à jour l'UI de tous les boutons coeur sur la page
+
+            // La fermeture de la modale est gérée par Finsweet (si l'utilisateur clique sur un bouton fermer)
+            // ou par votre système si un bouton dans la modale a un attribut pour la fermer.
+            // Nous ne la fermons PAS activement ici.
+
+            triggerSaveAnimation("Enregistré ! ✅"); // Animation de confirmation
+
+        } else {
+            console.error("[FAVORITES_ALBUM_MANAGER] Réponse invalide de Xano après POST à /favorites_list:", newFavoriteEntry);
+            throw new Error("La réponse du serveur pour la sauvegarde n'est pas celle attendue.");
+        }
+
+    } catch (error) {
+        console.error("[FAVORITES_ALBUM_MANAGER] Erreur lors de l'ajout de l'annonce à l'album:", error);
+        alert(`Erreur : ${error.message || "Impossible d'ajouter l'annonce à l'album."}`);
+        // En cas d'erreur, resynchroniser l'état des favoris peut être une bonne idée
+        // pour s'assurer que l'UI est correcte.
+        await fetchAndStoreUserFavoriteItems();
+        updateAllHeartButtonsUI();
+    }
+}
 
     
     // --- NOUVEAU : SUPPRIMER L'ANNONCE D'UN ALBUM ---
