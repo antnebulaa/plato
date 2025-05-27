@@ -23,26 +23,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let currentPropertyIdToSave = null;
     let userAlbums = [];
-    let userFavoriteItems = new Map(); // property_id => { favoritesListId, albumId, albumName }
+    let userFavoriteItems = new Map();
 
-    // IDs des éléments HTML (adaptez si nécessaire)
     const MODAL_ID = 'modale-favorites';
-    const MODAL_VIEW_ALBUM_LIST_ID = 'modal-view-album-list'; // Vue affichant la liste des albums
-    const MODAL_VIEW_CREATE_ALBUM_ID = 'modal-view-create-album'; // Vue affichant le formulaire de création
+    const MODAL_VIEW_ALBUM_LIST_ID = 'modal-view-album-list';
+    const MODAL_VIEW_CREATE_ALBUM_ID = 'modal-view-create-album';
     const MODAL_LISTE_ALBUMS_CONTENEUR_ID = 'modal-liste-albums-conteneur';
     const TEMPLATE_ITEM_ALBUM_MODAL_ID = 'template-item-album-modal';
     const BTN_OUVRIR_FORM_NOUVEL_ALBUM_ID = 'btn-ouvrir-form-nouvel-album';
-    const BTN_RETOUR_LISTE_ALBUMS_ID = 'btn-retour-liste-albums'; // Nouveau bouton "Retour"
-    const FORM_NOUVEL_ALBUM_ID = 'form-nouvel-album';
+    const BTN_RETOUR_LISTE_ALBUMS_ID = 'btn-retour-liste-albums';
+    const FORM_NOUVEL_ALBUM_ID = 'form-nouvel-album'; // ID crucial pour votre <form>
     const INPUT_NOM_NOUVEL_ALBUM_ID = 'input-nom-nouvel-album';
     const INPUT_DESC_NOUVEL_ALBUM_ID = 'input-desc-nouvel-album';
     const BTN_SUBMIT_NOUVEL_ALBUM_ID = 'btn-submit-nouvel-album';
     const MESSAGE_MODAL_ALBUMS_ID = 'message-modal-albums';
     const DEFAULT_ALBUM_NAME = "Mes Favoris";
-    // ID de votre bouton caché qui ouvre la modale via Finsweet (fs-modal-element="open-X")
-    const HIDDEN_FINSWEET_MODAL_TRIGGER_ID = 'hidden-finsweet-album-trigger'; // Adaptez cet ID !
+    const HIDDEN_FINSWEET_MODAL_TRIGGER_ID = 'hidden-finsweet-album-trigger';
 
-    // Récupération des éléments du DOM
     const modalElement = document.getElementById(MODAL_ID);
     const modalViewAlbumList = document.getElementById(MODAL_VIEW_ALBUM_LIST_ID);
     const modalViewCreateAlbum = document.getElementById(MODAL_VIEW_CREATE_ALBUM_ID);
@@ -56,17 +53,29 @@ document.addEventListener('DOMContentLoaded', function () {
     const btnSubmitNouvelAlbum = document.getElementById(BTN_SUBMIT_NOUVEL_ALBUM_ID);
     const messageModalAlbums = document.getElementById(MESSAGE_MODAL_ALBUMS_ID);
 
-    // Vérifications initiales des éléments
-    // Ces éléments DOIVENT exister dans votre HTML pour que la modale fonctionne.
-    if (!modalElement || !modalViewAlbumList || !modalViewCreateAlbum || !modalListeAlbumsConteneur || !btnOuvrirFormNouvelAlbum || !formNouvelAlbum || !inputNomNouvelAlbum || !btnSubmitNouvelAlbum || !messageModalAlbums || !btnRetourListeAlbums) {
-        console.warn('[FAVORITES_ALBUM_MANAGER] Un ou plusieurs éléments clés de la modale sont introuvables. Vérifiez les IDs. La modale risque de ne pas fonctionner correctement. Assurez-vous que votre HTML contient bien les divs "modal-view-album-list", "modal-view-create-album" et le bouton "btn-retour-liste-albums" à l\'intérieur de votre "modale-favorites".');
+    // Vérification initiale détaillée
+    let allElementsFound = true;
+    const elementsToCheck = {
+        modalElement, modalViewAlbumList, modalViewCreateAlbum, modalListeAlbumsConteneur,
+        btnOuvrirFormNouvelAlbum, formNouvelAlbum, inputNomNouvelAlbum,
+        btnSubmitNouvelAlbum, messageModalAlbums, btnRetourListeAlbums
+    };
+    for (const key in elementsToCheck) {
+        if (!elementsToCheck[key]) {
+            console.error(`[FAVORITES_ALBUM_MANAGER] ÉLÉMENT INTROUVABLE: ${key} (devrait avoir l'ID: ${eval(key.toUpperCase() + '_ID') || 'ID non défini pour modalElement'}). Vérifiez votre HTML.`);
+            allElementsFound = false;
+        }
     }
     if (!templateItemAlbumModal) {
-        console.warn('[FAVORITES_ALBUM_MANAGER] Template pour les items d\'album (ID: "' + TEMPLATE_ITEM_ALBUM_MODAL_ID + '") introuvable. Le rendu des albums échouera.');
+        console.warn('[FAVORITES_ALBUM_MANAGER] Template pour les items d\'album (ID: "' + TEMPLATE_ITEM_ALBUM_MODAL_ID + '") introuvable.');
+        // allElementsFound = false; // Pas bloquant pour tout, mais le rendu des albums échouera
+    }
+    if (!allElementsFound) {
+        console.error("[FAVORITES_ALBUM_MANAGER] Au moins un élément clé est manquant. Le script risque de ne pas fonctionner correctement.");
+        // return; // On pourrait arrêter le script ici, mais laissons-le continuer pour voir jusqu'où il va.
     }
 
 
-    // --- RÉCUPÉRATION DES ITEMS FAVORIS DE L'UTILISATEUR ---
     async function fetchAndStoreUserFavoriteItems() {
         updateAuthToken();
         if (!authToken) {
@@ -86,7 +95,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                 });
             }
-            console.log('[FAVORITES_ALBUM_MANAGER] Items favoris stockés:', userFavoriteItems);
         } catch (error) {
             console.error('[FAVORITES_ALBUM_MANAGER] Erreur lors de la récupération des items favoris:', error);
             userFavoriteItems.clear();
@@ -94,12 +102,10 @@ document.addEventListener('DOMContentLoaded', function () {
         updateAllHeartButtonsUI();
     }
 
-    // --- MISE À JOUR DE L'UI DES BOUTONS COEUR ---
     function updateAllHeartButtonsUI() {
         document.querySelectorAll('.favorite-btn').forEach(button => {
             const propertyId = button.dataset.propertyId;
             const favoriteTextElement = button.querySelector('.favorite-text');
-
             if (propertyId && userFavoriteItems.has(propertyId)) {
                 const favoriteInfo = userFavoriteItems.get(propertyId);
                 button.classList.add('is-favorited');
@@ -117,63 +123,46 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // --- GESTION DU CLIC SUR L'ICÔNE "COEUR" ---
     function initPropertyHeartButtons() {
         const buttons = document.querySelectorAll('.favorite-btn');
         buttons.forEach(button => {
             const newButton = button.cloneNode(true);
             if (button.parentNode) {
                 button.parentNode.replaceChild(newButton, button);
-            } else {
-                console.warn("[FAVORITES_ALBUM_MANAGER] Le bouton favori n'a pas de parent, impossible de le remplacer pour attacher l'écouteur d'événement proprement.", button);
-                // Fallback: attacher directement, mais risque d'écouteurs multiples si initPropertyHeartButtons est appelé plusieurs fois sans nettoyage.
-                // Pour l'instant, on logue et on continue avec le bouton original s'il n'a pas de parent.
-                // Idéalement, tous les boutons devraient être dans le DOM avec un parent.
             }
-            
-            // Utiliser newButton s'il a été correctement inséré, sinon button (avec le risque mentionné)
             const targetButton = newButton.parentNode ? newButton : button;
-
-
             targetButton.addEventListener('click', async function (event) {
-                event.preventDefault();
+                event.preventDefault(); 
                 event.stopPropagation();
                 updateAuthToken();
                 if (!authToken) {
                     alert("Veuillez vous connecter pour gérer vos favoris.");
                     return;
                 }
-
                 const clickedPropertyId = this.dataset.propertyId;
                 if (!clickedPropertyId || clickedPropertyId === "[REMPLACER_PAR_ID_ANNONCE]") {
                     console.error("ID d'annonce manquant ou invalide sur le bouton.");
                     return;
                 }
-
                 if (this.classList.contains('is-favorited')) {
                     const favoritesListId = this.dataset.favoritesListId;
                     const albumName = this.dataset.albumName || 'cet album';
                     if (favoritesListId) {
                         await removePropertyFromAlbum(favoritesListId, clickedPropertyId, albumName);
                     } else {
-                        console.error("favoritesListId manquant pour la suppression.");
                         await fetchAndStoreUserFavoriteItems();
                     }
                 } else {
                     currentPropertyIdToSave = clickedPropertyId;
-                    await populateModalWithAlbums(); // Prépare le contenu
-                    showModalView(MODAL_VIEW_ALBUM_LIST_ID); // Définit la vue interne par défaut
-
-                    // Déclenche l'ouverture de la modale via le bouton Finsweet caché
+                    await populateModalWithAlbums();
+                    showModalView(MODAL_VIEW_ALBUM_LIST_ID);
                     const hiddenTrigger = document.getElementById(HIDDEN_FINSWEET_MODAL_TRIGGER_ID);
                     if (hiddenTrigger) {
-                        console.log(`[FAVORITES_ALBUM_MANAGER] Clic sur le trigger caché Finsweet (ID: ${HIDDEN_FINSWEET_MODAL_TRIGGER_ID}) pour ouvrir la modale.`);
                         hiddenTrigger.click();
                     } else {
-                        console.error(`[FAVORITES_ALBUM_MANAGER] Trigger de modale caché (ID: ${HIDDEN_FINSWEET_MODAL_TRIGGER_ID}) introuvable. La modale ne s'ouvrira pas automatiquement.`);
-                        // Optionnel: Tenter d'ouvrir la modale manuellement si le trigger est introuvable (moins idéal si Finsweet est utilisé)
-                        // if (modalElement) modalElement.style.display = 'block'; // Ou une autre méthode pour la rendre visible
-                        alert("Erreur : Impossible d'ouvrir la fenêtre de sauvegarde (trigger manquant).");
+                        console.error(`[FAVORITES_ALBUM_MANAGER] Trigger de modale caché (ID: ${HIDDEN_FINSWEET_MODAL_TRIGGER_ID}) introuvable.`);
+                        if (modalElement) modalElement.style.display = 'block'; // Fallback pour ouvrir
+                        else alert("Erreur : Impossible d'ouvrir la fenêtre de sauvegarde (trigger et modale manquants).");
                     }
                 }
             });
@@ -181,7 +170,6 @@ document.addEventListener('DOMContentLoaded', function () {
         updateAllHeartButtonsUI();
     }
 
-    // --- GESTION DES VUES DE LA MODALE (LISTE VS CRÉATION) ---
     function showModalView(viewIdToShow) {
         if (modalViewAlbumList && modalViewCreateAlbum) {
             if (viewIdToShow === MODAL_VIEW_ALBUM_LIST_ID) {
@@ -194,23 +182,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 if(btnSubmitNouvelAlbum && inputNomNouvelAlbum) btnSubmitNouvelAlbum.disabled = !inputNomNouvelAlbum.value.trim();
             }
         } else {
-            console.error("[FAVORITES_ALBUM_MANAGER] Les conteneurs de vues de la modale (modal-view-album-list ou modal-view-create-album) ne sont pas tous définis/trouvés dans le DOM. La navigation interne de la modale échouera.");
+            console.error("[FAVORITES_ALBUM_MANAGER] `modalViewAlbumList` ou `modalViewCreateAlbum` est null. La navigation interne de la modale échouera.");
         }
     }
 
-    // --- CHARGEMENT ET AFFICHAGE DES ALBUMS DANS LA MODALE ---
     async function populateModalWithAlbums() {
         if (!modalElement || !modalListeAlbumsConteneur || !messageModalAlbums) {
-            console.error("Éléments de la modale pour albums manquants (conteneur principal, liste ou message).");
+            console.error("Éléments de la modale pour albums manquants.");
             return;
         }
-        
         messageModalAlbums.textContent = 'Chargement de vos albums...';
         messageModalAlbums.style.display = 'block';
         modalListeAlbumsConteneur.innerHTML = '';
-        // S'assurer que le formulaire de création est caché quand on charge la liste des albums
         if (modalViewCreateAlbum) modalViewCreateAlbum.style.display = 'none';
-        if (modalViewAlbumList) modalViewAlbumList.style.display = 'block'; // S'assurer que la vue liste est visible
+        if (modalViewAlbumList) modalViewAlbumList.style.display = 'block';
 
         updateAuthToken();
         if (!authToken) {
@@ -220,20 +205,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         if(btnOuvrirFormNouvelAlbum) btnOuvrirFormNouvelAlbum.style.display = '';
 
-
         try {
             const albumsResponse = await favoritesXanoClient.get('favorites_album');
             userAlbums = (Array.isArray(albumsResponse)) ? albumsResponse : (albumsResponse && Array.isArray(albumsResponse.items)) ? albumsResponse.items : [];
-            
             if (userAlbums.length === 0 && currentPropertyIdToSave) {
-                console.log("Aucun album existant. Création de l'album par défaut et sauvegarde.");
                 const defaultAlbum = await createAlbum(DEFAULT_ALBUM_NAME, "Mon premier album de favoris.", true);
                 if (defaultAlbum && defaultAlbum.id) {
                     userAlbums.push(defaultAlbum);
                     await savePropertyToAlbum(currentPropertyIdToSave, defaultAlbum.id, defaultAlbum.name_Album);
                     return; 
                 } else {
-                    messageModalAlbums.textContent = "Impossible de créer l'album par défaut. Veuillez en créer un manuellement.";
+                    messageModalAlbums.textContent = "Impossible de créer l'album par défaut.";
                 }
             }
             renderAlbumListInModal(userAlbums);
@@ -244,18 +226,11 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderAlbumListInModal(albums) {
-        if (!modalListeAlbumsConteneur) {
-             console.error("Conteneur de liste d'albums introuvable pour le rendu.");
-             if (messageModalAlbums) messageModalAlbums.textContent = "Erreur d'affichage (conteneur liste).";
+        if (!modalListeAlbumsConteneur || !templateItemAlbumModal) {
+             if (messageModalAlbums) messageModalAlbums.textContent = "Erreur d'affichage des albums.";
              return;
         }
-        if (!templateItemAlbumModal) {
-            console.error("Template pour item d'album introuvable pour le rendu.");
-            if (messageModalAlbums) messageModalAlbums.textContent = "Erreur d'affichage (template item).";
-            return;
-        }
         modalListeAlbumsConteneur.innerHTML = '';
-
         if (albums.length === 0) {
             if (messageModalAlbums) {
                 messageModalAlbums.textContent = "Vous n'avez aucun album. Créez-en un !";
@@ -267,17 +242,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 const clone = templateItemAlbumModal.cloneNode(true);
                 clone.removeAttribute('id');
                 clone.style.display = 'flex'; 
-
                 const nameElement = clone.querySelector('[data-album-name]');
                 if (nameElement) nameElement.textContent = album.name_Album || 'Album sans nom';
                 clone.dataset.albumId = album.id;
                 clone.dataset.albumName = album.name_Album; 
-
                 clone.addEventListener('click', async function () {
                     const albumId = this.dataset.albumId;
                     const albumName = this.dataset.albumName;
                     if (!currentPropertyIdToSave) {
-                        alert("Erreur : Aucune annonce sélectionnée pour la sauvegarde.");
+                        alert("Erreur : Aucune annonce sélectionnée.");
                         return;
                     }
                     await savePropertyToAlbum(currentPropertyIdToSave, albumId, albumName);
@@ -290,18 +263,13 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // --- SAUVEGARDE D'UNE ANNONCE DANS UN ALBUM ---
     async function savePropertyToAlbum(propertyId, albumId, albumName) {
-        if (!propertyId || !albumId) {
-            console.error("ID de propriété ou d'album manquant pour la sauvegarde.");
-            return;
-        }
+        if (!propertyId || !albumId) return;
         try {
             const newFavoriteEntry = await favoritesXanoClient.post('favorites_list', {
                 favorites_album_id: parseInt(albumId),
                 property_id: parseInt(propertyId)
             });
-
             if (newFavoriteEntry && newFavoriteEntry.id) {
                 userFavoriteItems.set(newFavoriteEntry.property_id.toString(), {
                     favoritesListId: newFavoriteEntry.id,
@@ -310,23 +278,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 updateAllHeartButtonsUI();
                 triggerSaveAnimation(`Enregistré dans "${albumName || DEFAULT_ALBUM_NAME}" ! ✅`);
-                
                 const closeButton = modalElement ? modalElement.querySelector('[fs-modal-element="close"]') : null;
                 if (closeButton) {
                      closeButton.click(); 
                 } else {
-                    console.warn("Aucun bouton de fermeture Finsweet [fs-modal-element=\"close\"] trouvé dans la modale pour la fermer après sauvegarde.");
+                    console.warn("Bouton de fermeture Finsweet introuvable après sauvegarde.");
                 }
-            } else {
-                throw new Error("La réponse du serveur pour la sauvegarde est invalide.");
-            }
+            } else { throw new Error("Réponse serveur invalide pour sauvegarde."); }
         } catch (error) {
-            console.error("Erreur lors de la sauvegarde de l'annonce:", error);
-            alert(`Erreur : ${error.message || "Impossible d'ajouter l'annonce à l'album."}`);
+            console.error("Erreur sauvegarde annonce:", error);
+            alert(`Erreur : ${error.message || "Impossible d'ajouter à l'album."}`);
         }
     }
 
-    // --- SUPPRESSION D'UNE ANNONCE D'UN ALBUM ---
     async function removePropertyFromAlbum(favoritesListId, propertyId, albumName) {
         try {
             await favoritesXanoClient.delete(`favorites_list/${favoritesListId}`);
@@ -334,13 +298,12 @@ document.addEventListener('DOMContentLoaded', function () {
             updateAllHeartButtonsUI();
             triggerSaveAnimation(`Supprimé de "${albumName}" 👋`);
         } catch (error) {
-            console.error("Erreur lors de la suppression de l'annonce de l'album:", error);
-            alert(`Erreur : ${error.message || "Impossible de supprimer l'annonce de l'album."}`);
+            console.error("Erreur suppression annonce:", error);
+            alert(`Erreur : ${error.message || "Impossible de supprimer de l'album."}`);
             await fetchAndStoreUserFavoriteItems();
         }
     }
 
-    // --- CRÉATION D'UN NOUVEL ALBUM ---
     async function createAlbum(nomAlbum, descAlbum, suppressReload = false) {
         updateAuthToken();
         if (!authToken) {
@@ -348,36 +311,41 @@ document.addEventListener('DOMContentLoaded', function () {
             return null;
         }
         try {
+            console.log(`[FAVORITES_ALBUM_MANAGER] Appel Xano pour créer album: ${nomAlbum}`);
             const newAlbum = await favoritesXanoClient.post('favorites_album', {
                 name_Album: nomAlbum,
                 description_album: descAlbum
             });
+            console.log('[FAVORITES_ALBUM_MANAGER] Réponse Xano création album:', newAlbum);
 
             if (newAlbum && newAlbum.id) {
-                console.log("Nouvel album créé:", newAlbum);
                 if (!suppressReload) {
                     await populateModalWithAlbums(); 
                     showModalView(MODAL_VIEW_ALBUM_LIST_ID); 
                 }
                 return newAlbum; 
-            } else {
-                throw new Error("La réponse du serveur pour la création d'album est invalide.");
+            } else { 
+                console.error("Réponse serveur invalide pour création album ou ID manquant:", newAlbum);
+                throw new Error("La réponse du serveur pour la création d'album est invalide ou ID manquant."); 
             }
         } catch (error) {
-            console.error("Erreur lors de la création de l'album:", error);
+            console.error("Erreur création album Xano:", error);
             alert(`Erreur : ${error.message || "Impossible de créer l'album."}`);
             return null;
         }
     }
 
-
+    // GESTION DE LA SOUMISSION DU FORMULAIRE DE CRÉATION D'ALBUM
     if (formNouvelAlbum && btnSubmitNouvelAlbum && inputNomNouvelAlbum) {
+        console.log('[FAVORITES_ALBUM_MANAGER] Écouteur d\'événement SUBMIT attaché au formulaire de création d\'album.');
         inputNomNouvelAlbum.addEventListener('input', function() {
             btnSubmitNouvelAlbum.disabled = !this.value.trim();
         });
 
         formNouvelAlbum.addEventListener('submit', async function(event) {
-            event.preventDefault();
+            event.preventDefault(); // Empêche la soumission Webflow native
+            console.log('[FAVORITES_ALBUM_MANAGER] Soumission du formulaire de création d\'album interceptée.');
+
             const nomAlbum = inputNomNouvelAlbum.value.trim();
             const descAlbum = inputDescNouvelAlbum ? inputDescNouvelAlbum.value.trim() : "";
 
@@ -385,68 +353,82 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert("Le nom de l'album ne peut pas être vide.");
                 return;
             }
-            btnSubmitNouvelAlbum.disabled = true;
-            const createdAlbum = await createAlbum(nomAlbum, descAlbum);
-            if (createdAlbum) {
-                inputNomNouvelAlbum.value = '';
-                if (inputDescNouvelAlbum) inputDescNouvelAlbum.value = '';
-                // Le bouton sera réactivé par showModalView ou l'input listener si on reste.
-            } else {
-                btnSubmitNouvelAlbum.disabled = !inputNomNouvelAlbum.value.trim(); // Réactiver si erreur et nom présent
+            btnSubmitNouvelAlbum.disabled = true; // Désactiver pendant le traitement
+
+            try {
+                const createdAlbum = await createAlbum(nomAlbum, descAlbum);
+                if (createdAlbum) {
+                    console.log('[FAVORITES_ALBUM_MANAGER] Album créé avec succès via JS:', createdAlbum);
+                    inputNomNouvelAlbum.value = ''; // Vider le champ
+                    if (inputDescNouvelAlbum) inputDescNouvelAlbum.value = '';
+                    // Le message de succès personnalisé sera géré par createAlbum via populateModal et showModalView
+                    // ou par une animation si on reste sur la même vue (non implémenté ici pour la création)
+                    // Pour l'instant, on retourne à la liste qui se rafraîchit.
+                } else {
+                    // L'erreur est déjà gérée et alertée dans createAlbum
+                    console.warn('[FAVORITES_ALBUM_MANAGER] La création d\'album a échoué ou n\'a pas retourné d\'album.');
+                }
+            } catch (error) {
+                // Normalement, createAlbum gère ses propres erreurs et alertes.
+                console.error('[FAVORITES_ALBUM_MANAGER] Erreur inattendue lors de la soumission du formulaire de création:', error);
+                alert("Une erreur inattendue est survenue lors de la création de l'album.");
+            } finally {
+                // Réactiver le bouton si le nom n'est pas vide (ou toujours le réactiver)
+                btnSubmitNouvelAlbum.disabled = !inputNomNouvelAlbum.value.trim(); 
+                
+                // Cacher les messages de succès/échec de Webflow s'ils existent
+                const wfFormDone = formNouvelAlbum.parentElement.querySelector('.w-form-done');
+                const wfFormFail = formNouvelAlbum.parentElement.querySelector('.w-form-fail');
+                if (wfFormDone) wfFormDone.style.display = 'none';
+                if (wfFormFail) wfFormFail.style.display = 'none';
             }
         });
+    } else {
+        console.warn("[FAVORITES_ALBUM_MANAGER] Le formulaire de création d'album (formNouvelAlbum) ou ses composants (btnSubmitNouvelAlbum, inputNomNouvelAlbum) sont introuvables. La création d'album via JS ne fonctionnera pas.");
+        if (!formNouvelAlbum) console.warn(" > formNouvelAlbum est null. VÉRIFIEZ L'ID DE VOTRE BALISE <form> ! Il doit être 'form-nouvel-album'.");
+        if (!btnSubmitNouvelAlbum) console.warn(" > btnSubmitNouvelAlbum est null");
+        if (!inputNomNouvelAlbum) console.warn(" > inputNomNouvelAlbum est null");
     }
 
-    // Écouteur pour le bouton "Créer un nouvel album"
     if (btnOuvrirFormNouvelAlbum) {
-        btnOuvrirFormNouvelAlbum.addEventListener('click', (event) => {
-            event.preventDefault();
-            console.log('[FAVORITES_ALBUM_MANAGER] Clic sur btn-ouvrir-form-nouvel-album. Planification du changement de vue.');
-            
-            // Différer légèrement le changement de vue
-            setTimeout(() => {
-                console.log('[FAVORITES_ALBUM_MANAGER] Exécution différée de showModalView pour la vue de création.');
-                showModalView(MODAL_VIEW_CREATE_ALBUM_ID);
-            }, 50); // Un petit délai, par exemple 50 millisecondes
+        btnOuvrirFormNouvelAlbum.addEventListener('click', () => {
+            console.log('[FAVORITES_ALBUM_MANAGER] Clic sur btn-ouvrir-form-nouvel-album.');
+            showModalView(MODAL_VIEW_CREATE_ALBUM_ID);
         });
+    } else {
+        console.warn("[FAVORITES_ALBUM_MANAGER] Bouton 'btn-ouvrir-form-nouvel-album' introuvable.");
     }
+
     if (btnRetourListeAlbums) {
-        btnRetourListeAlbums.addEventListener('click', () => {
+        btnRetourListeAlbums.addEventListener('click', () => { 
+            console.log('[FAVORITES_ALBUM_MANAGER] Clic sur btn-retour-liste-albums.');
             showModalView(MODAL_VIEW_ALBUM_LIST_ID);
         });
+    } else {
+        console.warn("[FAVORITES_ALBUM_MANAGER] Bouton 'btn-retour-liste-albums' introuvable.");
     }
 
-    // --- ANIMATION DE CONFIRMATION ---
     function triggerSaveAnimation(message) {
         let animationElement = document.getElementById('save-confirmation-animation');
         if (!animationElement) {
             animationElement = document.createElement('div');
             animationElement.id = 'save-confirmation-animation';
             Object.assign(animationElement.style, {
-                position: 'fixed',
-                top: '50%',
-                left: '50%',
+                position: 'fixed', top: '50%', left: '50%',
                 transform: 'translate(-50%, -50%) scale(0.9)',
-                padding: '20px 40px',
-                backgroundColor: 'rgba(40, 40, 40, 0.85)', 
-                color: 'white',
-                borderRadius: '12px', 
-                zIndex: '10001', 
-                fontSize: '18px',
-                opacity: '0',
+                padding: '20px 40px', backgroundColor: 'rgba(40, 40, 40, 0.85)', 
+                color: 'white', borderRadius: '12px', zIndex: '10001', 
+                fontSize: '18px', opacity: '0',
                 transition: 'opacity 0.3s ease-out, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)', 
-                boxShadow: '0 8px 20px rgba(0,0,0,0.2)',
-                textAlign: 'center'
+                boxShadow: '0 8px 20px rgba(0,0,0,0.2)', textAlign: 'center'
             });
             document.body.appendChild(animationElement);
         }
         animationElement.textContent = message;
-
         setTimeout(() => { 
             animationElement.style.opacity = '1';
             animationElement.style.transform = 'translate(-50%, -50%) scale(1)';
         }, 50);
-
         setTimeout(() => { 
             animationElement.style.opacity = '0';
             animationElement.style.transform = 'translate(-50%, -50%) scale(0.9)';
@@ -456,14 +438,13 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 2650);
     }
 
-    // --- INITIALISATION ET ÉCOUTEURS D'ÉVÉNEMENTS GLOBAUX ---
     (async () => {
         await fetchAndStoreUserFavoriteItems();
         initPropertyHeartButtons();
     })();
 
     document.addEventListener('annoncesChargeesEtRendues', async function() {
-        console.log('[FAVORITES_ALBUM_MANAGER] Nouvelles annonces chargées, réinitialisation des boutons favoris.');
+        console.log('[FAVORITES_ALBUM_MANAGER] Nouvelles annonces chargées.');
         initPropertyHeartButtons();
     });
 
@@ -471,17 +452,13 @@ document.addEventListener('DOMContentLoaded', function () {
         console.log('[FAVORITES_ALBUM_MANAGER] État d\'authentification changé.');
         updateAuthToken(); 
         await fetchAndStoreUserFavoriteItems(); 
-        
         if (!authToken && modalElement && (modalElement.style.display !== 'none' && modalElement.style.display !== '')) {
             const closeButton = modalElement.querySelector('[fs-modal-element="close"]');
-            if (closeButton) {
-                 closeButton.click();
-            }
-            alert("Vous avez été déconnecté. Veuillez vous reconnecter pour gérer vos favoris.");
+            if (closeButton) closeButton.click();
+            alert("Vous avez été déconnecté.");
         } else if (authToken && modalElement && (modalElement.style.display !== 'none' && modalElement.style.display !== '')) {
             await populateModalWithAlbums();
         }
     });
-
     console.log("[FAVORITES_ALBUM_MANAGER] Script initialisé.");
 });
