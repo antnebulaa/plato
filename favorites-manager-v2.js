@@ -402,41 +402,56 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function triggerSaveAnimation(message) {
-        console.log("[triggerSaveAnimation] Message:", message);
-        let el = document.getElementById('save-confirmation-animation');
-        if (!el) {
-            el = document.createElement('div');
-            el.id = 'save-confirmation-animation';
-            Object.assign(el.style, {
-                position: 'fixed', top: '1rem', left: '50%',
-                transform: 'translate(-10%, -10%) scale(0.9)',
-                padding: '20px 40px', backgroundColor: 'rgba(35, 35, 35, 100)', 
-                color: 'white', borderRadius: '1rem', zIndex: '10001', 
-                fontSize: '18px', opacity: '0',
-                transition: 'opacity 0.3s ease-out, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)', 
-                boxShadow: '0 8px 20px rgba(0,0,0,0.2)', textAlign: 'center'
-            });
-            document.body.appendChild(el);
-            console.log("[triggerSaveAnimation] Élément d'animation créé et ajouté au body.");
-        }
-        el.textContent = message;
-        el.style.opacity = '0'; 
-        el.style.transform = 'translate(-50%, -50%) scale(0.9)';
+    console.log("[triggerSaveAnimation] Déclenchée avec message:", message);
+    let animationElement = document.getElementById('save-confirmation-animation');
 
-        setTimeout(() => { 
-            el.style.opacity = '1';
-            el.style.transform = 'translate(-50%, -50%) scale(1)';
-            console.log("[triggerSaveAnimation] Animation d'apparition.");
-        }, 50);
-        setTimeout(() => { 
-            el.style.opacity = '0';
-            el.style.transform = 'translate(-50%, -50%) scale(0.9)';
-            console.log("[triggerSaveAnimation] Animation de disparition.");
-        }, 2300); 
-         setTimeout(() => { 
-            if(el) el.style.transform = 'translate(-50%, -50%) scale(0.9)'; 
-        }, 2650);
+    if (!animationElement) {
+        animationElement = document.createElement('div');
+        animationElement.id = 'save-confirmation-animation';
+        document.body.appendChild(animationElement);
+        console.log("[triggerSaveAnimation] Élément d'animation créé et ajouté au body.");
     }
+
+    // Styles pour la nouvelle animation (bannière en haut)
+    Object.assign(animationElement.style, {
+        position: 'fixed',
+        top: '20px', // Distance du haut de la page
+        left: '1rem',
+        right: '1rem',
+        width: 'auto', // S'ajuste grâce à left/right
+        padding: '12px 20px', // Padding ajusté
+        backgroundColor: 'rgba(35, 35, 35, 1)', // Fond semi-transparent
+        color: 'white',
+        borderRadius: '1rem',
+        zIndex: '10001', // Au-dessus des autres éléments
+        fontSize: '1rem',
+        textAlign: 'center',
+        boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+        opacity: '0', // État initial: invisible
+        transform: 'translateY(-200%)', // État initial: caché au-dessus de la fenêtre
+        // Transition douce pour l'opacité et la transformation (slide)
+        transition: 'opacity 0.4s ease-in-out, transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)' // easeInSine pour transform
+    });
+
+    animationElement.textContent = message;
+    
+    // Force le reflow pour s'assurer que l'état initial est appliqué avant la transition
+    void animationElement.offsetWidth; 
+
+    // Apparition (slide down)
+    setTimeout(() => {
+        animationElement.style.opacity = '1';
+        animationElement.style.transform = 'translateY(0)'; // Glisse à sa position finale (top: 20px)
+        console.log("[triggerSaveAnimation] Animation d'apparition (slide-down).");
+    }, 50); // Léger délai pour que la transition CSS s'applique
+
+    // Disparition (slide up) après un délai
+    setTimeout(() => {
+        animationElement.style.opacity = '0';
+        animationElement.style.transform = 'translateY(-200%)'; // Glisse vers le haut pour disparaître
+        console.log("[triggerSaveAnimation] Animation de disparition (slide-up).");
+    }, 2500); // L'animation reste visible pendant environ 2.45 secondes (2500 - 50)
+}
 
     (async () => {
         await fetchAndStoreUserFavoriteItems();
