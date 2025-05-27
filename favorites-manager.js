@@ -103,13 +103,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (propertyId && userFavoriteItems.has(propertyId)) {
                 const favoriteInfo = userFavoriteItems.get(propertyId);
                 button.classList.add('is-favorited');
-                if (favoriteTextElement) favoriteTextElement.textContent = 'Sauvegardé';
+                if (favoriteTextElement) favoriteTextElement.textContent = 'Retirer';
                 button.dataset.favoritesListId = favoriteInfo.favoritesListId;
                 button.dataset.albumId = favoriteInfo.albumId;
                 button.dataset.albumName = favoriteInfo.albumName;
             } else if (propertyId) {
                 button.classList.remove('is-favorited');
-                if (favoriteTextElement) favoriteTextElement.textContent = 'Ajouter aux favoris';
+                if (favoriteTextElement) favoriteTextElement.textContent = 'Enregistrer';
                 delete button.dataset.favoritesListId;
                 delete button.dataset.albumId;
                 delete button.dataset.albumName;
