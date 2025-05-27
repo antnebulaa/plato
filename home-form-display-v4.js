@@ -240,6 +240,44 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
             console.warn("La fonction bindDataToElement n'est pas définie.");
         }
         // --- FIN DE LA SECTION DE BINDING ---
+
+
+        // --- DÉBUT DE LA SECTION À MODIFIER/AJOUTER ---
+        const favoriteButton = clone.querySelector('.favorite-btn'); // Trouvez votre bouton favori
+        const propertyId = itemData.id; // Ou comment vous accédez à l'ID de la propriété
+
+        if (favoriteButton && propertyId !== undefined && propertyId !== null) {
+            favoriteButton.dataset.propertyId = propertyId.toString();
+
+            // Récupérer l'URL de la photo de couverture
+            let coverPhotoUrl = null;
+            if (itemData._property_photos && 
+                itemData._property_photos.length > 0 &&
+                itemData._property_photos[0].images &&
+                itemData._property_photos[0].images.length > 0 &&
+                itemData._property_photos[0].images[0].url) {
+                
+                coverPhotoUrl = itemData._property_photos[0].images[0].url;
+            } else {
+                console.warn(`[RENDER_ANNONCES] Aucune photo de couverture trouvée pour l'annonce ID: ${propertyId}`);
+                // Optionnel: définir une URL de placeholder si aucune photo n'est trouvée
+                // coverPhotoUrl = 'URL_DE_VOTRE_PLACEHOLDER_IMAGE'; 
+            }
+
+            // Ajouter l'attribut data-cover-photo-url
+            if (coverPhotoUrl) {
+                favoriteButton.dataset.coverPhotoUrl = coverPhotoUrl;
+                console.log(`[RENDER_ANNONCES] Attribut data-cover-photo-url="${coverPhotoUrl}" ajouté au bouton favori pour l'annonce ID: ${propertyId}`);
+            } else {
+                 console.warn(`[RENDER_ANNONCES] coverPhotoUrl est null ou vide pour l'annonce ID: ${propertyId}, l'attribut data-cover-photo-url ne sera pas ajouté.`);
+            }
+
+        } else {
+            if (!favoriteButton) console.warn("[RENDER_ANNONCES] Bouton .favorite-btn non trouvé dans le template pour l'item:", itemData);
+            if (propertyId === undefined || propertyId === null) console.warn("[RENDER_ANNONCES] ID de propriété non trouvé pour l'item:", itemData);
+        }
+        // --- FIN DE LA SECTION À MODIFIER/AJOUTER ---
+        
             
         // --- CRÉATION DU LIEN VERS LA PAGE DE DÉTAIL (RÉINTÉGRÉE) ---
         if (propertyId !== undefined && propertyId !== null) {
