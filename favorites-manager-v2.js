@@ -419,8 +419,8 @@ document.addEventListener('DOMContentLoaded', function () {
         left: '1rem',
         right: '1rem',
         width: 'auto', // S'ajuste grâce à left/right
-        padding: '12px 20px', // Padding ajusté
-        backgroundColor: 'rgba(35, 35, 35, 1)', // Fond semi-transparent
+        padding: '16px 20px', // Padding ajusté
+        backgroundColor: 'rgba(18, 18, 18, 1)', // Fond semi-transparent
         color: 'white',
         borderRadius: '1rem',
         zIndex: '10001', // Au-dessus des autres éléments
