@@ -297,6 +297,7 @@ function renderAlbumListInModal(albums) {
 // (Cette fonction se trouve normalement après renderAlbumListInModal et avant removePropertyFromAlbum)
 
 async function savePropertyToAlbum(propertyId, albumId) {
+    console.log(`[FAVORITES_ALBUM_MANAGER] Entrée dans savePropertyToAlbum avec propertyId: ${propertyId}, albumId: ${albumId}`);
     if (!propertyId || !albumId) {
         console.error("[FAVORITES_ALBUM_MANAGER] ID de propriété ou d'album manquant pour la sauvegarde.");
         return; // Arrêt si IDs manquants
