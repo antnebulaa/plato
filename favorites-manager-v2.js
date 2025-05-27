@@ -430,7 +430,7 @@ document.addEventListener('DOMContentLoaded', function () {
         opacity: '0', // État initial: invisible
         transform: 'translateY(-200%)', // État initial: caché au-dessus de la fenêtre
         // Transition douce pour l'opacité et la transformation (slide)
-        transition: 'opacity 0.4s ease-in-out, transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)' // easeInSine pour transform
+        transition: 'opacity 0.3s ease-in-out, transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)' // easeInSine pour transform
     });
 
     animationElement.textContent = message;
