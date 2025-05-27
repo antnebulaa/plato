@@ -16,14 +16,14 @@ document.addEventListener('DOMContentLoaded', function () {
     updateAuthToken();
 
     let currentPropertyIdToSave = null;
-    let currentPropertyPhotoUrlToDisplay = null;
+    let currentPropertyPhotoUrlToDisplay = null; 
     let userAlbums = [];
     let userFavoriteItems = new Map();
 
     const MODAL_ID = 'modale-favorites';
     const MODAL_VIEW_ALBUM_LIST_ID = 'modal-view-album-list';
     const MODAL_VIEW_CREATE_ALBUM_ID = 'modal-view-create-album';
-    const AD_COVER_PHOTO_PREVIEW_ID = 'ad-cover-photo-preview';
+    const AD_COVER_PHOTO_PREVIEW_ID = 'ad-cover-photo-preview'; 
     const MODAL_LISTE_ALBUMS_CONTENEUR_ID = 'modal-liste-albums-conteneur';
     const TEMPLATE_ITEM_ALBUM_MODAL_ID = 'template-item-album-modal';
     const BTN_OUVRIR_FORM_NOUVEL_ALBUM_ID = 'btn-ouvrir-form-nouvel-album';
@@ -58,14 +58,14 @@ document.addEventListener('DOMContentLoaded', function () {
         { name: 'modalViewCreateAlbum', el: modalViewCreateAlbum, id: MODAL_VIEW_CREATE_ALBUM_ID },
         { name: 'modalListeAlbumsConteneur', el: modalListeAlbumsConteneur, id: MODAL_LISTE_ALBUMS_CONTENEUR_ID },
         { name: 'btnOuvrirFormNouvelAlbum', el: btnOuvrirFormNouvelAlbum, id: BTN_OUVRIR_FORM_NOUVEL_ALBUM_ID },
-        { name: 'formNouvelAlbum', el: formNouvelAlbum, id: FORM_NOUVEL_ALBUM_ID },
+        { name: 'formNouvelAlbum', el: formNouvelAlbum, id: FORM_NOUVEL_ALBUM_ID }, // Crucial
         { name: 'inputNomNouvelAlbum', el: inputNomNouvelAlbum, id: INPUT_NOM_NOUVEL_ALBUM_ID },
         { name: 'btnSubmitNouvelAlbum', el: btnSubmitNouvelAlbum, id: BTN_SUBMIT_NOUVEL_ALBUM_ID },
         { name: 'messageModalAlbums', el: messageModalAlbums, id: MESSAGE_MODAL_ALBUMS_ID },
         { name: 'btnRetourListeAlbums', el: btnRetourListeAlbums, id: BTN_RETOUR_LISTE_ALBUMS_ID }
     ];
     if (!adCoverPhotoPreviewElement) {
-        console.warn(`[FAVORITES_ALBUM_MANAGER] L'élément pour l'aperçu photo (ID: "${AD_COVER_PHOTO_PREVIEW_ID}") est introuvable.`);
+        console.warn(`[FAVORITES_ALBUM_MANAGER] L'élément pour l'aperçu photo (ID: "${AD_COVER_PHOTO_PREVIEW_ID}") est introuvable. L'aperçu ne s'affichera pas.`);
     }
     for (const item of elementsToVerify) {
         if (!item.el) {
@@ -134,26 +134,26 @@ document.addEventListener('DOMContentLoaded', function () {
 
         buttons.forEach((button, index) => {
             const propertyIdFromData = button.dataset.propertyId;
-            console.log(`[FAVORITES_ALBUM_MANAGER] Traitement du bouton #${index}. data-property-id: "${propertyIdFromData}". Bouton:`, button);
+            const coverPhotoUrlFromData = button.dataset.coverPhotoUrl; 
+            console.log(`[FAVORITES_ALBUM_MANAGER] Traitement du bouton #${index}. data-property-id: "${propertyIdFromData}", data-cover-photo-url: "${coverPhotoUrlFromData}". Bouton:`, button);
 
-            // Cloner pour éviter les écouteurs multiples si la fonction est appelée plusieurs fois sur les mêmes éléments non recréés
             const newButton = button.cloneNode(true);
             if (button.parentNode) {
                 button.parentNode.replaceChild(newButton, button);
             } else {
-                console.warn(`[FAVORITES_ALBUM_MANAGER] Bouton #${index} n'a pas de parent. L'écouteur sera attaché à l'original.`);
+                console.warn(`[FAVORITES_ALBUM_MANAGER] Bouton #${index} n'a pas de parent.`);
             }
             const targetButton = newButton.parentNode ? newButton : button;
 
             targetButton.addEventListener('click', async function (event) {
-                console.log('[FAVORITES_ALBUM_MANAGER] Clic détecté sur un .favorite-btn.');
+                console.log('[FAVORITES_ALBUM_MANAGER] Clic détecté. Event Target:', event.target, 'Event CurrentTarget (this):', this);
                 event.preventDefault(); 
                 event.stopPropagation();
                 console.log('[FAVORITES_ALBUM_MANAGER] event.preventDefault() et event.stopPropagation() appelés.');
                 
                 const clickedPropertyId = this.dataset.propertyId;
-                const coverPhotoUrl = this.dataset.coverPhotoUrl || null; 
-                console.log('[FAVORITES_ALBUM_MANAGER] ID Propriété extrait:', clickedPropertyId, 'URL Photo:', coverPhotoUrl, 'Bouton:', this);
+                const coverPhotoUrlOnClick = this.dataset.coverPhotoUrl || null; 
+                console.log('[FAVORITES_ALBUM_MANAGER] ID Propriété extrait:', clickedPropertyId, 'URL Photo au clic:', coverPhotoUrlOnClick, 'Bouton:', this);
 
                 if (!clickedPropertyId || clickedPropertyId.trim() === "" || clickedPropertyId === "[REMPLACER_PAR_ID_ANNONCE]") {
                     console.error("ID d'annonce manquant, vide, ou placeholder. Action annulée.", this);
@@ -177,7 +177,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 } else {
                     currentPropertyIdToSave = clickedPropertyId;
-                    currentPropertyPhotoUrlToDisplay = coverPhotoUrl;
+                    currentPropertyPhotoUrlToDisplay = coverPhotoUrlOnClick; 
                     await populateModalWithAlbums();
                     showModalView(MODAL_VIEW_ALBUM_LIST_ID);
                     const hiddenTrigger = document.getElementById(HIDDEN_FINSWEET_MODAL_TRIGGER_ID);
@@ -204,12 +204,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 modalViewAlbumList.style.display = 'none';
                 modalViewCreateAlbum.style.display = 'block';
                 if (adCoverPhotoPreviewElement) {
-                    if (currentPropertyPhotoUrlToDisplay) {
+                    console.log("[FAVORITES_ALBUM_MANAGER] Tentative d'affichage de l'aperçu photo. URL à utiliser:", currentPropertyPhotoUrlToDisplay);
+                    if (currentPropertyPhotoUrlToDisplay && currentPropertyPhotoUrlToDisplay !== "URL_DE_LA_PHOTO_DE_COUVERTURE" && !currentPropertyPhotoUrlToDisplay.includes("undefined") && currentPropertyPhotoUrlToDisplay.startsWith("http")) {
                         adCoverPhotoPreviewElement.src = currentPropertyPhotoUrlToDisplay;
-                        adCoverPhotoPreviewElement.style.display = 'block';
+                        adCoverPhotoPreviewElement.style.display = 'block'; 
+                         console.log("[FAVORITES_ALBUM_MANAGER] Aperçu photo affiché avec src:", currentPropertyPhotoUrlToDisplay);
                     } else {
                         adCoverPhotoPreviewElement.style.display = 'none';
+                        console.warn("[FAVORITES_ALBUM_MANAGER] Aperçu photo non affiché. currentPropertyPhotoUrlToDisplay:", currentPropertyPhotoUrlToDisplay);
                     }
+                } else {
+                     console.warn("Élément adCoverPhotoPreviewElement introuvable pour afficher l'aperçu.");
                 }
                 if(inputNomNouvelAlbum) inputNomNouvelAlbum.focus();
                 if(btnSubmitNouvelAlbum && inputNomNouvelAlbum) btnSubmitNouvelAlbum.disabled = !inputNomNouvelAlbum.value.trim();
@@ -270,7 +275,11 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function savePropertyToAlbum(propertyId, albumId, albumName) {
-        if (!propertyId || !albumId) return;
+        if (!propertyId || !albumId) {
+            console.warn("[savePropertyToAlbum] ID de propriété ou d'album manquant.", {propertyId, albumId});
+            return;
+        }
+        console.log(`[savePropertyToAlbum] Tentative de sauvegarde: P_ID=${propertyId}, A_ID=${albumId}, A_Name=${albumName}`);
         try {
             const newFavoriteEntry = await favoritesXanoClient.post('favorites_list', {
                 favorites_album_id: parseInt(albumId), property_id: parseInt(propertyId)
@@ -289,16 +298,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (closeButton) closeButton.click();
                 else console.warn("Bouton fermeture Finsweet introuvable.");
             } else { throw new Error("Réponse serveur invalide."); }
-        } catch (error) { alert(`Erreur sauvegarde: ${error.message}`); }
+        } catch (error) { 
+            console.error("Erreur dans savePropertyToAlbum:", error);
+            alert(`Erreur sauvegarde: ${error.message}`); 
+        }
     }
 
     async function removePropertyFromAlbum(favoritesListId, propertyId, albumName) {
+        console.log(`[removePropertyFromAlbum] Tentative de suppression: FavList_ID=${favoritesListId}, P_ID=${propertyId}`);
         try {
             await favoritesXanoClient.delete(`favorites_list/${favoritesListId}`);
             userFavoriteItems.delete(propertyId.toString());
             updateAllHeartButtonsUI();
             triggerSaveAnimation(`Supprimé de "${albumName}" 👋`);
         } catch (error) {
+            console.error("Erreur dans removePropertyFromAlbum:", error);
             alert(`Erreur suppression: ${error.message}`);
             await fetchAndStoreUserFavoriteItems();
         }
@@ -319,6 +333,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 return newAlbum; 
             } else { throw new Error("Réponse serveur invalide (création album)."); }
         } catch (error) {
+            console.error("Erreur dans createAlbum:", error);
             alert(`Erreur création album: ${error.message}`);
             return null;
         }
@@ -330,6 +345,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         formNouvelAlbum.addEventListener('submit', async function(event) {
             event.preventDefault(); 
+            console.log('[FAVORITES_ALBUM_MANAGER] Soumission du formulaire de création interceptée.');
             const nomAlbum = inputNomNouvelAlbum.value.trim();
             const descAlbum = inputDescNouvelAlbum ? inputDescNouvelAlbum.value.trim() : "";
             if (!nomAlbum) { alert("Nom d'album requis."); return; }
@@ -338,28 +354,39 @@ document.addEventListener('DOMContentLoaded', function () {
                 const createdAlbum = await createAlbum(nomAlbum, descAlbum, true); 
                 if (createdAlbum && createdAlbum.id) {
                     if (currentPropertyIdToSave) {
+                        console.log(`[FAVORITES_ALBUM_MANAGER] Album "${createdAlbum.name_Album}" créé. Ajout de l'annonce ID ${currentPropertyIdToSave}.`);
                         await savePropertyToAlbum(currentPropertyIdToSave, createdAlbum.id, createdAlbum.name_Album);
                     } else {
+                        console.log(`[FAVORITES_ALBUM_MANAGER] Album "${createdAlbum.name_Album}" créé. Aucune annonce en attente.`);
                         await populateModalWithAlbums(); 
                         showModalView(MODAL_VIEW_ALBUM_LIST_ID);
                         triggerSaveAnimation(`Album "${createdAlbum.name_Album}" créé !`); 
                     }
                     inputNomNouvelAlbum.value = ''; 
                     if (inputDescNouvelAlbum) inputDescNouvelAlbum.value = '';
+                } else {
+                     console.warn('[FAVORITES_ALBUM_MANAGER] La création d\'album a échoué (pas d\'album retourné par createAlbum).');
                 }
+            } catch(error) {
+                 console.error('[FAVORITES_ALBUM_MANAGER] Erreur dans le gestionnaire de soumission du formulaire:', error);
             } finally {
                 if (inputNomNouvelAlbum && btnSubmitNouvelAlbum) btnSubmitNouvelAlbum.disabled = !inputNomNouvelAlbum.value.trim();
-                setTimeout(() => {
-                    const parentForm = document.getElementById(FORM_NOUVEL_ALBUM_ID);
-                    if (parentForm && parentForm.parentElement) {
-                        const wfDone = parentForm.parentElement.querySelector('.w-form-done');
-                        const wfFail = parentForm.parentElement.querySelector('.w-form-fail');
-                        if (wfDone) wfDone.style.display = 'none';
-                        if (wfFail) wfFail.style.display = 'none';
-                    }
-                }, 100); // Augmenté légèrement le délai pour être sûr
+                
+                const parentFormElement = document.getElementById(FORM_NOUVEL_ALBUM_ID);
+                if (parentFormElement && parentFormElement.parentElement) {
+                    const wfDone = parentFormElement.parentElement.querySelector('.w-form-done');
+                    const wfFail = parentFormElement.parentElement.querySelector('.w-form-fail');
+                    
+                    setTimeout(() => {
+                        if (wfDone) { wfDone.style.display = 'none'; console.log("Message .w-form-done masqué."); }
+                        if (wfFail) { wfFail.style.display = 'none'; console.log("Message .w-form-fail masqué."); }
+                    }, 150); 
+                }
             }
         });
+    } else {
+        console.warn("[FAVORITES_ALBUM_MANAGER] Le formulaire de création d'album ou ses composants sont introuvables.");
+        if (!formNouvelAlbum) console.warn(" > formNouvelAlbum est null.");
     }
 
     if (btnOuvrirFormNouvelAlbum) {
@@ -375,39 +402,58 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function triggerSaveAnimation(message) {
+        console.log("[triggerSaveAnimation] Message:", message);
         let el = document.getElementById('save-confirmation-animation');
         if (!el) {
             el = document.createElement('div');
             el.id = 'save-confirmation-animation';
-            Object.assign(el.style, { /* ... styles ... */ });
+            Object.assign(el.style, {
+                position: 'fixed', top: '50%', left: '50%',
+                transform: 'translate(-50%, -50%) scale(0.9)',
+                padding: '20px 40px', backgroundColor: 'rgba(40, 40, 40, 0.85)', 
+                color: 'white', borderRadius: '12px', zIndex: '10001', 
+                fontSize: '18px', opacity: '0',
+                transition: 'opacity 0.3s ease-out, transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)', 
+                boxShadow: '0 8px 20px rgba(0,0,0,0.2)', textAlign: 'center'
+            });
             document.body.appendChild(el);
+            console.log("[triggerSaveAnimation] Élément d'animation créé et ajouté au body.");
         }
         el.textContent = message;
-        // ... animation logic ...
+        el.style.opacity = '0'; 
+        el.style.transform = 'translate(-50%, -50%) scale(0.9)';
+
+        setTimeout(() => { 
+            el.style.opacity = '1';
+            el.style.transform = 'translate(-50%, -50%) scale(1)';
+            console.log("[triggerSaveAnimation] Animation d'apparition.");
+        }, 50);
+        setTimeout(() => { 
+            el.style.opacity = '0';
+            el.style.transform = 'translate(-50%, -50%) scale(0.9)';
+            console.log("[triggerSaveAnimation] Animation de disparition.");
+        }, 2300); 
+         setTimeout(() => { 
+            if(el) el.style.transform = 'translate(-50%, -50%) scale(0.9)'; 
+        }, 2650);
     }
 
     (async () => {
         await fetchAndStoreUserFavoriteItems();
-        // Appel initial de initPropertyHeartButtons après le premier chargement du DOM
-        // et après que les favoris existants aient été récupérés.
         initPropertyHeartButtons(); 
     })();
 
     document.addEventListener('annoncesChargeesEtRendues', async function() {
         console.log('[FAVORITES_ALBUM_MANAGER] Événement "annoncesChargeesEtRendues" reçu.');
-        // AJOUT D'UN DÉLAI ICI
         setTimeout(() => {
             console.log('[FAVORITES_ALBUM_MANAGER] Exécution différée de initPropertyHeartButtons après annoncesChargeesEtRendues.');
             initPropertyHeartButtons();
-        }, 100); // Délai de 100ms, ajustable
+        }, 100);
     });
 
     document.addEventListener('authStateChanged', async function() {
         updateAuthToken(); 
         await fetchAndStoreUserFavoriteItems(); 
-        // initPropertyHeartButtons(); // Est appelé par fetchAndStoreUserFavoriteItems via updateAllHeartButtonsUI, et au chargement initial.
-                                     // Mais si l'état d'auth change pendant que des annonces sont visibles, il faut peut-être le réexécuter.
-                                     // Pour l'instant, on se fie à l'appel dans annoncesChargeesEtRendues et au DOMContentLoaded.
         if (!authToken && modalElement && (modalElement.style.display !== 'none' && modalElement.style.display !== '')) {
             const closeButton = modalElement.querySelector('[fs-modal-element="close"]');
             if (closeButton) closeButton.click();
