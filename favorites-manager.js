@@ -397,12 +397,14 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // Écouteur pour le bouton "Créer un nouvel album"
     if (btnOuvrirFormNouvelAlbum) {
-        btnOuvrirFormNouvelAlbum.addEventListener('click', () => {
+        btnOuvrirFormNouvelAlbum.addEventListener('click', (event) => { // AJOUT DE 'event'
+            event.preventDefault(); // AJOUT DE CETTE LIGNE IMPORTANTE
+            console.log('[FAVORITES_ALBUM_MANAGER] Clic sur btn-ouvrir-form-nouvel-album. Appel de showModalView pour la vue de création.');
             showModalView(MODAL_VIEW_CREATE_ALBUM_ID);
         });
     }
-
     if (btnRetourListeAlbums) {
         btnRetourListeAlbums.addEventListener('click', () => {
             showModalView(MODAL_VIEW_ALBUM_LIST_ID);
