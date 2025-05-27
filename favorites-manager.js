@@ -53,26 +53,36 @@ document.addEventListener('DOMContentLoaded', function () {
     const btnSubmitNouvelAlbum = document.getElementById(BTN_SUBMIT_NOUVEL_ALBUM_ID);
     const messageModalAlbums = document.getElementById(MESSAGE_MODAL_ALBUMS_ID);
 
-    // Vérification initiale détaillée
-    let allElementsFound = true;
-    const elementsToCheck = {
-        modalElement, modalViewAlbumList, modalViewCreateAlbum, modalListeAlbumsConteneur,
-        btnOuvrirFormNouvelAlbum, formNouvelAlbum, inputNomNouvelAlbum,
-        btnSubmitNouvelAlbum, messageModalAlbums, btnRetourListeAlbums
-    };
-    for (const key in elementsToCheck) {
-        if (!elementsToCheck[key]) {
-            console.error(`[FAVORITES_ALBUM_MANAGER] ÉLÉMENT INTROUVABLE: ${key} (devrait avoir l'ID: ${eval(key.toUpperCase() + '_ID') || 'ID non défini pour modalElement'}). Vérifiez votre HTML.`);
-            allElementsFound = false;
+    // Vérification initiale détaillée corrigée
+    let allElementsFoundCheck = true;
+    const elementsToVerify = [
+        { name: 'modalElement', el: modalElement, id: MODAL_ID },
+        { name: 'modalViewAlbumList', el: modalViewAlbumList, id: MODAL_VIEW_ALBUM_LIST_ID },
+        { name: 'modalViewCreateAlbum', el: modalViewCreateAlbum, id: MODAL_VIEW_CREATE_ALBUM_ID },
+        { name: 'modalListeAlbumsConteneur', el: modalListeAlbumsConteneur, id: MODAL_LISTE_ALBUMS_CONTENEUR_ID },
+        { name: 'btnOuvrirFormNouvelAlbum', el: btnOuvrirFormNouvelAlbum, id: BTN_OUVRIR_FORM_NOUVEL_ALBUM_ID },
+        { name: 'formNouvelAlbum', el: formNouvelAlbum, id: FORM_NOUVEL_ALBUM_ID },
+        { name: 'inputNomNouvelAlbum', el: inputNomNouvelAlbum, id: INPUT_NOM_NOUVEL_ALBUM_ID },
+        // inputDescNouvelAlbum est optionnel, on ne le vérifie pas de manière bloquante ici
+        { name: 'btnSubmitNouvelAlbum', el: btnSubmitNouvelAlbum, id: BTN_SUBMIT_NOUVEL_ALBUM_ID },
+        { name: 'messageModalAlbums', el: messageModalAlbums, id: MESSAGE_MODAL_ALBUMS_ID },
+        { name: 'btnRetourListeAlbums', el: btnRetourListeAlbums, id: BTN_RETOUR_LISTE_ALBUMS_ID }
+    ];
+
+    for (const item of elementsToVerify) {
+        if (!item.el) {
+            console.error(`[FAVORITES_ALBUM_MANAGER] ÉLÉMENT INTROUVABLE: ${item.name} (ID attendu: "${item.id}"). Vérifiez votre HTML.`);
+            allElementsFoundCheck = false;
         }
     }
+
     if (!templateItemAlbumModal) {
-        console.warn('[FAVORITES_ALBUM_MANAGER] Template pour les items d\'album (ID: "' + TEMPLATE_ITEM_ALBUM_MODAL_ID + '") introuvable.');
-        // allElementsFound = false; // Pas bloquant pour tout, mais le rendu des albums échouera
+        console.warn(`[FAVORITES_ALBUM_MANAGER] Template pour les items d'album (ID: "${TEMPLATE_ITEM_ALBUM_MODAL_ID}") introuvable.`);
     }
-    if (!allElementsFound) {
-        console.error("[FAVORITES_ALBUM_MANAGER] Au moins un élément clé est manquant. Le script risque de ne pas fonctionner correctement.");
-        // return; // On pourrait arrêter le script ici, mais laissons-le continuer pour voir jusqu'où il va.
+
+    if (!allElementsFoundCheck) {
+        console.error("[FAVORITES_ALBUM_MANAGER] Au moins un élément clé est manquant lors de l'initialisation. Le script risque de ne pas fonctionner correctement. Veuillez vérifier les erreurs ci-dessus.");
+        // return; // Décommenter pour arrêter le script si des éléments critiques sont manquants.
     }
 
 
@@ -161,7 +171,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         hiddenTrigger.click();
                     } else {
                         console.error(`[FAVORITES_ALBUM_MANAGER] Trigger de modale caché (ID: ${HIDDEN_FINSWEET_MODAL_TRIGGER_ID}) introuvable.`);
-                        if (modalElement) modalElement.style.display = 'block'; // Fallback pour ouvrir
+                        if (modalElement) modalElement.style.display = 'block'; 
                         else alert("Erreur : Impossible d'ouvrir la fenêtre de sauvegarde (trigger et modale manquants).");
                     }
                 }
@@ -171,18 +181,24 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function showModalView(viewIdToShow) {
+        console.log('[showModalView] Appelée avec viewIdToShow:', viewIdToShow);
+        console.log('[showModalView] modalViewAlbumList:', modalViewAlbumList);
+        console.log('[showModalView] modalViewCreateAlbum:', modalViewCreateAlbum);
+
         if (modalViewAlbumList && modalViewCreateAlbum) {
             if (viewIdToShow === MODAL_VIEW_ALBUM_LIST_ID) {
                 modalViewAlbumList.style.display = 'block';
                 modalViewCreateAlbum.style.display = 'none';
+                console.log('[showModalView] Affichage de la liste des albums.');
             } else if (viewIdToShow === MODAL_VIEW_CREATE_ALBUM_ID) {
                 modalViewAlbumList.style.display = 'none';
                 modalViewCreateAlbum.style.display = 'block';
+                console.log('[showModalView] Affichage du formulaire de création d\'album.');
                 if(inputNomNouvelAlbum) inputNomNouvelAlbum.focus();
                 if(btnSubmitNouvelAlbum && inputNomNouvelAlbum) btnSubmitNouvelAlbum.disabled = !inputNomNouvelAlbum.value.trim();
             }
         } else {
-            console.error("[FAVORITES_ALBUM_MANAGER] `modalViewAlbumList` ou `modalViewCreateAlbum` est null. La navigation interne de la modale échouera.");
+            console.error("[FAVORITES_ALBUM_MANAGER] ERREUR DANS SHOWMODALVIEW: `modalViewAlbumList` ou `modalViewCreateAlbum` est null. La navigation interne de la modale échouera. Vérifiez les IDs HTML et leur présence au chargement du DOM.");
         }
     }
 
@@ -335,15 +351,14 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // GESTION DE LA SOUMISSION DU FORMULAIRE DE CRÉATION D'ALBUM
     if (formNouvelAlbum && btnSubmitNouvelAlbum && inputNomNouvelAlbum) {
         console.log('[FAVORITES_ALBUM_MANAGER] Écouteur d\'événement SUBMIT attaché au formulaire de création d\'album.');
         inputNomNouvelAlbum.addEventListener('input', function() {
-            btnSubmitNouvelAlbum.disabled = !this.value.trim();
+            if (btnSubmitNouvelAlbum) btnSubmitNouvelAlbum.disabled = !this.value.trim();
         });
 
         formNouvelAlbum.addEventListener('submit', async function(event) {
-            event.preventDefault(); // Empêche la soumission Webflow native
+            event.preventDefault(); 
             console.log('[FAVORITES_ALBUM_MANAGER] Soumission du formulaire de création d\'album interceptée.');
 
             const nomAlbum = inputNomNouvelAlbum.value.trim();
@@ -353,32 +368,25 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert("Le nom de l'album ne peut pas être vide.");
                 return;
             }
-            btnSubmitNouvelAlbum.disabled = true; // Désactiver pendant le traitement
+            if (btnSubmitNouvelAlbum) btnSubmitNouvelAlbum.disabled = true;
 
             try {
                 const createdAlbum = await createAlbum(nomAlbum, descAlbum);
                 if (createdAlbum) {
                     console.log('[FAVORITES_ALBUM_MANAGER] Album créé avec succès via JS:', createdAlbum);
-                    inputNomNouvelAlbum.value = ''; // Vider le champ
+                    inputNomNouvelAlbum.value = ''; 
                     if (inputDescNouvelAlbum) inputDescNouvelAlbum.value = '';
-                    // Le message de succès personnalisé sera géré par createAlbum via populateModal et showModalView
-                    // ou par une animation si on reste sur la même vue (non implémenté ici pour la création)
-                    // Pour l'instant, on retourne à la liste qui se rafraîchit.
                 } else {
-                    // L'erreur est déjà gérée et alertée dans createAlbum
                     console.warn('[FAVORITES_ALBUM_MANAGER] La création d\'album a échoué ou n\'a pas retourné d\'album.');
                 }
             } catch (error) {
-                // Normalement, createAlbum gère ses propres erreurs et alertes.
                 console.error('[FAVORITES_ALBUM_MANAGER] Erreur inattendue lors de la soumission du formulaire de création:', error);
                 alert("Une erreur inattendue est survenue lors de la création de l'album.");
             } finally {
-                // Réactiver le bouton si le nom n'est pas vide (ou toujours le réactiver)
-                btnSubmitNouvelAlbum.disabled = !inputNomNouvelAlbum.value.trim(); 
+                if (btnSubmitNouvelAlbum && inputNomNouvelAlbum) btnSubmitNouvelAlbum.disabled = !inputNomNouvelAlbum.value.trim(); 
                 
-                // Cacher les messages de succès/échec de Webflow s'ils existent
-                const wfFormDone = formNouvelAlbum.parentElement.querySelector('.w-form-done');
-                const wfFormFail = formNouvelAlbum.parentElement.querySelector('.w-form-fail');
+                const wfFormDone = formNouvelAlbum.parentElement ? formNouvelAlbum.parentElement.querySelector('.w-form-done') : null;
+                const wfFormFail = formNouvelAlbum.parentElement ? formNouvelAlbum.parentElement.querySelector('.w-form-fail') : null;
                 if (wfFormDone) wfFormDone.style.display = 'none';
                 if (wfFormFail) wfFormFail.style.display = 'none';
             }
