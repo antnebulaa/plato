@@ -399,10 +399,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Écouteur pour le bouton "Créer un nouvel album"
     if (btnOuvrirFormNouvelAlbum) {
-        btnOuvrirFormNouvelAlbum.addEventListener('click', (event) => { // AJOUT DE 'event'
-            event.preventDefault(); // AJOUT DE CETTE LIGNE IMPORTANTE
-            console.log('[FAVORITES_ALBUM_MANAGER] Clic sur btn-ouvrir-form-nouvel-album. Appel de showModalView pour la vue de création.');
-            showModalView(MODAL_VIEW_CREATE_ALBUM_ID);
+        btnOuvrirFormNouvelAlbum.addEventListener('click', (event) => {
+            event.preventDefault();
+            console.log('[FAVORITES_ALBUM_MANAGER] Clic sur btn-ouvrir-form-nouvel-album. Planification du changement de vue.');
+            
+            // Différer légèrement le changement de vue
+            setTimeout(() => {
+                console.log('[FAVORITES_ALBUM_MANAGER] Exécution différée de showModalView pour la vue de création.');
+                showModalView(MODAL_VIEW_CREATE_ALBUM_ID);
+            }, 50); // Un petit délai, par exemple 50 millisecondes
         });
     }
     if (btnRetourListeAlbums) {
