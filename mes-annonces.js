@@ -265,7 +265,7 @@ function getNestedValue(obj, pathString) {
 // MODIFIÉ: Fonction bindDataToElement pour utiliser getNestedValue et gérer les images de couverture
 function bindDataToElement(element, data) {
     const dataKey = element.getAttribute('data-xano-bind');
-    if (!dataKey) return; // Pas de clé de binding
+    if (!dataKey) return;
 
     const value = getNestedValue(data, dataKey);
 
@@ -278,73 +278,87 @@ function bindDataToElement(element, data) {
 
     switch (element.tagName.toLowerCase()) {
         case 'img':
-            const dataKeyForImg = element.getAttribute('data-xano-bind');
-            // Récupérer le titre de la propriété pour l'attribut alt, qu'une image soit trouvée ou non
+            console.log(`[DEBUG IMAGE] Binding pour dataKey: ${dataKey}`, element);
             const propertyTitleForAlt = getNestedValue(data, 'property_title') || 'Image de l\'annonce';
+            console.log(`[DEBUG IMAGE] propertyTitleForAlt: ${propertyTitleForAlt}`);
 
-            // Styles par défaut pour une image réelle, basés sur votre template HTML ou des valeurs sûres
+            // Styles par défaut pour une image réelle, basés sur votre template HTML
+            // Si votre template a des styles inline, ils seront utilisés. Sinon, ces valeurs seront les styles par défaut.
             const imageRealStyles = {
-                width: '5rem', // Doit correspondre à votre CSS/style inline pour les images réelles
-                height: '5rem',  // Doit correspondre à votre CSS/style inline pour les images réelles
-                objectFit: 'cover',
-                backgroundColor: '#f7f7f7', // Fond par défaut de votre template pour une image en chargement
-                borderRadius: '1rem' // Radius par défaut de votre template (probablement aucun)
+                width: element.style.width || '100px',
+                height: element.style.height || 'auto',
+                objectFit: element.style.objectFit || 'cover',
+                backgroundColor: element.style.backgroundColor || '#f0f0f0', // Fond de votre template
+                borderRadius: element.style.borderRadius || ''
             };
+            console.log('[DEBUG IMAGE] imageRealStyles capturés:', imageRealStyles);
 
-            let imageUrl = null; // Variable pour stocker l'URL de l'image à afficher
 
-            if (dataKeyForImg === '_property_photos') {
-                if (Array.isArray(value) && value.length > 0) { // 'value' est le tableau _property_photos
+            let imageUrl = null;
+
+            if (dataKey === '_property_photos') { // Note: j'ai enlevé la ré-déclaration de dataKeyForImg
+                console.log('[DEBUG IMAGE] Traitement pour _property_photos. Valeur reçue (value):', value);
+                if (Array.isArray(value) && value.length > 0) {
                     let coverPhotoObject = value.find(photo => getNestedValue(photo, 'is_cover') === true);
+                    console.log('[DEBUG IMAGE] coverPhotoObject (après recherche is_cover):', coverPhotoObject);
 
                     if (!coverPhotoObject) {
-                        coverPhotoObject = value[0]; // Fallback: prendre la première photo
+                        coverPhotoObject = value[0]; // Fallback
+                        console.log('[DEBUG IMAGE] coverPhotoObject (fallback sur le premier):', coverPhotoObject);
                     }
 
                     if (coverPhotoObject) {
                         const imagesArray = getNestedValue(coverPhotoObject, 'images');
+                        console.log('[DEBUG IMAGE] imagesArray dans coverPhotoObject:', imagesArray);
                         if (Array.isArray(imagesArray) && imagesArray.length > 0 && getNestedValue(imagesArray[0], 'url')) {
                             imageUrl = getNestedValue(imagesArray[0], 'url');
                         }
                         if (!imageUrl && getNestedValue(coverPhotoObject, 'url_photo')) {
                             imageUrl = getNestedValue(coverPhotoObject, 'url_photo');
+                            console.log('[DEBUG IMAGE] imageUrl trouvé via url_photo:', imageUrl);
+                        } else if (imageUrl) {
+                            console.log('[DEBUG IMAGE] imageUrl trouvé via images[0].url:', imageUrl);
                         }
+                    } else {
+                        console.log('[DEBUG IMAGE] Aucun coverPhotoObject trouvé (tableau _property_photos peut-être vide après filtrage initial).');
                     }
+                } else {
+                     console.log('[DEBUG IMAGE] _property_photos n\'est pas un tableau ou est vide.');
                 }
-            } else { // Logique pour d'autres images liées directement à une URL ou un objet image Xano simple
+            } else {
+                console.log(`[DEBUG IMAGE] Traitement pour une image simple (dataKey: ${dataKey}). Valeur reçue (value):`, value);
                 if (typeof value === 'object' && value && value.url) {
                     imageUrl = value.url;
                 } else if (typeof value === 'string' && (value.startsWith('http') || value.startsWith('/') || value.startsWith('data:'))) {
                     imageUrl = value;
                 }
+                console.log('[DEBUG IMAGE] imageUrl pour image simple:', imageUrl);
             }
 
-            // Maintenant, appliquer l'image ou les styles du placeholder
+            console.log(`[DEBUG IMAGE] imageUrl final déterminé: ${imageUrl}`);
+
             if (imageUrl) {
+                console.log('[DEBUG IMAGE] Application de l\'image réelle.');
                 element.src = imageUrl;
                 element.alt = propertyTitleForAlt;
-                // Appliquer/Rétablir les styles pour une image réelle
                 element.style.width = imageRealStyles.width;
                 element.style.height = imageRealStyles.height;
                 element.style.objectFit = imageRealStyles.objectFit;
                 element.style.backgroundColor = imageRealStyles.backgroundColor;
                 element.style.borderRadius = imageRealStyles.borderRadius;
             } else {
-                // Aucune image trouvée, appliquer les styles du placeholder
-                // Utiliser un pixel transparent comme src pour que le navigateur ne montre pas l'icône d'image cassée
-                // et pour aider à ne pas afficher le texte de l'attribut alt visuellement.
+                console.log('[DEBUG IMAGE] Application du placeholder.');
                 element.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"; // Pixel transparent
-                element.alt = propertyTitleForAlt; // Garder un alt pertinent pour l'accessibilité
-
-                // Styles pour le placeholder visuel
+                element.alt = propertyTitleForAlt;
                 element.style.width = '5rem';
                 element.style.height = '5rem';
-                element.style.objectFit = 'cover'; // Assure que le fond couvre bien la zone
+                element.style.objectFit = 'cover';
                 element.style.backgroundColor = '#F7F7F7';
                 element.style.borderRadius = '1rem';
             }
             break;
 
+        // ... (autres cases: input, textarea, etc. restent inchangées) ...
         case 'input':
             if (element.type === 'checkbox' || element.type === 'radio') {
                 if (element.type === 'checkbox'){
@@ -384,6 +398,7 @@ function bindDataToElement(element, data) {
                 element.textContent = displayValue;
             }
     }
+
 
     for (const attr of element.attributes) {
         if (attr.name.startsWith('data-xano-bind-attr-')) {
