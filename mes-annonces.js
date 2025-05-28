@@ -279,16 +279,16 @@ function bindDataToElement(element, data) {
     switch (element.tagName.toLowerCase()) {
         case 'img':
             const dataKeyForImg = element.getAttribute('data-xano-bind');
+            // Récupérer le titre de la propriété pour l'attribut alt, qu'une image soit trouvée ou non
             const propertyTitleForAlt = getNestedValue(data, 'property_title') || 'Image de l\'annonce';
 
-            // Récupérer les styles originaux de l'image depuis le template (ceux que vous avez définis dans Webflow)
-            // Ou définissez des valeurs par défaut si elles ne sont pas dans le style inline du template
-            const originalStyles = {
-                width: element.style.width || '5rem', // Largeur par défaut si une image est affichée
-                height: element.style.height || '5rem',  // Hauteur par défaut si une image est affichée
-                objectFit: element.style.objectFit || 'cover',
-                backgroundColor: element.style.backgroundColor || '#f7f7f7', // Fond original
-                borderRadius: element.style.borderRadius || '1rem' // Radius original
+            // Styles par défaut pour une image réelle, basés sur votre template HTML ou des valeurs sûres
+            const imageRealStyles = {
+                width: '5rem', // Doit correspondre à votre CSS/style inline pour les images réelles
+                height: '5rem',  // Doit correspondre à votre CSS/style inline pour les images réelles
+                objectFit: 'cover',
+                backgroundColor: '#f7f7f7', // Fond par défaut de votre template pour une image en chargement
+                borderRadius: '1rem' // Radius par défaut de votre template (probablement aucun)
             };
 
             let imageUrl = null; // Variable pour stocker l'URL de l'image à afficher
@@ -323,19 +323,23 @@ function bindDataToElement(element, data) {
             if (imageUrl) {
                 element.src = imageUrl;
                 element.alt = propertyTitleForAlt;
-                // Appliquer/Rétablir les styles originaux pour une image affichée
-                element.style.width = originalStyles.width;
-                element.style.height = originalStyles.height;
-                element.style.objectFit = originalStyles.objectFit;
-                element.style.backgroundColor = originalStyles.backgroundColor;
-                element.style.borderRadius = originalStyles.borderRadius;
+                // Appliquer/Rétablir les styles pour une image réelle
+                element.style.width = imageRealStyles.width;
+                element.style.height = imageRealStyles.height;
+                element.style.objectFit = imageRealStyles.objectFit;
+                element.style.backgroundColor = imageRealStyles.backgroundColor;
+                element.style.borderRadius = imageRealStyles.borderRadius;
             } else {
                 // Aucune image trouvée, appliquer les styles du placeholder
-                element.src = ""; // Important pour éviter l'icône d'image cassée
-                element.alt = propertyTitleForAlt; // Garder un alt pertinent
+                // Utiliser un pixel transparent comme src pour que le navigateur ne montre pas l'icône d'image cassée
+                // et pour aider à ne pas afficher le texte de l'attribut alt visuellement.
+                element.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"; // Pixel transparent
+                element.alt = propertyTitleForAlt; // Garder un alt pertinent pour l'accessibilité
+
+                // Styles pour le placeholder visuel
                 element.style.width = '5rem';
                 element.style.height = '5rem';
-                element.style.objectFit = 'cover'; // Peut être utile même pour le placeholder
+                element.style.objectFit = 'cover'; // Assure que le fond couvre bien la zone
                 element.style.backgroundColor = '#F7F7F7';
                 element.style.borderRadius = '1rem';
             }
