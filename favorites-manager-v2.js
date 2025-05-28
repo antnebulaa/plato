@@ -343,11 +343,8 @@ function renderAlbumListInModal(albums) {
             currentPropertyIdToSave = null;
             currentPropertyPhotoUrlToDisplay = null; // Réinitialiser après utilisation
             const closeButton = modalElement ? modalElement.querySelector('[fs-modal-element="close-4"]') : null;
-            console.log('[FAVORITES_ALBUM_MANAGER] Tentative de fermeture de la modale. Bouton trouvé:', closeButton); // NOUVEAU LOG
             if (closeButton) closeButton.click();
-            console.log('[FAVORITES_ALBUM_MANAGER] Clic programmé sur le bouton de fermeture.'); // NOUVEAU LOG    
             else console.warn("Bouton fermeture Finsweet introuvable.");
-            console.warn("[FAVORITES_ALBUM_MANAGER] Bouton de fermeture Finsweet (fs-modal-element=\"close-4\") introuvable dans la modale.");
         } else { throw new Error("Réponse serveur invalide lors de l'ajout aux favoris."); }
     } catch (error) { 
         console.error("Erreur dans savePropertyToAlbum:", error);
@@ -412,15 +409,6 @@ function renderAlbumListInModal(albums) {
                         await populateModalWithAlbums(); 
                         showModalView(MODAL_VIEW_ALBUM_LIST_ID);
                         triggerSaveAnimation(`Album ${createdAlbum.name_Album} créé`); 
-                        // AJOUTER LA FERMETURE DE LA MODALE ICI AUSSI
-                        const closeButton = modalElement ? modalElement.querySelector('[fs-modal-element="close-4"]') : null;
-                        console.log('[FAVORITES_ALBUM_MANAGER] Tentative de fermeture (création album sans item). Bouton trouvé:', closeButton);
-
-                        if (closeButton) {
-                            closeButton.click();
-                        } else {
-                            console.warn("[FAVORITES_ALBUM_MANAGER] Bouton fermeture (fs-modal-element=\"close-4\") introuvable après création album sans item.");
-                        }
                     }
                     inputNomNouvelAlbum.value = ''; 
                     if (inputDescNouvelAlbum) inputDescNouvelAlbum.value = '';
