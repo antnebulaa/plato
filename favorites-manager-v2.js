@@ -64,33 +64,59 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
     async function fetchAndStoreUserFavoriteItems() {
-        // (Votre fonction fetchAndStoreUserFavoriteItems, qui fonctionnait pour l'état des boutons)
-        updateAuthToken();
-        if (!authToken) {
-            userFavoriteItems.clear();
-            updateAllHeartButtonsUI();
-            return;
-        }
-        try {
-            const favoriteEntries = await favoritesXanoClient.get('favorites_list');
-            userFavoriteItems.clear();
-            if (favoriteEntries && Array.isArray(favoriteEntries)) {
-                favoriteEntries.forEach(entry => {
+    updateAuthToken();
+    if (!authToken) {
+        console.log('[FAVORITES_ALBUM_MANAGER] fetchAndStoreUserFavoriteItems: Pas de token, vidage des favoris locaux.');
+        userFavoriteItems.clear();
+        updateAllHeartButtonsUI();
+        return;
+    }
+    try {
+        console.log('[FAVORITES_ALBUM_MANAGER] fetchAndStoreUserFavoriteItems: Appel de GET favorites_list...');
+        const favoriteEntries = await favoritesXanoClient.get('favorites_list');
+        
+        // ---> LOG IMPORTANT : Voir ce que Xano renvoie <---
+        console.log('[FAVORITES_ALBUM_MANAGER] fetchAndStoreUserFavoriteItems: Réponse de GET favorites_list:', JSON.stringify(favoriteEntries, null, 2));
+
+        userFavoriteItems.clear(); // Vider avant de remplir
+
+        if (favoriteEntries && Array.isArray(favoriteEntries) && favoriteEntries.length > 0) {
+            favoriteEntries.forEach(entry => {
+                if (entry && entry.property_id !== undefined) { // Vérifier que entry et property_id existent
                     userFavoriteItems.set(entry.property_id.toString(), {
                         favoritesListId: entry.id,
                         albumId: entry.favorites_album_id,
-                        albumName: entry.name_Album || 'Album inconnu' // Comme dans votre version
+                        albumName: entry.name_Album || 'Album inconnu'
                     });
-                });
-            }
-        } catch (error) {
-            console.error('[FAVORITES_ALBUM_MANAGER] Erreur lors de la récupération des items favoris:', error);
-            userFavoriteItems.clear();
+                } else {
+                    console.warn('[FAVORITES_ALBUM_MANAGER] fetchAndStoreUserFavoriteItems: Entrée de favori invalide ou sans property_id:', entry);
+                }
+            });
+        } else if (favoriteEntries && Array.isArray(favoriteEntries) && favoriteEntries.length === 0) {
+            console.log('[FAVORITES_ALBUM_MANAGER] fetchAndStoreUserFavoriteItems: Aucun favori retourné par Xano.');
+        } else {
+            console.warn('[FAVORITES_ALBUM_MANAGER] fetchAndStoreUserFavoriteItems: Réponse inattendue de GET favorites_list (pas un tableau ou vide).');
         }
-        updateAllHeartButtonsUI();
+        
+        // ---> LOG IMPORTANT : Vérifier la taille de la Map <---
+        console.log('[FAVORITES_ALBUM_MANAGER] fetchAndStoreUserFavoriteItems: userFavoriteItems rempli. Taille:', userFavoriteItems.size);
+        userFavoriteItems.forEach((value, key) => {
+            console.log(`[FAVORITES_ALBUM_MANAGER] Map entry: ${key} => ${JSON.stringify(value)}`);
+        });
+
+
+    } catch (error) {
+        console.error('[FAVORITES_ALBUM_MANAGER] Erreur lors de la récupération des items favoris:', error);
+        userFavoriteItems.clear(); // S'assurer de vider en cas d'erreur
     }
+    
+    // Cet appel est crucial après avoir rempli userFavoriteItems
+    console.log('[FAVORITES_ALBUM_MANAGER] fetchAndStoreUserFavoriteItems: Appel de updateAllHeartButtonsUI.');
+    updateAllHeartButtonsUI();
+}
 
     function updateAllHeartButtonsUI() {
+         console.log('[FAVORITES_ALBUM_MANAGER] updateAllHeartButtonsUI: Exécution. Taille de userFavoriteItems:', userFavoriteItems.size);
         // (Votre fonction updateAllHeartButtonsUI, qui fonctionnait)
         document.querySelectorAll('.favorite-btn').forEach(button => {
             const propertyId = button.dataset.propertyId;
