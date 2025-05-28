@@ -193,11 +193,11 @@ document.addEventListener('DOMContentLoaded', function () {
         // (Votre fonction showModalView, inchangée par rapport à favorites-manager-v2 (1).js)
         if (modalViewAlbumList && modalViewCreateAlbum) { //
             if (viewIdToShow === MODAL_VIEW_ALBUM_LIST_ID) { //
-                modalViewAlbumList.style.display = 'block'; //
+                modalViewAlbumList.style.display = 'flex'; //
                 modalViewCreateAlbum.style.display = 'none'; //
             } else if (viewIdToShow === MODAL_VIEW_CREATE_ALBUM_ID) { //
                 modalViewAlbumList.style.display = 'none'; //
-                modalViewCreateAlbum.style.display = 'block'; //
+                modalViewCreateAlbum.style.display = 'flex'; //
                 if (adCoverPhotoPreviewElement) { //
                     console.log("[FAVORITES_ALBUM_MANAGER] Tentative d'affichage de l'aperçu photo. URL à utiliser:", currentPropertyPhotoUrlToDisplay); //
                     if (currentPropertyPhotoUrlToDisplay && currentPropertyPhotoUrlToDisplay !== "URL_DE_LA_PHOTO_DE_COUVERTURE" && !String(currentPropertyPhotoUrlToDisplay).includes("undefined") && String(currentPropertyPhotoUrlToDisplay).startsWith("http")) { //
