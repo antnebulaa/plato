@@ -319,7 +319,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 triggerSaveAnimation(`Enregistré dans ${albumName || DEFAULT_ALBUM_NAME}`);
                 currentPropertyIdToSave = null;
                 currentPropertyPhotoUrlToDisplay = null;
-                const closeButton = modalElement ? modalElement.querySelector('[fs-modal-element="close"]') : null;
+                const closeButton = modalElement ? modalElement.querySelector('[fs-modal-element="close-4"]') : null;
                 if (closeButton) closeButton.click();
                 else console.warn("Bouton fermeture Finsweet introuvable.");
             } else { throw new Error("Réponse serveur invalide."); }
@@ -495,7 +495,7 @@ document.addEventListener('DOMContentLoaded', function () {
         updateAuthToken(); 
         await fetchAndStoreUserFavoriteItems(); 
         if (!authToken && modalElement && (modalElement.style.display !== 'none' && modalElement.style.display !== '')) {
-            const closeButton = modalElement.querySelector('[fs-modal-element="close"]');
+            const closeButton = modalElement.querySelector('[fs-modal-element="close-4"]');
             if (closeButton) closeButton.click();
             alert("Vous avez été déconnecté.");
         } else if (authToken && modalElement && (modalElement.style.display !== 'none' && modalElement.style.display !== '')) {
