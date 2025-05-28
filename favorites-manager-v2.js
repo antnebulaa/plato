@@ -248,86 +248,120 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // MODIFIÉ pour afficher la photo de couverture de l'album
-    function renderAlbumListInModal(albums) {
-        if (!modalListeAlbumsConteneur || !templateItemAlbumModal) {
-             if (messageModalAlbums) messageModalAlbums.textContent = "Erreur d'affichage des albums (template/conteneur manquant).";
-             console.error("Conteneur de liste d'albums ou template d'item manquant.");
-             return;
-        }
-        modalListeAlbumsConteneur.innerHTML = '';
+    // Dans favorites-manager-v2.js
 
-        if (albums.length === 0) {
-            if (messageModalAlbums) {
-                messageModalAlbums.textContent = "Vous n'avez aucun album. Créez-en un !";
-                messageModalAlbums.style.display = 'block';
-            }
-        } else {
-            if (messageModalAlbums) messageModalAlbums.style.display = 'none';
-            albums.forEach(album => {
-                const clone = templateItemAlbumModal.cloneNode(true);
-                clone.removeAttribute('id');
-                clone.style.display = 'flex'; // Ou le style d'affichage de vos items
-
-                const nameElement = clone.querySelector('[data-album-name]');
-                if (nameElement) nameElement.textContent = album.name_Album || 'Album sans nom';
-                
-                // NOUVEAU : Gestion de l'image de couverture de l'album
-                const coverImgElement = clone.querySelector('[data-album-cover-img="true"]');
-                if (coverImgElement) {
-                    if (album.representative_photo_url) { // Xano doit fournir ce champ
-                        coverImgElement.src = album.representative_photo_url;
-                        coverImgElement.alt = `Couverture de l'album ${album.name_Album || ''}`;
-                        coverImgElement.style.backgroundColor = 'transparent'; // Enlever le fond si l'image charge
-                    } else {
-                        // Garder le style de fond du placeholder (ex: gris) ou cacher l'img
-                        // coverImgElement.style.display = 'none'; // Option si vous ne voulez pas de placeholder
-                        coverImgElement.alt = ``;
-                        console.warn(`[RENDER_ALBUM_LIST] Pas de representative_photo_url pour l'album ID: ${album.id} (${album.name_Album})`);
-                    }
-                } else {
-                    console.warn(`[RENDER_ALBUM_LIST] Élément img [data-album-cover-img="true"] non trouvé dans le template pour l'album ID: ${album.id}`);
-                }
-
-                clone.dataset.albumId = album.id;
-                clone.dataset.albumName = album.name_Album; 
-                clone.addEventListener('click', async function () {
-                    await savePropertyToAlbum(currentPropertyIdToSave, this.dataset.albumId, this.dataset.albumName);
-                });
-                modalListeAlbumsConteneur.appendChild(clone);
-            });
-        }
-        if (btnOuvrirFormNouvelAlbum) btnOuvrirFormNouvelAlbum.style.display = '';
+function renderAlbumListInModal(albums) {
+    if (!modalListeAlbumsConteneur || !templateItemAlbumModal) {
+         if (messageModalAlbums) messageModalAlbums.textContent = "Erreur d'affichage des albums (template/conteneur manquant).";
+         console.error("Conteneur de liste d'albums ou template d'item manquant.");
+         return;
     }
+    modalListeAlbumsConteneur.innerHTML = '';
+
+    if (albums.length === 0) {
+        if (messageModalAlbums) {
+            messageModalAlbums.textContent = "Vous n'avez aucun album. Créez-en un !";
+            messageModalAlbums.style.display = 'block';
+        }
+    } else {
+        if (messageModalAlbums) messageModalAlbums.style.display = 'none';
+        albums.forEach(album => {
+            const clone = templateItemAlbumModal.cloneNode(true);
+            clone.removeAttribute('id');
+            clone.style.display = 'flex'; // Ou le style d'affichage de vos items
+
+            const nameElement = clone.querySelector('[data-album-name]');
+            if (nameElement) nameElement.textContent = album.name_Album || 'Album sans nom';
+            
+            const coverImgElement = clone.querySelector('[data-album-cover-img="true"]');
+            if (coverImgElement) {
+                // 'representative_photo_url' est le champ que Xano doit fournir pour la couverture de l'album
+                if (album.representative_photo_url && typeof album.representative_photo_url === 'string' && album.representative_photo_url.startsWith("http")) {
+                    coverImgElement.src = album.representative_photo_url;
+                    coverImgElement.alt = `Couverture de l'album ${album.name_Album || ''}`;
+                    coverImgElement.style.backgroundColor = 'transparent'; // Réinitialiser le fond si une image est chargée
+                    coverImgElement.style.display = ''; // Assurez-vous qu'il est visible si précédemment caché
+                } else {
+                    // Pas de photo de couverture : afficher un placeholder visuel (carré gris).
+                    coverImgElement.src = ''; // TRÈS IMPORTANT : pour éviter l'icône d'image cassée.
+                    
+                    // L'attribut 'alt' est pour l'accessibilité (lecteurs d'écran).
+                    // Il n'est généralement pas affiché visuellement si l'image ne se charge pas à la place de l'image.
+                    // Un 'alt' descriptif est une bonne pratique. S'il doit être vide, utilisez alt="".
+                    coverImgElement.alt = `Placeholder pour l'album ${album.name_Album || 'sans nom'}`;
+                    
+                    coverImgElement.style.backgroundColor = '#CCCCCC'; // Votre couleur grise pour le placeholder.
+                    
+                    // Assurez-vous que votre CSS pour [data-album-cover-img="true"] définit bien
+                    // une largeur et une hauteur (width, height) pour que le carré gris soit visible.
+                    // Si ce n'est pas le cas, vous pourriez les définir ici, par exemple :
+                    // coverImgElement.style.width = '50px'; // Remplacez par la taille désirée
+                    // coverImgElement.style.height = '50px'; // Remplacez par la taille désirée
+                    // coverImgElement.style.display = 'block'; // Ou 'inline-block', selon votre mise en page.
+
+                    console.warn(`[RENDER_ALBUM_LIST] Pas de representative_photo_url pour l'album ID: ${album.id} (${album.name_Album}). Affichage du placeholder gris.`);
+                }
+            } else {
+                console.warn(`[RENDER_ALBUM_LIST] Élément img [data-album-cover-img="true"] non trouvé dans le template pour l'album ID: ${album.id}`);
+            }
+
+            clone.dataset.albumId = album.id;
+            clone.dataset.albumName = album.name_Album; 
+            clone.addEventListener('click', async function () {
+                await savePropertyToAlbum(currentPropertyIdToSave, this.dataset.albumId, this.dataset.albumName);
+            });
+            modalListeAlbumsConteneur.appendChild(clone);
+        });
+    }
+    if (btnOuvrirFormNouvelAlbum) btnOuvrirFormNouvelAlbum.style.display = '';
+}
 
     async function savePropertyToAlbum(propertyId, albumId, albumName) {
-        if (!propertyId || !albumId) {
-            console.warn("[savePropertyToAlbum] ID de propriété ou d'album manquant.", {propertyId, albumId});
-            return;
-        }
-        console.log(`[savePropertyToAlbum] Tentative de sauvegarde: P_ID=${propertyId}, A_ID=${albumId}, A_Name=${albumName}`);
-        try {
-            const newFavoriteEntry = await favoritesXanoClient.post('favorites_list', {
-                favorites_album_id: parseInt(albumId), property_id: parseInt(propertyId)
-            });
-            if (newFavoriteEntry && newFavoriteEntry.id) {
-                userFavoriteItems.set(newFavoriteEntry.property_id.toString(), {
-                    favoritesListId: newFavoriteEntry.id,
-                    albumId: newFavoriteEntry.favorites_album_id,
-                    albumName: albumName || 'cet album'
-                });
-                updateAllHeartButtonsUI();
-                triggerSaveAnimation(`Enregistré dans ${albumName || DEFAULT_ALBUM_NAME}`);
-                currentPropertyIdToSave = null;
-                currentPropertyPhotoUrlToDisplay = null;
-                const closeButton = modalElement ? modalElement.querySelector('[fs-modal-element="close-4"]') : null;
-                if (closeButton) closeButton.click();
-                else console.warn("Bouton fermeture Finsweet introuvable.");
-            } else { throw new Error("Réponse serveur invalide."); }
-        } catch (error) { 
-            console.error("Erreur dans savePropertyToAlbum:", error);
-            alert(`Erreur sauvegarde: ${error.message}`); 
-        }
+    if (!propertyId || !albumId) {
+        console.warn("[savePropertyToAlbum] ID de propriété ou d'album manquant.", {propertyId, albumId});
+        return;
     }
+    console.log(`[savePropertyToAlbum] Tentative de sauvegarde: P_ID=<span class="math-inline">\{propertyId\}, A\_ID\=</span>{albumId}, A_Name=${albumName}`);
+
+    const payload = {
+        favorites_album_id: parseInt(albumId),
+        property_id: parseInt(propertyId)
+    };
+
+    // NOUVEAU : Envoyer l'URL de la photo de la propriété actuelle
+    // Xano décidera si cette URL doit être utilisée comme couverture de l'album.
+    if (currentPropertyPhotoUrlToDisplay && typeof currentPropertyPhotoUrlToDisplay === 'string' && currentPropertyPhotoUrlToDisplay.startsWith("http")) {
+        payload.property_photo_url_for_cover = currentPropertyPhotoUrlToDisplay; // Nom de champ à définir côté Xano
+        console.log('[FAVORITES_ALBUM_MANAGER] Envoi de property_photo_url_for_cover:', currentPropertyPhotoUrlToDisplay);
+    }
+
+    try {
+        // Assurez-vous que le nom de l'endpoint est correct, ici 'favorites_list'
+        const newFavoriteEntry = await favoritesXanoClient.post('favorites_list', payload); 
+
+        if (newFavoriteEntry && newFavoriteEntry.id) {
+            userFavoriteItems.set(newFavoriteEntry.property_id.toString(), {
+                favoritesListId: newFavoriteEntry.id,
+                albumId: newFavoriteEntry.favorites_album_id,
+                albumName: albumName || 'cet album'
+                // Note : La `representative_photo_url` de l'album sera mise à jour côté Xano.
+                // Il faudra peut-être rafraîchir `userAlbums` ou faire un nouveau `populateModalWithAlbums`
+                // si la modale reste ouverte et que l'on veut voir la nouvelle cover immédiatement.
+                // Actuellement, la modale se ferme, donc au prochain affichage, elle sera à jour.
+            });
+            updateAllHeartButtonsUI();
+            triggerSaveAnimation(`Enregistré dans ${albumName || DEFAULT_ALBUM_NAME}`);
+            currentPropertyIdToSave = null;
+            currentPropertyPhotoUrlToDisplay = null; // Réinitialiser après utilisation
+            const closeButton = modalElement ? modalElement.querySelector('[fs-modal-element="close-4"]') : null;
+            if (closeButton) closeButton.click();
+            else console.warn("Bouton fermeture Finsweet introuvable.");
+        } else { throw new Error("Réponse serveur invalide lors de l'ajout aux favoris."); }
+    } catch (error) { 
+        console.error("Erreur dans savePropertyToAlbum:", error);
+        alert(`Erreur sauvegarde: ${error.message}`); 
+    }
+}
 
     async function removePropertyFromAlbum(favoritesListId, propertyId, albumName) {
         console.log(`[removePropertyFromAlbum] Tentative de suppression: FavList_ID=${favoritesListId}, P_ID=${propertyId}`);
