@@ -284,7 +284,7 @@ function renderAlbumListInModal(albums) {
                     // Pas de photo de couverture : afficher un placeholder visuel (carré gris).
                     coverImgElement.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; // Pixel transparent
                     coverImgElement.alt = `L'album ${album.name_Album || 'sans nom'} n'a pas de photo de couverture`; // Pour l'accessibilité
-                    coverImgElement.style.backgroundColor = '#CCCCCC'; // Ou la couleur grise de votre CSS
+                    coverImgElement.style.backgroundColor = '#E7E7E7'; // Ou la couleur grise de votre CSS
                     
                     // S'assurer via CSS que [data-album-cover-img="true"] a width et height.
                     console.warn(`[RENDER_ALBUM_LIST] Pas de representative_photo_url pour l'album ID: ${album.id} (${album.name_Album}). Affichage du placeholder gris.`);
