@@ -281,7 +281,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     } else {
                         // Garder le style de fond du placeholder (ex: gris) ou cacher l'img
                         // coverImgElement.style.display = 'none'; // Option si vous ne voulez pas de placeholder
-                        coverImgElement.alt = `Pas de couverture disponible`;
+                        coverImgElement.alt = ``;
                         console.warn(`[RENDER_ALBUM_LIST] Pas de representative_photo_url pour l'album ID: ${album.id} (${album.name_Album})`);
                     }
                 } else {
