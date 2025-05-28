@@ -106,13 +106,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (propertyId && userFavoriteItems.has(propertyId.toString())) { // Modification pour s'assurer que la clé est une chaîne
                 const favoriteInfo = userFavoriteItems.get(propertyId.toString()); // Modification pour s'assurer que la clé est une chaîne
                 button.classList.add('is-favorited'); //
-                if (favoriteTextElement) favoriteTextElement.textContent = 'Retirer'; //
+                if (favoriteTextElement) favoriteTextElement.textContent = ''; //
                 button.dataset.favoritesListId = favoriteInfo.favoritesListId; //
                 button.dataset.albumId = favoriteInfo.albumId; //
                 button.dataset.albumName = favoriteInfo.albumName; //
             } else if (propertyId) {
                 button.classList.remove('is-favorited'); //
-                if (favoriteTextElement) favoriteTextElement.textContent = 'Enregistrer'; //
+                if (favoriteTextElement) favoriteTextElement.textContent = ''; //
                 delete button.dataset.favoritesListId; //
                 delete button.dataset.albumId; //
                 delete button.dataset.albumName; //
