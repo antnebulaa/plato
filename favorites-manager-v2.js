@@ -275,35 +275,24 @@ function renderAlbumListInModal(albums) {
             
             const coverImgElement = clone.querySelector('[data-album-cover-img="true"]');
             if (coverImgElement) {
-                // 'representative_photo_url' est le champ que Xano doit fournir pour la couverture de l'album
                 if (album.representative_photo_url && typeof album.representative_photo_url === 'string' && album.representative_photo_url.startsWith("http")) {
                     coverImgElement.src = album.representative_photo_url;
                     coverImgElement.alt = `Couverture de l'album ${album.name_Album || ''}`;
-                    coverImgElement.style.backgroundColor = 'transparent'; // Réinitialiser le fond si une image est chargée
-                    coverImgElement.style.display = ''; // Assurez-vous qu'il est visible si précédemment caché
+                    coverImgElement.style.backgroundColor = 'transparent';
+                    coverImgElement.style.display = ''; 
                 } else {
                     // Pas de photo de couverture : afficher un placeholder visuel (carré gris).
-                    coverImgElement.src = ''; // TRÈS IMPORTANT : pour éviter l'icône d'image cassée.
+                    coverImgElement.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; // Pixel transparent
+                    coverImgElement.alt = `L'album ${album.name_Album || 'sans nom'} n'a pas de photo de couverture`; // Pour l'accessibilité
+                    coverImgElement.style.backgroundColor = '#CCCCCC'; // Ou la couleur grise de votre CSS
                     
-                    // L'attribut 'alt' est pour l'accessibilité (lecteurs d'écran).
-                    // Il n'est généralement pas affiché visuellement si l'image ne se charge pas à la place de l'image.
-                    // Un 'alt' descriptif est une bonne pratique. S'il doit être vide, utilisez alt="".
-                    coverImgElement.alt = `Placeholder pour l'album ${album.name_Album || 'sans nom'}`;
-                    
-                    coverImgElement.style.backgroundColor = '#CCCCCC'; // Votre couleur grise pour le placeholder.
-                    
-                    // Assurez-vous que votre CSS pour [data-album-cover-img="true"] définit bien
-                    // une largeur et une hauteur (width, height) pour que le carré gris soit visible.
-                    // Si ce n'est pas le cas, vous pourriez les définir ici, par exemple :
-                    // coverImgElement.style.width = '50px'; // Remplacez par la taille désirée
-                    // coverImgElement.style.height = '50px'; // Remplacez par la taille désirée
-                    // coverImgElement.style.display = 'block'; // Ou 'inline-block', selon votre mise en page.
-
+                    // S'assurer via CSS que [data-album-cover-img="true"] a width et height.
                     console.warn(`[RENDER_ALBUM_LIST] Pas de representative_photo_url pour l'album ID: ${album.id} (${album.name_Album}). Affichage du placeholder gris.`);
                 }
             } else {
                 console.warn(`[RENDER_ALBUM_LIST] Élément img [data-album-cover-img="true"] non trouvé dans le template pour l'album ID: ${album.id}`);
             }
+
 
             clone.dataset.albumId = album.id;
             clone.dataset.albumName = album.name_Album; 
