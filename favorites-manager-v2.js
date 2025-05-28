@@ -170,14 +170,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
             // Votre logique de clonage de bouton était ici, je la remets si elle était importante pour votre cas.
-            // Sinon, on peut l'enlever si dataset.listenerAttached suffit.
-            // const newButton = button.cloneNode(true);
-            // if (button.parentNode) {
-            //     button.parentNode.replaceChild(newButton, button);
-            // } else {
-            //     console.warn(`[FAVORITES_ALBUM_MANAGER] Bouton #${index} n'a pas de parent.`);
-            // }
-            // const targetButton = newButton.parentNode ? newButton : button; // Utiliser le bouton (nouveau ou original)
+             Sinon, on peut l'enlever si dataset.listenerAttached suffit.
+             const newButton = button.cloneNode(true);
+             if (button.parentNode) {
+                 button.parentNode.replaceChild(newButton, button);
+             } else {
+                 console.warn(`[FAVORITES_ALBUM_MANAGER] Bouton #${index} n'a pas de parent.`);
+             }
+             const targetButton = newButton.parentNode ? newButton : button; // Utiliser le bouton (nouveau ou original)
 
             // Utiliser 'button' directement si le clonage n'est pas strictement nécessaire
             const targetButton = button;
