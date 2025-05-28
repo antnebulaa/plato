@@ -284,11 +284,11 @@ function bindDataToElement(element, data) {
             // Récupérer les styles originaux de l'image depuis le template (ceux que vous avez définis dans Webflow)
             // Ou définissez des valeurs par défaut si elles ne sont pas dans le style inline du template
             const originalStyles = {
-                width: element.style.width || '100px', // Largeur par défaut si une image est affichée
-                height: element.style.height || 'auto',  // Hauteur par défaut si une image est affichée
+                width: element.style.width || '5rem', // Largeur par défaut si une image est affichée
+                height: element.style.height || '5rem',  // Hauteur par défaut si une image est affichée
                 objectFit: element.style.objectFit || 'cover',
-                backgroundColor: element.style.backgroundColor || '#f0f0f0', // Fond original
-                borderRadius: element.style.borderRadius || '' // Radius original
+                backgroundColor: element.style.backgroundColor || '#f7f7f7', // Fond original
+                borderRadius: element.style.borderRadius || '1rem' // Radius original
             };
 
             let imageUrl = null; // Variable pour stocker l'URL de l'image à afficher
