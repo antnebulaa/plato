@@ -163,81 +163,93 @@ function renderData(data, element) {
 
 function renderListData(dataArray, element) {
     dataArray = Array.isArray(dataArray) ? dataArray : [];
-    
-    const templateSelector = element.getAttribute('data-xano-list');
+
+    const templateSelector = element.getAttribute('data-xano-list'); // Devrait être "#property-template"
     const templateElement = document.querySelector(templateSelector);
 
     if (!templateElement) {
         console.error(`Élément modèle "${templateSelector}" introuvable.`);
-        element.textContent = `Erreur : Élément modèle "${templateSelector}" introuvable.`;
+        // Assurez-vous que le conteneur d'erreur est visible si le template n'est pas trouvé
+        const errorContainer = element.querySelector('[data-xano-list-container]') || element;
+        errorContainer.textContent = `Erreur : Élément modèle "${templateSelector}" introuvable.`;
+        if (element.classList.contains('liste-annonces-charge')) { // Si vous utilisez la méthode de fondu
+            element.classList.add('visible');
+        }
         return;
     }
 
     const container = element.querySelector('[data-xano-list-container]') || element;
-    
-    // Vider le conteneur avant d'ajouter de nouveaux éléments
-    // en s'assurant de ne pas supprimer le template lui-même s'il est enfant direct
-    let child = container.firstChild;
-    while(child) {
-        if (child !== templateElement) {
+
+    // Vider le contenu actuel du conteneur
+    // S'assurer de ne pas supprimer le template lui-même s'il est un enfant direct et non dans un conteneur séparé.
+    if (container !== element || (container === element && templateElement.parentNode !== container)) {
+         // Si un data-xano-list-container distinct existe OU
+         // si le template n'est PAS un enfant direct du conteneur principal (element), on peut vider le conteneur.
+        container.innerHTML = '';
+    } else {
+        // Si le conteneur est l'élément principal et que le template est un enfant direct,
+        // il faut supprimer les enfants prudemment pour ne pas effacer le template avant clonage.
+        let child = container.firstChild;
+        while (child) {
             const nextChild = child.nextSibling;
-            container.removeChild(child);
+            if (child !== templateElement) { // Ne pas supprimer le template lui-même
+                container.removeChild(child);
+            }
             child = nextChild;
-        } else {
-            child = child.nextSibling;
         }
     }
-    
-    templateElement.style.display = 'none'; // Assurez-vous qu'il est caché
 
-    dataArray.forEach((item, index) => {
-        const clone = templateElement.cloneNode(true);
-        clone.style.display = ''; // Ou le style d'affichage par défaut de vos items
-        clone.setAttribute('data-xano-list-item', '');
-        clone.setAttribute('data-xano-item-index', index);
-        
-        const boundElements = clone.querySelectorAll('[data-xano-bind]');
-        boundElements.forEach(boundElement => {
-            bindDataToElement(boundElement, item); // 'item' est l'objet annonce individuel
-        });
-        
-        const linkElements = clone.querySelectorAll('[data-xano-link-to]');
-        linkElements.forEach(linkElement => {
-            const targetPage = linkElement.getAttribute('data-xano-link-to');
-            const idField = linkElement.getAttribute('data-xano-link-param-id') || 'id'; // 'id' de l'annonce
-            const idParamName = linkElement.getAttribute('data-xano-link-url-param') || 'id'; // nom du paramètre dans l'URL
-            
-            let linkTarget = targetPage;
-            const itemId = getNestedValue(item, idField); // Utilise getNestedValue au cas où l'ID serait niché
-
-            if (itemId !== undefined) {
-                linkTarget = `${targetPage}?${idParamName}=${itemId}`;
-            }
-            
-            if (linkElement.tagName === 'A') {
-                linkElement.href = linkTarget;
-            } else {
-                linkElement.setAttribute('data-xano-link-target', linkTarget);
-                linkElement.style.cursor = 'pointer';
-            }
-        });
-        
-        container.appendChild(clone);
-    });
+    // Cacher le modèle original (même s'il l'est déjà via HTML, cela ne fait pas de mal)
+    templateElement.style.display = 'none';
 
     if (dataArray.length === 0) {
+        // Afficher un message si aucune donnée
         let messageElement;
         const customMessage = element.getAttribute('data-xano-empty-message');
         if (customMessage) {
             messageElement = document.createElement('div');
-            messageElement.className = 'xano-empty-message'; // Vous pouvez styler cette classe
+            messageElement.className = 'xano-empty-message';
             messageElement.textContent = customMessage;
         } else {
+            // Fallback si pas de message personnalisé (vous pouvez supprimer ceci si vous en avez toujours un)
             messageElement = document.createElement('div');
             messageElement.className = 'xano-empty-message';
-            messageElement.textContent = "Aucune annonce à afficher.";
+            messageElement.textContent = "Aucune donnée à afficher.";
         }
         container.appendChild(messageElement);
+    } else {
+        dataArray.forEach((item, index) => {
+            const clone = templateElement.cloneNode(true);
+            // MODIFICATION IMPORTANTE : Rendre le clone visible explicitement
+            // Utilisez 'block', 'flex', ou le type d'affichage approprié pour vos éléments de liste.
+            clone.style.display = 'block';
+            clone.setAttribute('data-xano-list-item', '');
+            clone.setAttribute('data-xano-item-index', index);
+
+            const boundElements = clone.querySelectorAll('[data-xano-bind]');
+            boundElements.forEach(boundElement => {
+                bindDataToElement(boundElement, item);
+            });
+
+            const linkElements = clone.querySelectorAll('[data-xano-link-to]');
+            linkElements.forEach(linkElement => {
+                const targetPage = linkElement.getAttribute('data-xano-link-to');
+                const idField = linkElement.getAttribute('data-xano-link-param-id') || 'id';
+                const idParamName = linkElement.getAttribute('data-xano-link-url-param') || 'id';
+                let linkTarget = targetPage;
+                const itemIdVal = getNestedValue(item, idField);
+                if (itemIdVal !== undefined) {
+                    linkTarget = `<span class="math-inline">\{targetPage\}?</span>{idParamName}=${itemIdVal}`;
+                }
+                if (linkElement.tagName === 'A') {
+                    linkElement.href = linkTarget;
+                } else {
+                    linkElement.setAttribute('data-xano-link-target', linkTarget);
+                    linkElement.style.cursor = 'pointer';
+                }
+            });
+            container.appendChild(clone);
+        });
     }
 }
 
