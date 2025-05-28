@@ -265,96 +265,153 @@ function getNestedValue(obj, pathString) {
 // MODIFIÉ: Fonction bindDataToElement pour utiliser getNestedValue et gérer les images de couverture
 function bindDataToElement(element, data) {
     const dataKey = element.getAttribute('data-xano-bind');
-    if (!dataKey) return;
+    if (!dataKey) return; // Pas de clé de binding
 
     // Utiliser getNestedValue pour récupérer la valeur, même si elle est nichée
     const value = getNestedValue(data, dataKey);
-    
+
     // Valeur par défaut à afficher si la donnée est null ou undefined
-    const displayValue = (value === null || value === undefined) ? '' : value;
+    // Pour les booléens, on veut afficher "true" ou "false" plutôt que de les cacher s'ils sont false.
+    let displayValue;
+    if (typeof value === 'boolean') {
+        displayValue = String(value);
+    } else {
+        displayValue = (value === null || value === undefined) ? '' : value;
+    }
+
 
     switch (element.tagName.toLowerCase()) {
         case 'img':
-            // Si dataKey pointe vers un tableau de photos (ex: "_property_photos")
-            if (Array.isArray(value)) {
-                let coverPhoto = value.find(p => getNestedValue(p, 'is_cover') === true); 
-                if (!coverPhoto && value.length > 0) {
-                     // Fallback : prendre la première photo si aucune n'est marquée comme couverture
-                     // Ou trier par date de création/ordre si ces champs existent.
-                     // Pour l'instant, prenons la première.
-                    coverPhoto = value[0];
-                }
+            const dataKeyForImg = element.getAttribute('data-xano-bind'); // Récupère la clé de liaison spécifique à cette image
 
-                if (coverPhoto) {
-                    // Chercher l'URL de l'image dans la structure de l'objet photo
-                    // Inspiré de detail-annonce.js: photo.images[0].url
-                    // Adaptez ce chemin si votre structure Xano est différente
-                    let imageUrl = getNestedValue(coverPhoto, 'images.0.url'); 
-                    if (!imageUrl) imageUrl = getNestedValue(coverPhoto, 'url'); // Autre chemin possible
+            // Logique spécifique pour la gestion de la photo de couverture via "_property_photos"
+            if (dataKeyForImg === '_property_photos') {
+                if (Array.isArray(value) && value.length > 0) { // 'value' est le tableau _property_photos
+                    let coverPhotoObject = value.find(photo => getNestedValue(photo, 'is_cover') === true);
 
-                    element.src = imageUrl || ''; // Mettre une image placeholder si ''
-                    element.alt = getNestedValue(data, 'property_title') || 'Image de l\'annonce';
+                    if (!coverPhotoObject) { // Fallback si aucune photo n'est marquée comme 'is_cover'
+                        // On pourrait ajouter une logique de tri ici (ex: par photo_order)
+                        // Pour l'instant, on prend la première photo du tableau.
+                        coverPhotoObject = value[0];
+                    }
+
+                    if (coverPhotoObject) {
+                        let imageUrl = null;
+                        const imagesArray = getNestedValue(coverPhotoObject, 'images');
+
+                        // Priorité 1: la structure Xano native 'images[0].url'
+                        if (Array.isArray(imagesArray) && imagesArray.length > 0 && getNestedValue(imagesArray[0], 'url')) {
+                            imageUrl = getNestedValue(imagesArray[0], 'url');
+                        }
+
+                        // Priorité 2: le champ 'url_photo' s'il existe et que imageUrl n'a pas été trouvé via 'images'
+                        if (!imageUrl && getNestedValue(coverPhotoObject, 'url_photo')) {
+                            imageUrl = getNestedValue(coverPhotoObject, 'url_photo');
+                        }
+
+                        element.src = imageUrl || 'URL_PLACEHOLDER_IMAGE.svg'; // REMPLACEZ par une vraie URL de placeholder
+                        const propertyTitle = getNestedValue(data, 'property_title'); // 'data' est l'objet annonce complet
+                        element.alt = propertyTitle ? `Image de couverture pour ${propertyTitle}` : 'Image de couverture de l\'annonce';
+                    } else {
+                        // Si _property_photos est un tableau vide, ou coverPhotoObject n'a pu être déterminé
+                        element.src = 'URL_PLACEHOLDER_IMAGE.svg'; // REMPLACEZ
+                        element.alt = 'Image non disponible';
+                    }
                 } else {
-                    element.src = ''; // Pas de photo, ou image placeholder
+                    // Si _property_photos n'est pas un tableau ou est manquant/vide pour cette annonce
+                    element.src = 'URL_PLACEHOLDER_IMAGE.svg'; // REMPLACEZ
                     element.alt = 'Image non disponible';
                 }
-            } 
-            // Si dataKey pointe directement vers un objet image Xano (avec une propriété 'url')
-            else if (typeof value === 'object' && value && value.url) {
-                element.src = value.url;
-                element.alt = getNestedValue(data, 'property_title') || 'Image de l\'annonce';
-            } 
-            // Si dataKey pointe directement vers une URL d'image (chaîne de caractères)
-            else if (typeof value === 'string' && (value.startsWith('http') || value.startsWith('/'))) {
-                element.src = value;
-                element.alt = getNestedValue(data, 'property_title') || 'Image de l\'annonce';
-            } 
-            // Sinon, pas d'image
-            else {
-                element.src = ''; // ou une image placeholder par défaut
-                element.alt = 'Image non disponible';
+            } else {
+                // Logique pour d'autres images qui seraient liées directement à une URL
+                // ou à un objet image Xano simple (pas un tableau _property_photos)
+                if (typeof value === 'object' && value && value.url) { // Objet image Xano simple
+                    element.src = value.url;
+                } else if (typeof value === 'string' && (value.startsWith('http') || value.startsWith('/') || value.startsWith('data:'))) { // URL directe
+                    element.src = value;
+                } else {
+                    element.src = 'URL_PLACEHOLDER_IMAGE.svg'; // REMPLACEZ
+                }
+                const propertyTitleForAlt = getNestedValue(data, 'property_title');
+                element.alt = propertyTitleForAlt ? `Image pour ${propertyTitleForAlt}` : 'Image de l\'annonce';
             }
             break;
+
         case 'input':
+            if (element.type === 'checkbox' || element.type === 'radio') {
+                if (element.type === 'checkbox'){
+                     element.checked = !!value; // Coché si truthy (ex: true, 1, "texte"), décoché si falsy (false, 0, "", null, undefined)
+                 } else { // radio
+                     element.checked = (element.value == value); // Comparaison non stricte
+                 }
+            } else if (element.type === 'date' && value) {
+                 try {
+                     element.value = new Date(value).toISOString().split('T')[0];
+                 } catch (e) { element.value = ''; console.warn("Impossible de formater la date", value); }
+            } else if (element.type === 'datetime-local' && value) {
+                  try {
+                     const d = new Date(value);
+                     element.value = d.toISOString().substring(0, 16);
+                  } catch (e) { element.value = ''; console.warn("Impossible de formater datetime-local", value); }
+            } else {
+                 element.value = displayValue;
+            }
+            break;
         case 'textarea':
         case 'select':
             element.value = displayValue;
             break;
         case 'a':
-            if (!element.hasAttribute('data-xano-link-to')) { // Ne pas écraser les liens gérés par renderListData
-                element.href = displayValue;
+            // Ne met à jour href que si ce n'est pas géré par data-xano-link-to (qui est géré dans renderListData)
+            if (!element.hasAttribute('data-xano-link-to')) {
+                 element.href = displayValue; // displayValue doit être une URL valide ici
             }
-            // Mettre à jour le texte du lien s'il est vide ou si dataKey n'est pas 'href'
-            if (!element.textContent.trim() || (dataKey !== 'href' && dataKey !== element.getAttribute('href'))) {
-                 element.textContent = displayValue;
-            }
+            // Mettre à jour le texte du lien si le texte est vide ou si dataKey ne correspond pas déjà à l'attribut href
+             if (!element.textContent.trim() || (dataKey !== 'href' && dataKey !== element.getAttribute('href'))) {
+                  element.textContent = displayValue;
+              }
             break;
         default:
-            element.textContent = displayValue;
+            // Par défaut, mettre à jour textContent (plus sûr que innerHTML)
+            // Si l'élément a un attribut data-xano-bind-html, on utilise innerHTML (attention XSS)
+            if (element.hasAttribute('data-xano-bind-html') && typeof value === 'string') {
+                element.innerHTML = value; // Utilisez avec prudence, seulement si la source HTML est sûre.
+            } else {
+                element.textContent = displayValue;
+            }
     }
 
+    // Gérer les attributs liés (data-xano-bind-attr-*)
     for (const attr of element.attributes) {
         if (attr.name.startsWith('data-xano-bind-attr-')) {
             const attrName = attr.name.replace('data-xano-bind-attr-', '');
-            const attrValueKey = attr.value; 
-            const attrValue = getNestedValue(data, attrValueKey); // Utiliser getNestedValue ici aussi
+            const attrValueKey = attr.value; // La valeur de cet attribut est la clé dans l'objet data
+
+            const attrValue = getNestedValue(data, attrValueKey);
 
             if (attrValue !== undefined) {
                 if (typeof attrValue === 'boolean') {
-                    if (attrValue) element.setAttribute(attrName, '');
-                    else element.removeAttribute(attrName);
+                     if (attrValue) {
+                         element.setAttribute(attrName, ''); // Ajoute l'attribut (ex: disabled)
+                     } else {
+                         element.removeAttribute(attrName); // Retire l'attribut
+                     }
                 } else {
                     element.setAttribute(attrName, attrValue);
                 }
             } else {
-                 element.removeAttribute(attrName); // Si la clé n'est pas trouvée, retirer l'attribut
+                 element.removeAttribute(attrName);
+                 // console.warn(`Clé "${attrValueKey}" pour l'attribut "${attrName}" non trouvée dans les données.`);
             }
         }
     }
-    
-    if (element.hasAttribute('data-xano-link-to') && getNestedValue(data, 'id') !== undefined) {
-        element.setAttribute('data-xano-data-id', getNestedValue(data, 'id'));
-    }
+
+     // Stocker l'ID si l'élément est aussi un lien (pour référence future si nécessaire par renderListData)
+     // data.id doit être le champ ID de l'annonce (ex: property_id ou juste id)
+     const itemId = getNestedValue(data, 'id'); // Assurez-vous que 'id' est le bon champ pour l'identifiant de l'annonce
+     if (element.hasAttribute('data-xano-link-to') && itemId !== undefined) {
+         element.setAttribute('data-xano-data-id', itemId);
+     }
 }
 
 function getQueryParam(param) {
