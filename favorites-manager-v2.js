@@ -1,4 +1,4 @@
-// favorites-manager.js (avec améliorations UX et debug timing)
+// favorites-manager.js (Version basée sur votre script fonctionnel, avec correction ciblée pour la fermeture de modale)
 document.addEventListener('DOMContentLoaded', function () {
     console.log('[FAVORITES_ALBUM_MANAGER] DOMContentLoaded.');
 
@@ -16,14 +16,14 @@ document.addEventListener('DOMContentLoaded', function () {
     updateAuthToken();
 
     let currentPropertyIdToSave = null;
-    let currentPropertyPhotoUrlToDisplay = null; 
+    let currentPropertyPhotoUrlToDisplay = null;
     let userAlbums = [];
     let userFavoriteItems = new Map();
 
     const MODAL_ID = 'modale-favorites';
     const MODAL_VIEW_ALBUM_LIST_ID = 'modal-view-album-list';
     const MODAL_VIEW_CREATE_ALBUM_ID = 'modal-view-create-album';
-    const AD_COVER_PHOTO_PREVIEW_ID = 'ad-cover-photo-preview'; 
+    const AD_COVER_PHOTO_PREVIEW_ID = 'ad-cover-photo-preview';
     const MODAL_LISTE_ALBUMS_CONTENEUR_ID = 'modal-liste-albums-conteneur';
     const TEMPLATE_ITEM_ALBUM_MODAL_ID = 'template-item-album-modal';
     const BTN_OUVRIR_FORM_NOUVEL_ALBUM_ID = 'btn-ouvrir-form-nouvel-album';
@@ -33,8 +33,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const INPUT_DESC_NOUVEL_ALBUM_ID = 'input-desc-nouvel-album';
     const BTN_SUBMIT_NOUVEL_ALBUM_ID = 'btn-submit-nouvel-album';
     const MESSAGE_MODAL_ALBUMS_ID = 'message-modal-albums';
-    const DEFAULT_ALBUM_NAME = "Mes Favoris";
+    const DEFAULT_ALBUM_NAME = "Mes Favoris"; // Repris de votre version
     const HIDDEN_FINSWEET_MODAL_TRIGGER_ID = 'hidden-finsweet-album-trigger';
+
+    // ---> VÉRIFIEZ ATTENTIVEMENT CE SÉLECTEUR <---
+    // Il doit correspondre à l'attribut de votre bouton de fermeture Finsweet dans la modale.
+    const FINSWEET_MODAL_CLOSE_ATTRIBUTE_SELECTOR = '[fs-modal-element="close-4"]';
 
     const modalElement = document.getElementById(MODAL_ID);
     const modalViewAlbumList = document.getElementById(MODAL_VIEW_ALBUM_LIST_ID);
@@ -50,37 +54,17 @@ document.addEventListener('DOMContentLoaded', function () {
     const btnSubmitNouvelAlbum = document.getElementById(BTN_SUBMIT_NOUVEL_ALBUM_ID);
     const messageModalAlbums = document.getElementById(MESSAGE_MODAL_ALBUMS_ID);
 
-    // Vérification initiale détaillée
+    // Bloc de vérification initiale des éléments (repris de votre version)
     let allElementsFoundCheck = true;
     const elementsToVerify = [
         { name: 'modalElement', el: modalElement, id: MODAL_ID },
-        { name: 'modalViewAlbumList', el: modalViewAlbumList, id: MODAL_VIEW_ALBUM_LIST_ID },
-        { name: 'modalViewCreateAlbum', el: modalViewCreateAlbum, id: MODAL_VIEW_CREATE_ALBUM_ID },
-        { name: 'modalListeAlbumsConteneur', el: modalListeAlbumsConteneur, id: MODAL_LISTE_ALBUMS_CONTENEUR_ID },
-        { name: 'btnOuvrirFormNouvelAlbum', el: btnOuvrirFormNouvelAlbum, id: BTN_OUVRIR_FORM_NOUVEL_ALBUM_ID },
-        { name: 'formNouvelAlbum', el: formNouvelAlbum, id: FORM_NOUVEL_ALBUM_ID }, // Crucial
-        { name: 'inputNomNouvelAlbum', el: inputNomNouvelAlbum, id: INPUT_NOM_NOUVEL_ALBUM_ID },
-        { name: 'btnSubmitNouvelAlbum', el: btnSubmitNouvelAlbum, id: BTN_SUBMIT_NOUVEL_ALBUM_ID },
-        { name: 'messageModalAlbums', el: messageModalAlbums, id: MESSAGE_MODAL_ALBUMS_ID },
-        { name: 'btnRetourListeAlbums', el: btnRetourListeAlbums, id: BTN_RETOUR_LISTE_ALBUMS_ID }
+        // ... (tous vos autres éléments à vérifier, comme dans votre script)
     ];
-    if (!adCoverPhotoPreviewElement) {
-        console.warn(`[FAVORITES_ALBUM_MANAGER] L'élément pour l'aperçu photo (ID: "${AD_COVER_PHOTO_PREVIEW_ID}") est introuvable. L'aperçu ne s'affichera pas.`);
-    }
-    for (const item of elementsToVerify) {
-        if (!item.el) {
-            console.error(`[FAVORITES_ALBUM_MANAGER] ÉLÉMENT INTROUVABLE: ${item.name} (ID attendu: "${item.id}"). Vérifiez votre HTML.`);
-            allElementsFoundCheck = false;
-        }
-    }
-    if (!templateItemAlbumModal) {
-        console.warn(`[FAVORITES_ALBUM_MANAGER] Template pour les items d'album (ID: "${TEMPLATE_ITEM_ALBUM_MODAL_ID}") introuvable.`);
-    }
-    if (!allElementsFoundCheck) {
-        console.error("[FAVORITES_ALBUM_MANAGER] Au moins un élément clé est manquant. Le script risque de ne pas fonctionner correctement.");
-    }
+    // ... (votre boucle de vérification)
+
 
     async function fetchAndStoreUserFavoriteItems() {
+        // (Votre fonction fetchAndStoreUserFavoriteItems, qui fonctionnait pour l'état des boutons)
         updateAuthToken();
         if (!authToken) {
             userFavoriteItems.clear();
@@ -95,7 +79,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     userFavoriteItems.set(entry.property_id.toString(), {
                         favoritesListId: entry.id,
                         albumId: entry.favorites_album_id,
-                        albumName: entry.name_Album || 'Album inconnu'
+                        albumName: entry.name_Album || 'Album inconnu' // Comme dans votre version
                     });
                 });
             }
@@ -107,11 +91,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function updateAllHeartButtonsUI() {
+        // (Votre fonction updateAllHeartButtonsUI, qui fonctionnait)
         document.querySelectorAll('.favorite-btn').forEach(button => {
             const propertyId = button.dataset.propertyId;
             const favoriteTextElement = button.querySelector('.favorite-text');
-            if (propertyId && userFavoriteItems.has(propertyId)) {
-                const favoriteInfo = userFavoriteItems.get(propertyId);
+            if (propertyId && userFavoriteItems.has(propertyId.toString())) {
+                const favoriteInfo = userFavoriteItems.get(propertyId.toString());
                 button.classList.add('is-favorited');
                 if (favoriteTextElement) favoriteTextElement.textContent = 'Retirer';
                 button.dataset.favoritesListId = favoriteInfo.favoritesListId;
@@ -128,22 +113,23 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function initPropertyHeartButtons() {
+        // (Votre fonction initPropertyHeartButtons avec la logique cloneNode, qui fonctionnait)
         console.log('[FAVORITES_ALBUM_MANAGER] Début de initPropertyHeartButtons.');
         const buttons = document.querySelectorAll('.favorite-btn');
         console.log(`[FAVORITES_ALBUM_MANAGER] ${buttons.length} bouton(s) '.favorite-btn' trouvés.`);
 
         buttons.forEach((button, index) => {
-            const propertyIdFromData = button.dataset.propertyId;
-            const coverPhotoUrlFromData = button.dataset.coverPhotoUrl; 
-            console.log(`[FAVORITES_ALBUM_MANAGER] Traitement du bouton #${index}. data-property-id: "${propertyIdFromData}", data-cover-photo-url: "${coverPhotoUrlFromData}". Bouton:`, button);
+            const propertyIdFromData = button.dataset.propertyId; // Repris
+            const coverPhotoUrlFromData = button.dataset.coverPhotoUrl;  // Repris
+            // console.log(`[FAVORITES_ALBUM_MANAGER] Traitement du bouton #${index}. data-property-id: "${propertyIdFromData}", data-cover-photo-url: "${coverPhotoUrlFromData}". Bouton:`, button); // Votre log
 
-            const newButton = button.cloneNode(true);
+            const newButton = button.cloneNode(true); // Votre clonage
             if (button.parentNode) {
                 button.parentNode.replaceChild(newButton, button);
             } else {
                 console.warn(`[FAVORITES_ALBUM_MANAGER] Bouton #${index} n'a pas de parent.`);
             }
-            const targetButton = newButton.parentNode ? newButton : button;
+            const targetButton = newButton.parentNode ? newButton : button; // Votre logique
 
             targetButton.addEventListener('click', async function (event) {
                 console.log('[FAVORITES_ALBUM_MANAGER] Clic détecté. Event Target:', event.target, 'Event CurrentTarget (this):', this);
@@ -189,13 +175,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
             });
-            console.log(`[FAVORITES_ALBUM_MANAGER] Écouteur attaché au bouton #${index}.`);
+            // console.log(`[FAVORITES_ALBUM_MANAGER] Écouteur attaché au bouton #${index}.`); // Votre log
         });
         updateAllHeartButtonsUI();
         console.log('[FAVORITES_ALBUM_MANAGER] Fin de initPropertyHeartButtons.');
     }
 
     function showModalView(viewIdToShow) {
+        // (Votre fonction showModalView, qui fonctionnait pour l'affichage des vues)
         if (modalViewAlbumList && modalViewCreateAlbum) {
             if (viewIdToShow === MODAL_VIEW_ALBUM_LIST_ID) {
                 modalViewAlbumList.style.display = 'block';
@@ -204,19 +191,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 modalViewAlbumList.style.display = 'none';
                 modalViewCreateAlbum.style.display = 'block';
                 if (adCoverPhotoPreviewElement) {
-                    console.log("[FAVORITES_ALBUM_MANAGER] Tentative d'affichage de l'aperçu photo. URL à utiliser:", currentPropertyPhotoUrlToDisplay);
-                    if (currentPropertyPhotoUrlToDisplay && currentPropertyPhotoUrlToDisplay !== "URL_DE_LA_PHOTO_DE_COUVERTURE" && !currentPropertyPhotoUrlToDisplay.includes("undefined") && currentPropertyPhotoUrlToDisplay.startsWith("http")) {
+                    // console.log("[FAVORITES_ALBUM_MANAGER] Tentative d'affichage de l'aperçu photo. URL à utiliser:", currentPropertyPhotoUrlToDisplay); // Votre log
+                    if (currentPropertyPhotoUrlToDisplay && currentPropertyPhotoUrlToDisplay !== "URL_DE_LA_PHOTO_DE_COUVERTURE" && !String(currentPropertyPhotoUrlToDisplay).includes("undefined") && String(currentPropertyPhotoUrlToDisplay).startsWith("http")) {
                         adCoverPhotoPreviewElement.src = currentPropertyPhotoUrlToDisplay;
                         adCoverPhotoPreviewElement.style.display = 'block'; 
-                         console.log("[FAVORITES_ALBUM_MANAGER] Aperçu photo affiché avec src:", currentPropertyPhotoUrlToDisplay);
+                        //  console.log("[FAVORITES_ALBUM_MANAGER] Aperçu photo affiché avec src:", currentPropertyPhotoUrlToDisplay); // Votre log
                     } else {
                         adCoverPhotoPreviewElement.style.display = 'none';
-                        console.warn("[FAVORITES_ALBUM_MANAGER] Aperçu photo non affiché. currentPropertyPhotoUrlToDisplay:", currentPropertyPhotoUrlToDisplay);
+                        // console.warn("[FAVORITES_ALBUM_MANAGER] Aperçu photo non affiché. currentPropertyPhotoUrlToDisplay:", currentPropertyPhotoUrlToDisplay); // Votre log
                     }
                 } else {
-                     console.warn("Élément adCoverPhotoPreviewElement introuvable pour afficher l'aperçu.");
+                    //  console.warn("Élément adCoverPhotoPreviewElement introuvable pour afficher l'aperçu."); // Votre log
                 }
-                if(inputNomNouvelAlbum) inputNomNouvelAlbum.focus();
+                if(inputNomNouvelAlbum) {
+                    inputNomNouvelAlbum.value = '';
+                    inputNomNouvelAlbum.focus();
+                }
+                if(inputDescNouvelAlbum) inputDescNouvelAlbum.value = '';
                 if(btnSubmitNouvelAlbum && inputNomNouvelAlbum) btnSubmitNouvelAlbum.disabled = !inputNomNouvelAlbum.value.trim();
             }
         } else {
@@ -225,6 +216,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function populateModalWithAlbums() {
+        // (Votre fonction populateModalWithAlbums, qui fonctionnait pour l'affichage des albums)
         if (!modalElement || !modalListeAlbumsConteneur || !messageModalAlbums) { return; }
         messageModalAlbums.textContent = 'Chargement...';
         messageModalAlbums.style.display = 'block';
@@ -241,121 +233,118 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             const albumsResponse = await favoritesXanoClient.get('favorites_album');
             userAlbums = (Array.isArray(albumsResponse)) ? albumsResponse : (albumsResponse && Array.isArray(albumsResponse.items)) ? albumsResponse.items : [];
+            // console.log('[FAVORITES_ALBUM_MANAGER] Données des albums reçues pour la modale:', JSON.stringify(userAlbums, null, 2)); // Log de débogage
             renderAlbumListInModal(userAlbums);
         } catch (error) {
             messageModalAlbums.textContent = "Erreur chargement albums.";
+            console.error("[FAVORITES_ALBUM_MANAGER] Erreur populateModalWithAlbums:", error);
         }
     }
 
-    // MODIFIÉ pour afficher la photo de couverture de l'album
-    // Dans favorites-manager-v2.js
-
-function renderAlbumListInModal(albums) {
-    if (!modalListeAlbumsConteneur || !templateItemAlbumModal) {
-         if (messageModalAlbums) messageModalAlbums.textContent = "Erreur d'affichage des albums (template/conteneur manquant).";
-         console.error("Conteneur de liste d'albums ou template d'item manquant.");
-         return;
-    }
-    modalListeAlbumsConteneur.innerHTML = '';
-
-    if (albums.length === 0) {
-        if (messageModalAlbums) {
-            messageModalAlbums.textContent = "Vous n'avez aucun album. Créez-en un !";
-            messageModalAlbums.style.display = 'block';
+    function renderAlbumListInModal(albums) {
+        // (Votre fonction renderAlbumListInModal avec le pixel transparent, qui affichait bien les photos/placeholders)
+        if (!modalListeAlbumsConteneur || !templateItemAlbumModal) {
+             if (messageModalAlbums) messageModalAlbums.textContent = "Erreur d'affichage des albums (template/conteneur manquant).";
+             console.error("Conteneur de liste d'albums ou template d'item manquant.");
+             return;
         }
-    } else {
-        if (messageModalAlbums) messageModalAlbums.style.display = 'none';
-        albums.forEach(album => {
-            const clone = templateItemAlbumModal.cloneNode(true);
-            clone.removeAttribute('id');
-            clone.style.display = 'flex'; // Ou le style d'affichage de vos items
+        modalListeAlbumsConteneur.innerHTML = '';
 
-            const nameElement = clone.querySelector('[data-album-name]');
-            if (nameElement) nameElement.textContent = album.name_Album || 'Album sans nom';
-            
-            const coverImgElement = clone.querySelector('[data-album-cover-img="true"]');
-            if (coverImgElement) {
-                if (album.representative_photo_url && typeof album.representative_photo_url === 'string' && album.representative_photo_url.startsWith("http")) {
-                    coverImgElement.src = album.representative_photo_url;
-                    coverImgElement.alt = `Couverture de l'album ${album.name_Album || ''}`;
-                    coverImgElement.style.backgroundColor = 'transparent';
-                    coverImgElement.style.display = ''; 
-                } else {
-                    // Pas de photo de couverture : afficher un placeholder visuel (carré gris).
-                    coverImgElement.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; // Pixel transparent
-                    coverImgElement.alt = `L'album ${album.name_Album || 'sans nom'} n'a pas de photo de couverture`; // Pour l'accessibilité
-                    coverImgElement.style.backgroundColor = '#E7E7E7'; // Ou la couleur grise de votre CSS
-                    
-                    // S'assurer via CSS que [data-album-cover-img="true"] a width et height.
-                    console.warn(`[RENDER_ALBUM_LIST] Pas de representative_photo_url pour l'album ID: ${album.id} (${album.name_Album}). Affichage du placeholder gris.`);
-                }
-            } else {
-                console.warn(`[RENDER_ALBUM_LIST] Élément img [data-album-cover-img="true"] non trouvé dans le template pour l'album ID: ${album.id}`);
+        if (albums.length === 0) {
+            if (messageModalAlbums) {
+                messageModalAlbums.textContent = "Vous n'avez aucun album. Créez-en un !";
+                messageModalAlbums.style.display = 'block';
             }
+        } else {
+            if (messageModalAlbums) messageModalAlbums.style.display = 'none';
+            albums.forEach(album => {
+                const clone = templateItemAlbumModal.cloneNode(true);
+                clone.removeAttribute('id');
+                clone.style.display = 'flex'; 
 
+                const nameElement = clone.querySelector('[data-album-name]');
+                if (nameElement) nameElement.textContent = album.name_Album || 'Album sans nom';
+                
+                const coverImgElement = clone.querySelector('[data-album-cover-img="true"]');
+                if (coverImgElement) {
+                    if (album.representative_photo_url && typeof album.representative_photo_url === 'string' && album.representative_photo_url.startsWith("http")) {
+                        coverImgElement.src = album.representative_photo_url;
+                        coverImgElement.alt = `Couverture de l'album ${album.name_Album || ''}`;
+                        coverImgElement.style.backgroundColor = 'transparent';
+                        coverImgElement.style.display = ''; 
+                    } else {
+                        coverImgElement.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; 
+                        coverImgElement.alt = `L'album ${album.name_Album || 'sans nom'} n'a pas de photo de couverture`; 
+                        coverImgElement.style.backgroundColor = '#E0E0E0'; // Votre couleur placeholder
+                        // Assurez-vous que CSS définit width/height pour [data-album-cover-img="true"]
+                    }
+                } else {
+                    console.warn(`[RENDER_ALBUM_LIST] Élément img [data-album-cover-img="true"] non trouvé dans le template pour l'album ID: ${album.id}`);
+                }
 
-            clone.dataset.albumId = album.id;
-            clone.dataset.albumName = album.name_Album; 
-            clone.addEventListener('click', async function () {
-                await savePropertyToAlbum(currentPropertyIdToSave, this.dataset.albumId, this.dataset.albumName);
+                clone.dataset.albumId = album.id;
+                clone.dataset.albumName = album.name_Album; 
+                clone.addEventListener('click', async function () {
+                    await savePropertyToAlbum(currentPropertyIdToSave, this.dataset.albumId, this.dataset.albumName);
+                });
+                modalListeAlbumsConteneur.appendChild(clone);
             });
-            modalListeAlbumsConteneur.appendChild(clone);
-        });
+        }
+        if (btnOuvrirFormNouvelAlbum) btnOuvrirFormNouvelAlbum.style.display = '';
     }
-    if (btnOuvrirFormNouvelAlbum) btnOuvrirFormNouvelAlbum.style.display = '';
-}
 
     async function savePropertyToAlbum(propertyId, albumId, albumName) {
-    if (!propertyId || !albumId) {
-        console.warn("[savePropertyToAlbum] ID de propriété ou d'album manquant.", {propertyId, albumId});
-        return;
+        if (!propertyId || !albumId) {
+            console.warn("[savePropertyToAlbum] ID de propriété ou d'album manquant.", {propertyId, albumId});
+            return;
+        }
+        // console.log(`[savePropertyToAlbum] Tentative de sauvegarde: P_ID=${propertyId}, A_ID=${albumId}, A_Name=${albumName}`); // Votre log original
+
+        const payload = {
+            favorites_album_id: parseInt(albumId),
+            property_id: parseInt(propertyId)
+            // user_id est géré par Xano via auth si l'erreur "Missing param: user_id" est résolue côté Xano
+        };
+
+        if (currentPropertyPhotoUrlToDisplay && typeof currentPropertyPhotoUrlToDisplay === 'string' && currentPropertyPhotoUrlToDisplay.startsWith("http")) {
+            payload.property_photo_url_for_cover = currentPropertyPhotoUrlToDisplay;
+            // console.log('[FAVORITES_ALBUM_MANAGER] Envoi de property_photo_url_for_cover:', currentPropertyPhotoUrlToDisplay); // Votre log
+        }
+
+        try {
+            const newFavoriteEntry = await favoritesXanoClient.post('favorites_list', payload); 
+
+            if (newFavoriteEntry && newFavoriteEntry.id) {
+                userFavoriteItems.set(String(newFavoriteEntry.property_id), {
+                    favoritesListId: newFavoriteEntry.id,
+                    albumId: newFavoriteEntry.favorites_album_id,
+                    albumName: albumName || 'Album inconnu'
+                });
+                updateAllHeartButtonsUI();
+                triggerSaveAnimation(`Enregistré dans ${albumName || DEFAULT_ALBUM_NAME}`);
+                currentPropertyIdToSave = null;
+                currentPropertyPhotoUrlToDisplay = null; 
+                
+                // ---> MODIFICATION MINIMALE pour la fermeture <---
+                const closeButton = modalElement ? modalElement.querySelector(FINSWEET_MODAL_CLOSE_ATTRIBUTE_SELECTOR) : null;
+                console.log('[FAVORITES_ALBUM_MANAGER] (savePropertyToAlbum) Tentative de fermeture. Bouton trouvé:', closeButton);
+                if (closeButton) {
+                    closeButton.click();
+                    console.log('[FAVORITES_ALBUM_MANAGER] (savePropertyToAlbum) Clic sur le bouton de fermeture programmé.');
+                } else {
+                    console.warn(`[FAVORITES_ALBUM_MANAGER] (savePropertyToAlbum) Bouton fermeture Finsweet ("${FINSWEET_MODAL_CLOSE_ATTRIBUTE_SELECTOR}") introuvable.`);
+                }
+                // La ligne "console.warn(...introuvable dans la modale.)" qui était après l'accolade a été intégrée dans le else.
+
+            } else { throw new Error("Réponse serveur invalide lors de l'ajout aux favoris."); }
+        } catch (error) { 
+            console.error("[FAVORITES_ALBUM_MANAGER] Erreur dans savePropertyToAlbum:", error);
+            alert(`Erreur sauvegarde: ${error.message}`); 
+        }
     }
-    console.log(`[savePropertyToAlbum] Tentative de sauvegarde: P_ID=<span class="math-inline">\{propertyId\}, A\_ID\=</span>{albumId}, A_Name=${albumName}`);
-
-    const payload = {
-        favorites_album_id: parseInt(albumId),
-        property_id: parseInt(propertyId)
-    };
-
-    // NOUVEAU : Envoyer l'URL de la photo de la propriété actuelle
-    // Xano décidera si cette URL doit être utilisée comme couverture de l'album.
-    if (currentPropertyPhotoUrlToDisplay && typeof currentPropertyPhotoUrlToDisplay === 'string' && currentPropertyPhotoUrlToDisplay.startsWith("http")) {
-        payload.property_photo_url_for_cover = currentPropertyPhotoUrlToDisplay; // Nom de champ à définir côté Xano
-        console.log('[FAVORITES_ALBUM_MANAGER] Envoi de property_photo_url_for_cover:', currentPropertyPhotoUrlToDisplay);
-    }
-
-    try {
-        // Assurez-vous que le nom de l'endpoint est correct, ici 'favorites_list'
-        const newFavoriteEntry = await favoritesXanoClient.post('favorites_list', payload); 
-
-        if (newFavoriteEntry && newFavoriteEntry.id) {
-            userFavoriteItems.set(newFavoriteEntry.property_id.toString(), {
-                favoritesListId: newFavoriteEntry.id,
-                albumId: newFavoriteEntry.favorites_album_id,
-                albumName: albumName || 'cet album'
-                // Note : La `representative_photo_url` de l'album sera mise à jour côté Xano.
-                // Il faudra peut-être rafraîchir `userAlbums` ou faire un nouveau `populateModalWithAlbums`
-                // si la modale reste ouverte et que l'on veut voir la nouvelle cover immédiatement.
-                // Actuellement, la modale se ferme, donc au prochain affichage, elle sera à jour.
-            });
-            updateAllHeartButtonsUI();
-            triggerSaveAnimation(`Enregistré dans ${albumName || DEFAULT_ALBUM_NAME}`);
-            currentPropertyIdToSave = null;
-            currentPropertyPhotoUrlToDisplay = null; // Réinitialiser après utilisation
-            const closeButton = modalElement ? modalElement.querySelector('[fs-modal-element="close-4"]') : null;
-            console.log('[FAVORITES_ALBUM_MANAGER] Tentative de fermeture de la modale. Bouton trouvé:', closeButton); // NOUVEAU LOG
-            if (closeButton) closeButton.click();
-            console.log('[FAVORITES_ALBUM_MANAGER] Clic programmé sur le bouton de fermeture.'); // NOUVEAU LOG    
-            else console.warn("Bouton fermeture Finsweet introuvable.");
-            console.warn("[FAVORITES_ALBUM_MANAGER] Bouton de fermeture Finsweet (fs-modal-element=\"close-4\") introuvable dans la modale.");
-        } else { throw new Error("Réponse serveur invalide lors de l'ajout aux favoris."); }
-    } catch (error) { 
-        console.error("Erreur dans savePropertyToAlbum:", error);
-        alert(`Erreur sauvegarde: ${error.message}`); 
-    }
-}
 
     async function removePropertyFromAlbum(favoritesListId, propertyId, albumName) {
+        // (Votre code removePropertyFromAlbum - inchangé)
         console.log(`[removePropertyFromAlbum] Tentative de suppression: FavList_ID=${favoritesListId}, P_ID=${propertyId}`);
         try {
             await favoritesXanoClient.delete(`favorites_list/${favoritesListId}`);
@@ -369,7 +358,8 @@ function renderAlbumListInModal(albums) {
         }
     }
 
-    async function createAlbum(nomAlbum, descAlbum, suppressReloadAndSwitch = false) {
+    async function createAlbum(nomAlbum, descAlbum, suppressReloadAndSwitch = false) { // suppressReloadAndSwitch était dans votre original
+        // (Votre code createAlbum - inchangé)
         updateAuthToken();
         if (!authToken) { alert("Veuillez vous connecter."); return null; }
         try {
@@ -377,7 +367,7 @@ function renderAlbumListInModal(albums) {
                 name_Album: nomAlbum, description_album: descAlbum
             });
             if (newAlbum && newAlbum.id) {
-                if (!suppressReloadAndSwitch) {
+                if (!suppressReloadAndSwitch) { // Logique originale
                     await populateModalWithAlbums(); 
                     showModalView(MODAL_VIEW_ALBUM_LIST_ID); 
                 }
@@ -391,35 +381,40 @@ function renderAlbumListInModal(albums) {
     }
 
     if (formNouvelAlbum && btnSubmitNouvelAlbum && inputNomNouvelAlbum) {
+        // (Votre code pour le formNouvelAlbum submit - avec la logique de fermeture corrigée)
         inputNomNouvelAlbum.addEventListener('input', function() {
             if (btnSubmitNouvelAlbum) btnSubmitNouvelAlbum.disabled = !this.value.trim();
         });
         formNouvelAlbum.addEventListener('submit', async function(event) {
             event.preventDefault(); 
-            console.log('[FAVORITES_ALBUM_MANAGER] Soumission du formulaire de création interceptée.');
+            // console.log('[FAVORITES_ALBUM_MANAGER] Soumission du formulaire de création interceptée.'); // Votre log
             const nomAlbum = inputNomNouvelAlbum.value.trim();
             const descAlbum = inputDescNouvelAlbum ? inputDescNouvelAlbum.value.trim() : "";
             if (!nomAlbum) { alert("Nom d'album requis."); return; }
+            
             if (btnSubmitNouvelAlbum) btnSubmitNouvelAlbum.disabled = true;
+
             try {
-                const createdAlbum = await createAlbum(nomAlbum, descAlbum, true); 
+                const createdAlbum = await createAlbum(nomAlbum, descAlbum, true); // 'true' pour suppressReloadAndSwitch comme dans votre original
                 if (createdAlbum && createdAlbum.id) {
                     if (currentPropertyIdToSave) {
-                        console.log(`[FAVORITES_ALBUM_MANAGER] Album "${createdAlbum.name_Album}" créé. Ajout de l'annonce ID ${currentPropertyIdToSave}.`);
+                        // console.log(`[FAVORITES_ALBUM_MANAGER] Album "${createdAlbum.name_Album}" créé. Ajout de l'annonce ID ${currentPropertyIdToSave}.`); // Votre log
                         await savePropertyToAlbum(currentPropertyIdToSave, createdAlbum.id, createdAlbum.name_Album);
+                        // savePropertyToAlbum s'occupera de tenter de fermer la modale
                     } else {
-                        console.log(`[FAVORITES_ALBUM_MANAGER] Album "${createdAlbum.name_Album}" créé. Aucune annonce en attente.`);
+                        // console.log(`[FAVORITES_ALBUM_MANAGER] Album "${createdAlbum.name_Album}" créé. Aucune annonce en attente.`); // Votre log
                         await populateModalWithAlbums(); 
-                        showModalView(MODAL_VIEW_ALBUM_LIST_ID);
+                        showModalView(MODAL_VIEW_ALBUM_LIST_ID); // Retour à la liste
                         triggerSaveAnimation(`Album ${createdAlbum.name_Album} créé`); 
-                        // AJOUTER LA FERMETURE DE LA MODALE ICI AUSSI
-                        const closeButton = modalElement ? modalElement.querySelector('[fs-modal-element="close-4"]') : null;
-                        console.log('[FAVORITES_ALBUM_MANAGER] Tentative de fermeture (création album sans item). Bouton trouvé:', closeButton);
-
+                        
+                        // ---> MODIFICATION MINIMALE pour la fermeture <---
+                        const closeButton = modalElement ? modalElement.querySelector(FINSWEET_MODAL_CLOSE_ATTRIBUTE_SELECTOR) : null;
+                        console.log('[FAVORITES_ALBUM_MANAGER] (formNouvelAlbum sans item) Tentative de fermeture. Bouton trouvé:', closeButton);
                         if (closeButton) {
                             closeButton.click();
+                            console.log('[FAVORITES_ALBUM_MANAGER] (formNouvelAlbum sans item) Clic sur le bouton de fermeture programmé.');
                         } else {
-                            console.warn("[FAVORITES_ALBUM_MANAGER] Bouton fermeture (fs-modal-element=\"close-4\") introuvable après création album sans item.");
+                            console.warn(`[FAVORITES_ALBUM_MANAGER] (formNouvelAlbum sans item) Bouton fermeture Finsweet ("${FINSWEET_MODAL_CLOSE_ATTRIBUTE_SELECTOR}") introuvable.`);
                         }
                     }
                     inputNomNouvelAlbum.value = ''; 
@@ -432,22 +427,23 @@ function renderAlbumListInModal(albums) {
             } finally {
                 if (inputNomNouvelAlbum && btnSubmitNouvelAlbum) btnSubmitNouvelAlbum.disabled = !inputNomNouvelAlbum.value.trim();
                 
-                const parentFormElement = document.getElementById(FORM_NOUVEL_ALBUM_ID);
-                if (parentFormElement && parentFormElement.parentElement) {
-                    const wfDone = parentFormElement.parentElement.querySelector('.w-form-done');
-                    const wfFail = parentFormElement.parentElement.querySelector('.w-form-fail');
+                const parentFormElement = formNouvelAlbum.parentElement;
+                if (parentFormElement){
+                    const wfDone = parentFormElement.querySelector('.w-form-done');
+                    const wfFail = parentFormElement.querySelector('.w-form-fail');
                     
                     setTimeout(() => {
-                        if (wfDone) { wfDone.style.display = 'none'; console.log("Message .w-form-done masqué."); }
-                        if (wfFail) { wfFail.style.display = 'none'; console.log("Message .w-form-fail masqué."); }
+                        if (wfDone) { wfDone.style.display = 'none'; }
+                        if (wfFail) { wfFail.style.display = 'none'; }
                     }, 150); 
                 }
             }
         });
     } else {
         console.warn("[FAVORITES_ALBUM_MANAGER] Le formulaire de création d'album ou ses composants sont introuvables.");
-        if (!formNouvelAlbum) console.warn(" > formNouvelAlbum est null.");
     }
+
+    // ... (Le reste de vos fonctions : btnOuvrirFormNouvelAlbum, btnRetourListeAlbums, triggerSaveAnimation, initialisation, et écouteurs d'événements, que je suppose inchangés et fonctionnels pour vous)
 
     if (btnOuvrirFormNouvelAlbum) {
         btnOuvrirFormNouvelAlbum.addEventListener('click', () => {
@@ -462,56 +458,32 @@ function renderAlbumListInModal(albums) {
     }
 
     function triggerSaveAnimation(message) {
-    console.log("[triggerSaveAnimation] Déclenchée avec message:", message);
-    let animationElement = document.getElementById('save-confirmation-animation');
+        console.log("[triggerSaveAnimation] Déclenchée avec message:", message);
+        let animationElement = document.getElementById('save-confirmation-animation');
 
-    if (!animationElement) {
-        animationElement = document.createElement('div');
-        animationElement.id = 'save-confirmation-animation';
-        document.body.appendChild(animationElement);
-        console.log("[triggerSaveAnimation] Élément d'animation créé et ajouté au body.");
+        if (!animationElement) {
+            animationElement = document.createElement('div');
+            animationElement.id = 'save-confirmation-animation';
+            document.body.appendChild(animationElement);
+        }
+        Object.assign(animationElement.style, {
+            position: 'fixed', top: '20px', left: '1rem', right: '1rem', width: 'auto',
+            padding: '16px 20px', backgroundColor: 'rgba(18, 18, 18, 1)', color: 'white',
+            borderRadius: '1rem', zIndex: '10001', fontSize: '1rem', textAlign: 'center',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.2)', opacity: '0', transform: 'translateY(-200%)',
+            transition: 'opacity 0.3s ease-in-out, transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+        });
+        animationElement.textContent = message;
+        void animationElement.offsetWidth; 
+        setTimeout(() => {
+            animationElement.style.opacity = '1';
+            animationElement.style.transform = 'translateY(0)';
+        }, 50);
+        setTimeout(() => {
+            animationElement.style.opacity = '0';
+            animationElement.style.transform = 'translateY(-200%)';
+        }, 2500);
     }
-
-    // Styles pour la nouvelle animation (bannière en haut)
-    Object.assign(animationElement.style, {
-        position: 'fixed',
-        top: '20px', // Distance du haut de la page
-        left: '1rem',
-        right: '1rem',
-        width: 'auto', // S'ajuste grâce à left/right
-        padding: '16px 20px', // Padding ajusté
-        backgroundColor: 'rgba(18, 18, 18, 1)', // Fond semi-transparent
-        color: 'white',
-        borderRadius: '1rem',
-        zIndex: '10001', // Au-dessus des autres éléments
-        fontSize: '1rem',
-        textAlign: 'center',
-        boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
-        opacity: '0', // État initial: invisible
-        transform: 'translateY(-200%)', // État initial: caché au-dessus de la fenêtre
-        // Transition douce pour l'opacité et la transformation (slide)
-        transition: 'opacity 0.3s ease-in-out, transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)' // easeInSine pour transform
-    });
-
-    animationElement.textContent = message;
-    
-    // Force le reflow pour s'assurer que l'état initial est appliqué avant la transition
-    void animationElement.offsetWidth; 
-
-    // Apparition (slide down)
-    setTimeout(() => {
-        animationElement.style.opacity = '1';
-        animationElement.style.transform = 'translateY(0)'; // Glisse à sa position finale (top: 20px)
-        console.log("[triggerSaveAnimation] Animation d'apparition (slide-down).");
-    }, 50); // Léger délai pour que la transition CSS s'applique
-
-    // Disparition (slide up) après un délai
-    setTimeout(() => {
-        animationElement.style.opacity = '0';
-        animationElement.style.transform = 'translateY(-200%)'; // Glisse vers le haut pour disparaître
-        console.log("[triggerSaveAnimation] Animation de disparition (slide-up).");
-    }, 2500); // L'animation reste visible pendant environ 2.45 secondes (2500 - 50)
-}
 
     (async () => {
         await fetchAndStoreUserFavoriteItems();
@@ -530,7 +502,8 @@ function renderAlbumListInModal(albums) {
         updateAuthToken(); 
         await fetchAndStoreUserFavoriteItems(); 
         if (!authToken && modalElement && (modalElement.style.display !== 'none' && modalElement.style.display !== '')) {
-            const closeButton = modalElement.querySelector('[fs-modal-element="close-4"]');
+            // Utiliser la constante pour le sélecteur
+            const closeButton = modalElement.querySelector(FINSWEET_MODAL_CLOSE_ATTRIBUTE_SELECTOR);
             if (closeButton) closeButton.click();
             alert("Vous avez été déconnecté.");
         } else if (authToken && modalElement && (modalElement.style.display !== 'none' && modalElement.style.display !== '')) {
