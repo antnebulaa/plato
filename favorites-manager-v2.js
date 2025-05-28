@@ -247,12 +247,18 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // MODIFIÉ pour afficher la photo de couverture de l'album
     function renderAlbumListInModal(albums) {
-        if (!modalListeAlbumsConteneur || !templateItemAlbumModal) { return; }
+        if (!modalListeAlbumsConteneur || !templateItemAlbumModal) {
+             if (messageModalAlbums) messageModalAlbums.textContent = "Erreur d'affichage des albums (template/conteneur manquant).";
+             console.error("Conteneur de liste d'albums ou template d'item manquant.");
+             return;
+        }
         modalListeAlbumsConteneur.innerHTML = '';
+
         if (albums.length === 0) {
             if (messageModalAlbums) {
-                messageModalAlbums.textContent = "Aucun album. Créez-en un !";
+                messageModalAlbums.textContent = "Vous n'avez aucun album. Créez-en un !";
                 messageModalAlbums.style.display = 'block';
             }
         } else {
@@ -260,9 +266,28 @@ document.addEventListener('DOMContentLoaded', function () {
             albums.forEach(album => {
                 const clone = templateItemAlbumModal.cloneNode(true);
                 clone.removeAttribute('id');
-                clone.style.display = 'flex'; 
+                clone.style.display = 'flex'; // Ou le style d'affichage de vos items
+
                 const nameElement = clone.querySelector('[data-album-name]');
                 if (nameElement) nameElement.textContent = album.name_Album || 'Album sans nom';
+                
+                // NOUVEAU : Gestion de l'image de couverture de l'album
+                const coverImgElement = clone.querySelector('[data-album-cover-img="true"]');
+                if (coverImgElement) {
+                    if (album.representative_photo_url) { // Xano doit fournir ce champ
+                        coverImgElement.src = album.representative_photo_url;
+                        coverImgElement.alt = `Couverture de l'album ${album.name_Album || ''}`;
+                        coverImgElement.style.backgroundColor = 'transparent'; // Enlever le fond si l'image charge
+                    } else {
+                        // Garder le style de fond du placeholder (ex: gris) ou cacher l'img
+                        // coverImgElement.style.display = 'none'; // Option si vous ne voulez pas de placeholder
+                        coverImgElement.alt = `Pas de couverture disponible`;
+                        console.warn(`[RENDER_ALBUM_LIST] Pas de representative_photo_url pour l'album ID: ${album.id} (${album.name_Album})`);
+                    }
+                } else {
+                    console.warn(`[RENDER_ALBUM_LIST] Élément img [data-album-cover-img="true"] non trouvé dans le template pour l'album ID: ${album.id}`);
+                }
+
                 clone.dataset.albumId = album.id;
                 clone.dataset.albumName = album.name_Album; 
                 clone.addEventListener('click', async function () {
