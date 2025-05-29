@@ -248,28 +248,32 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 function setupMobileBackButton() {
-    const backButton = document.getElementById('mobile-back-button'); // Assurez-vous que l'ID est correct
+    // Sélectionne tous les boutons avec la nouvelle classe
+    const backButtons = document.querySelectorAll('.mobile-back-button');
 
-    if (backButton) {
-        backButton.addEventListener('click', function() {
-            console.log("Clic bouton Retour Mobile");
+    if (backButtons.length > 0) {
+        backButtons.forEach(button => {
+            button.addEventListener('click', function(event) {
+                event.preventDefault(); // Bonne pratique pour les liens <a> utilisés comme boutons
+                console.log("Clic bouton Retour Mobile (via classe)");
 
-            // Cache toutes les sections de contenu --- ESSENTIEL
-            document.querySelectorAll('.section-container').forEach(container => {
-                container.style.display = 'none';
+                // Cache toutes les sections de contenu --- ESSENTIEL
+                document.querySelectorAll('.section-container').forEach(container => {
+                    container.style.display = 'none';
+                });
+
+                // Optionnel : Si Webflow ne gère pas bien l'affichage du menu principal
+                // const menuContainer = document.getElementById('side-menu-container');
+                // if (menuContainer) {
+                //     menuContainer.style.display = 'block'; // Ou 'flex', etc.
+                // }
+                // La logique actuelle de votre script compte sur Webflow pour réafficher le menu
+                // une fois toutes les sections masquées.
             });
-
-            // Note: On ne touche plus à l'affichage du menu ou du bouton retour ici.
-            // On fait confiance à Webflow pour afficher le menu et masquer le bouton
-            // via les réglages responsives une fois qu'aucune section n'est affichée.
-
-            // Optionnel : Si jamais masquer les sections ne suffisait pas pour faire
-            // réapparaître le menu sur mobile, on pourrait décommenter la ligne suivante :
-             document.getElementById('side-menu-container').style.display = 'block'; // Ou 'flex'...
         });
-        console.log("Écouteur pour bouton retour mobile ajouté (version simplifiée).");
+        console.log(`Écouteur pour ${backButtons.length} bouton(s) retour mobile (classe .mobile-back-button) ajouté.`);
     } else {
-         console.warn("Bouton retour mobile #mobile-back-button non trouvé.");
+        console.warn("Aucun bouton retour mobile avec la classe .mobile-back-button trouvé.");
     }
 }
 
