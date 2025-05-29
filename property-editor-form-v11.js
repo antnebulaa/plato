@@ -269,6 +269,11 @@ function setupMobileBackButton() {
                 // }
                 // La logique actuelle de votre script compte sur Webflow pour réafficher le menu
                 // une fois toutes les sections masquées.
+             
+              // Optionnel : Si jamais masquer les sections ne suffisait pas pour faire
+            // réapparaître le menu sur mobile, on pourrait décommenter la ligne suivante :
+             document.getElementById('side-menu-container').style.display = 'block'; // Ou 'flex'...
+             
             });
         });
         console.log(`Écouteur pour ${backButtons.length} bouton(s) retour mobile (classe .mobile-back-button) ajouté.`);
