@@ -483,7 +483,7 @@ document.addEventListener('DOMContentLoaded', function () {
             fontSize: '1rem',
             textAlign: 'center',
             boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
-            opacity: '0', 
+            opacity: '1', 
             transform: 'translateY(-200%)', 
             transition: 'opacity 0.3s ease-in-out, transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)' 
         });
@@ -499,7 +499,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 50); 
 
         setTimeout(() => { //
-            animationElement.style.opacity = '0'; //
+            animationElement.style.opacity = '1'; //
             animationElement.style.transform = 'translateY(-200%)'; //
             console.log("[triggerSaveAnimation] Animation de disparition (slide-up)."); //
         }, 2500); 
