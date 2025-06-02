@@ -281,18 +281,43 @@
 
                     const propertiesToRender = [];
                     for (const item of items) {
-                        // SIMULATION: Fetching property details. Replace with actual API call if needed.
-                        // const propertyDetails = await favoritesXanoClient.get(`properties/${item.property_id}`); // Example
-                        const propertyDetails = { // Placeholder details
-                            id: item.property_id,
-                            name: `Annonce ID ${item.property_id}`,
-                            description: `Description pour l'annonce ${item.property_id}. Plus de détails seraient affichés ici.`,
-                            // The actual image URL should come from your properties table/endpoint
-                            image_url: `https://placehold.co/600x400/CBD5E0/718096?text=Annonce+${item.property_id}`,
-                            // We need favorites_list_id to remove it
-                            favorites_list_id: item.id 
-                        };
-                        propertiesToRender.push(propertyDetails);
+                        // propertiesToRender.push(propertyDetails); // Ligne à supprimer ou commenter
+
+// Directement utiliser les données de l'item retourné par Xano
+const propertyData = item._property; // Contient rent_type, loyer_cc, Statut, et probablement d'autres détails
+const photosData = item._property_photos; // Un tableau de photos
+
+// Déterminer le nom/titre de l'annonce
+// Vous devrez remplacer 'nom_du_champ_titre_dans_property' par le vrai nom du champ
+// qui contient le titre ou le nom de votre annonce dans l'objet _property.
+// Exemples: propertyData.titre, propertyData.name, propertyData.nom_annonce etc.
+const propertyName = propertyData.nom_du_champ_titre_dans_property || `Annonce ID ${item.property_id}`;
+
+// Déterminer la description (si vous en avez une à afficher)
+// Remplacez 'nom_du_champ_description_dans_property'
+const propertyDescription = propertyData.nom_du_champ_description_dans_property || `Loyer CC : ${propertyData.loyer_cc} € - Statut : ${propertyData.Statut}`;
+
+
+// Déterminer l'URL de l'image de couverture
+let coverImageUrl = `https://placehold.co/600x400/CBD5E0/718096?text=${encodeURIComponent(propertyName)}`; // Placeholder par défaut
+if (photosData && photosData.length > 0) {
+    const coverPhoto = photosData.find(p => p.is_cover === true);
+    if (coverPhoto && coverPhoto.images && coverPhoto.images.length > 0 && coverPhoto.images[0].url) {
+        coverImageUrl = coverPhoto.images[0].url;
+    } else if (photosData[0].images && photosData[0].images.length > 0 && photosData[0].images[0].url) {
+        // Sinon, prendre la première photo de la liste si pas de "is_cover"
+        coverImageUrl = photosData[0].images[0].url;
+    }
+}
+
+const actualPropertyDetails = {
+    id: item.property_id, // L'ID de la propriété elle-même
+    name: propertyName,
+    description: propertyDescription,
+    image_url: coverImageUrl,
+    favorites_list_id: item.id // L'ID de l'entrée dans la table favorites_list (pour la suppression)
+};
+propertiesToRender.push(actualPropertyDetails);
                     }
                     renderPropertiesInAlbum(propertiesToRender, albumId);
 
