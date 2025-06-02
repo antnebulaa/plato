@@ -210,6 +210,9 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
             clone = templateNode.cloneNode(true);
             clone.style.display = ''; // Rendre visible
             clone.removeAttribute('id'); // Éviter les IDs dupliqués
+            if (propertyId) {
+    clone.dataset.propertyId = propertyId;
+                            }
         } else {
             console.error("Le template est une balise <template>, la logique de clonage doit être ajustée si ce n'est pas un div.");
             return; 
@@ -303,7 +306,13 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
         initializePageSwipers(container);
     }
     
-    document.dispatchEvent(new CustomEvent('annoncesChargeesEtRendues', { detail: { container: container } }));
+    // home-form-display-v4.js -> dans renderAnnouncements
+document.dispatchEvent(new CustomEvent('annoncesChargeesEtRendues', { 
+    detail: { 
+        container: container,
+        annonces: items // <-- AJOUT IMPORTANT : on passe le tableau d'items
+    } 
+}));
     console.log("[NOM_DE_VOTRE_FONCTION_RENDER] Terminé.");
 }
         
