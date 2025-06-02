@@ -31,42 +31,53 @@ document.addEventListener('DOMContentLoaded', function() {
     /**
      * Point d'entrée principal : écoute l'événement de l'autre script.
      */
-    document.addEventListener('annoncesChargeesEtRendues', (event) => {
-        console.log('[MAP_SCRIPT] Événement "annoncesChargeesEtRendues" reçu.');
-        const annonces = event.detail.annonces;
-        if (!annonces || !Array.isArray(annonces)) {
-            console.error('[MAP_SCRIPT] Aucune donnée "annonces" valide reçue dans l\'événement.');
-            return;
-        }
-        allAnnouncements = annonces;
+    // map-listings.js
 
-        if (!map) {
-            initializeMap();
-        }
+document.addEventListener('annoncesChargeesEtRendues', (event) => {
+    console.log('[MAP_SCRIPT] Événement "annoncesChargeesEtRendues" reçu.');
+    const annonces = event.detail.annonces;
+    if (!annonces || !Array.isArray(annonces)) {
+        console.error('[MAP_SCRIPT] Aucune donnée "annonces" valide reçue dans l\'événement.');
+        return;
+    }
+    allAnnouncements = annonces;
+
+    // Si la carte n'existe pas, on l'initialise. 
+    // Si elle existe déjà (ex: après un filtre), on met juste à jour les marqueurs.
+    if (!map) {
+        initializeMap();
+    } else {
         addMarkersToMap();
-        updateVisibleAnnouncementsAndList();
-    });
+    }
+});
 
     /**
      * Initialise la carte MapLibre (une seule fois).
      */
-    function initializeMap() {
-        console.log('[MAP_SCRIPT] Initialisation de la carte MapLibre.');
-        map = new maplibregl.Map({
-            container: MAP_CONTAINER_ID,
-            style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`,
-            center: [2.3522, 48.8566], // Centre sur Paris
-            zoom: 11
-        });
+    // map-listings.js
 
-        map.on('load', () => {
-            console.log('[MAP_SCRIPT] Carte chargée.');
-            // Mettre à jour la liste quand l'utilisateur a fini de bouger la carte
-            map.on('moveend', updateVisibleAnnouncementsAndList);
-        });
+function initializeMap() {
+    console.log('[MAP_SCRIPT] Initialisation de la carte MapLibre.');
+    map = new maplibregl.Map({
+        container: MAP_CONTAINER_ID,
+        style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`,
+        center: [2.3522, 48.8566], // Centre sur Paris
+        zoom: 11
+    });
 
-        map.addControl(new maplibregl.NavigationControl(), 'top-right');
-    }
+    map.on('load', () => {
+        console.log('[MAP_SCRIPT] Carte chargée. Ajout des données initiales.');
+        
+        // C'EST ICI QU'ON FAIT LE PREMIER APPEL, EN TOUTE SÉCURITÉ
+        addMarkersToMap();
+        updateVisibleAnnouncementsAndList();
+
+        // Mettre à jour la liste pour tous les mouvements FUTURS de la carte
+        map.on('moveend', updateVisibleAnnouncementsAndList);
+    });
+
+    map.addControl(new maplibregl.NavigationControl(), 'top-right');
+}
 
     /**
      * Ajoute les "pins" de prix sur la carte.
