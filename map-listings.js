@@ -1,3 +1,4 @@
+
 // map-listings.js - VERSION AVEC POPUP AMÉLIORÉ ET PIN SÉLECTIONNÉ
 
 document.addEventListener('DOMContentLoaded', function() {
