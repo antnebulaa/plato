@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Configuration ---
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL'; // !! REMPLACEZ PAR VOTRE VRAIE CLÉ (MapTiler, Stadia, etc.)
     const MAP_CONTAINER_ID = 'map-section';
-    const LIST_CONTAINER_ID = 'annonce-list-section';
+    const LIST_CONTAINER_ID = 'annonces-wrapper';
     const MOBILE_TOGGLE_BUTTON_ID = 'mobile-map-toggle';
     const MODAL_ID = 'annonce-modal';
 
