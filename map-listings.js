@@ -178,7 +178,7 @@ function updateVisibleList() {
     const allListItems = listContainer.querySelectorAll('[data-property-id]');
     // ... (le reste de la fonction reste pareil, car item.dataset.propertyId est déjà une chaîne)
     // La comparaison sera visiblePropertyIds.has(itemIdString)
-}
+
     if (allListItems.length === 0) {
         console.warn('[UPDATE_LIST] Aucun item trouvé dans la liste HTML avec [data-property-id].');
     }
