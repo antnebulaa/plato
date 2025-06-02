@@ -90,8 +90,8 @@ function initializeMap() {
         console.log(`[MAP_SCRIPT] Ajout de ${allAnnouncements.length} markers.`);
 
         allAnnouncements.forEach(annonce => {
-            const lat = getNestedValue(annonce, '_property_location.data.y');
-            const lng = getNestedValue(annonce, '_property_location.data.x');
+            const lat = getNestedValue(annonce, 'geo_location.data.lat');
+            const lng = getNestedValue(annonce, 'geo_location.data.lng');
             const price = getNestedValue(annonce, '_property_lease_of_property.0.loyer');
 
             if (lat && lng) {
@@ -127,8 +127,8 @@ function initializeMap() {
         });
 
         allAnnouncements.forEach(annonce => {
-            const lat = getNestedValue(annonce, '_property_location.data.y');
-            const lng = getNestedValue(annonce, '_property_location.data.x');
+            const lat = getNestedValue(annonce, 'geo_location.data.lat');
+            const lng = getNestedValue(annonce, 'geo_location.data.lng');
             
             if (lat && lng && bounds.contains([lng, lat])) {
                 visibleCount++;
