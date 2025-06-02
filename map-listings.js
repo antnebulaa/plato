@@ -40,30 +40,37 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
   
+// map-listings.js
+// map-listings.js
 function convertAnnoncesToGeoJSON(annonces) {
     const features = annonces.map(annonce => {
         const lat = getNestedValue(annonce, 'geo_location.data.lat');
         const lng = getNestedValue(annonce, 'geo_location.data.lng');
 
-        if (annonce.id === undefined || annonce.id === null || lat === undefined || lng === undefined) { // Vérification plus stricte
+        if (annonce.id === undefined || annonce.id === null || lat === undefined || lng === undefined) {
             console.warn('[GEOJSON_CONVERT] Annonce sans ID ou coordonnées valides, ignorée:', annonce);
+            return null;
+        }
+
+        let featureId = parseInt(annonce.id, 10); // Assurons-nous que c'est un nombre
+        if (isNaN(featureId)) {
+            console.warn('[GEOJSON_CONVERT] ID d\'annonce non numérique, ignorée:', annonce);
             return null;
         }
 
         return {
             type: 'Feature',
-            id: String(annonce.id), // Assurer que l'ID est une chaîne de caractères
+            id: featureId, // ID numérique à la racine
             geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] },
             properties: {
-                // Garder l'id original ici peut être utile pour d'autres usages si nécessaire
-                // mais feature.id (à la racine) sera utilisé par MapLibre
-                original_id_prop: annonce.id, 
+                // On peut garder l'id original ici aussi sous forme de string pour la liste
+                id_str: String(annonce.id), 
                 price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?',
                 title: getNestedValue(annonce, 'property_title'),
                 coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url')
             }
         };
-    }).filter(Boolean); // Retire les annonces null (celles sans ID/coords)
+    }).filter(Boolean);
     return { type: 'FeatureCollection', features };
 }
 
@@ -155,19 +162,23 @@ function convertAnnoncesToGeoJSON(annonces) {
     // map-listings.js
 
 // map-listings.js
+// map-listings.js
 function updateVisibleList() {
     if (!map.isStyleLoaded() || !listContainer) {
-        console.log('[UPDATE_LIST] Carte non prête ou listContainer non trouvé.');
+        // console.log('[UPDATE_LIST] Carte non prête ou listContainer non trouvé.'); // Déjà présent
         return;
     }
     const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_PINS] });
 
-    // feature.id sera une chaîne si la conversion GeoJSON a utilisé String(annonce.id)
-    const visibleIds = new Set(visibleFeatures.map(feature => feature.id)); 
+    // On utilise l'ID des propriétés qui est une chaîne pour la comparaison avec data-attributes
+    const visiblePropertyIds = new Set(visibleFeatures.map(feature => feature.properties.id_str)); 
 
-    console.log(`[UPDATE_LIST] Annonces visibles sur la carte (IDs as strings):`, Array.from(visibleIds));
+    console.log(`[UPDATE_LIST] Annonces visibles sur la carte (IDs de propriété):`, Array.from(visiblePropertyIds));
 
     const allListItems = listContainer.querySelectorAll('[data-property-id]');
+    // ... (le reste de la fonction reste pareil, car item.dataset.propertyId est déjà une chaîne)
+    // La comparaison sera visiblePropertyIds.has(itemIdString)
+}
     if (allListItems.length === 0) {
         console.warn('[UPDATE_LIST] Aucun item trouvé dans la liste HTML avec [data-property-id].');
     }
@@ -204,7 +215,7 @@ function updateVisibleList() {
         const coverPhoto = properties.coverPhoto || placeholderImage;
         const title = properties.title || "Titre non disponible";
         const priceText = `${properties.price || '?'} € / mois`;
-        const detailLink = `annonce?id=${properties.original_id}`; 
+        const detailLink = `annonce?id=${properties.id_str}`;
 
         return `
             <div class="map-custom-popup">
