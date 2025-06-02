@@ -1,25 +1,24 @@
-// map-listings.js - VERSION AVEC POPUP STYLE AIRBNB
+// map-listings.js - VERSION AVEC POPUP AMÉLIORÉ ET PIN SÉLECTIONNÉ
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT POPUP] Initialisation du module de carte avec popups.');
+    console.log('[MAP_SCRIPT V3] Initialisation avec pin sélectionné.');
 
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const MAP_CONTAINER_ID = 'map-section';
     const LIST_CONTAINER_ID = 'annonces-wrapper';
     const MOBILE_TOGGLE_BUTTON_ID = 'mobile-map-toggle';
-    // const MODAL_ID = 'annonce-modal'; // On n'utilise plus la grosse modale pour les clics carte
     const SOURCE_ID = 'annonces-source';
     const LAYER_ID_PINS = 'annonces-pins-layer';
     const LAYER_ID_LABELS = 'annonces-labels-layer';
 
     const listContainer = document.getElementById(LIST_CONTAINER_ID);
     const mobileToggleButton = document.getElementById(MOBILE_TOGGLE_BUTTON_ID);
-    // const modalElement = document.getElementById(MODAL_ID); // Plus nécessaire pour les clics carte
 
     let map = null;
     let allAnnouncements = [];
     let isMobile = window.innerWidth < 768;
-    let currentPopup = null; // Garde une référence au popup actuel
+    let currentPopup = null;
+    let selectedFeatureId = null; // Pour garder l'ID du pin actuellement sélectionné
 
     document.addEventListener('annoncesChargeesEtRendues', (event) => {
         const annonces = event.detail.annonces;
@@ -31,6 +30,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!map) {
             initializeMap(geojsonData);
         } else {
+            // Si la carte existe déjà, on met juste à jour la source et on efface la sélection
+            if (selectedFeatureId !== null) {
+                map.setFeatureState({ source: SOURCE_ID, id: selectedFeatureId }, { selected: false });
+                selectedFeatureId = null;
+            }
             map.getSource(SOURCE_ID).setData(geojsonData);
         }
     });
@@ -40,11 +44,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const lat = getNestedValue(annonce, 'geo_location.data.lat');
             const lng = getNestedValue(annonce, 'geo_location.data.lng');
             if (!lat || !lng) return null;
+
+            // IMPORTANT: L'ID doit être à la racine du feature pour setFeatureState
             return {
                 type: 'Feature',
-                geometry: { type: 'Point', coordinates: [lng, lat] },
+                id: annonce.id, // ID à la racine du feature
+                geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] }, // Assurer que ce sont des nombres
                 properties: {
-                    id: annonce.id,
+                    // On peut toujours garder l'id dans les properties si d'autres parties du code s'en servent
+                    original_id: annonce.id, 
                     price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?',
                     title: getNestedValue(annonce, 'property_title'),
                     coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url')
@@ -64,25 +72,65 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         map.on('load', () => {
-            console.log('[MAP_SCRIPT POPUP] Carte chargée. Ajout des couches et des événements.');
+            console.log('[MAP_SCRIPT V3] Carte chargée. Ajout des couches et des événements.');
 
-            map.addSource(SOURCE_ID, { type: 'geojson', data: initialGeoJSON });
+            map.addSource(SOURCE_ID, { 
+                type: 'geojson', 
+                data: initialGeoJSON,
+                promoteId: 'id' // Indique à MapLibre d'utiliser la propriété 'id' de nos features comme ID de source
+            });
+            
+            // Couche des CERCLES (fond des pins)
             map.addLayer({
                 id: LAYER_ID_PINS,
                 type: 'circle',
                 source: SOURCE_ID,
-                paint: { 'circle-color': 'white', 'circle-radius': 16, 'circle-stroke-width': 1, 'circle-stroke-color': '#BDBDBD' }
+                paint: {
+                    'circle-color': [
+                        'case',
+                        ['boolean', ['feature-state', 'selected'], false],
+                        '#0056b3', // Couleur de fond si sélectionné (bleu foncé)
+                        '#FFFFFF'  // Couleur de fond par défaut (blanc)
+                    ],
+                    'circle-radius': 18, // Légèrement plus grand
+                    'circle-stroke-width': [
+                        'case',
+                        ['boolean', ['feature-state', 'selected'], false],
+                        2,       // Épaisseur de la bordure si sélectionné
+                        1.5      // Épaisseur par défaut
+                    ],
+                    'circle-stroke-color': [
+                        'case',
+                        ['boolean', ['feature-state', 'selected'], false],
+                        '#FFFFFF', // Couleur de bordure si sélectionné (blanc)
+                        '#007bff'  // Couleur de bordure par défaut (bleu)
+                    ]
+                }
             });
+
+            // Couche des LABELS (prix)
             map.addLayer({
                 id: LAYER_ID_LABELS,
                 type: 'symbol',
                 source: SOURCE_ID,
-                layout: { 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'], 'text-size': 12, 'text-allow-overlap': true },
-                paint: { 'text-color': '#000000' }
+                layout: {
+                    'text-field': ['concat', ['to-string', ['get', 'price']], '€'],
+                    'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
+                    'text-size': 11, // Légèrement plus petit pour tenir dans le cercle
+                    'text-allow-overlap': true
+                },
+                paint: {
+                    'text-color': [
+                        'case',
+                        ['boolean', ['feature-state', 'selected'], false],
+                        '#FFFFFF', // Couleur du texte si sélectionné (blanc)
+                        '#007bff'  // Couleur du texte par défaut (bleu)
+                    ]
+                }
             });
 
             map.on('click', LAYER_ID_PINS, handleMapClick);
-            map.on('click', LAYER_ID_LABELS, handleMapClick);
+            map.on('click', LAYER_ID_LABELS, handleMapClick); // On peut aussi cliquer sur le label
             map.on('mouseenter', LAYER_ID_PINS, () => map.getCanvas().style.cursor = 'pointer');
             map.on('mouseleave', LAYER_ID_PINS, () => map.getCanvas().style.cursor = '');
             
@@ -96,9 +144,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateVisibleList() {
         if (!map.isStyleLoaded() || !listContainer) return;
         const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_PINS] });
-        const visibleIds = new Set(visibleFeatures.map(feature => feature.properties.id));
+        // On utilise 'id' car c'est ce qu'on a promu comme ID de feature pour la source
+        const visibleIds = new Set(visibleFeatures.map(feature => feature.id)); 
         
-        console.log(`[MAP_SCRIPT POPUP] ${visibleIds.size} annonces visibles. Mise à jour de la liste.`);
+        console.log(`[MAP_SCRIPT V3] ${visibleIds.size} annonces visibles. Mise à jour de la liste.`);
 
         const allListItems = listContainer.querySelectorAll('[data-property-id]');
         allListItems.forEach(item => {
@@ -115,13 +164,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Nouvelle fonction pour créer le HTML du popup
     function createPopupHTML(properties) {
         const placeholderImage = 'https://i.imgur.com/KpaGW6j.png';
+        // On utilise original_id car 'id' est maintenant l'ID du feature MapLibre
         const coverPhoto = properties.coverPhoto || placeholderImage;
         const title = properties.title || "Titre non disponible";
         const priceText = `${properties.price || '?'} € / mois`;
-        const detailLink = `annonce?id=${properties.id}`;
+        const detailLink = `annonce?id=${properties.original_id}`; 
 
         return `
             <div class="map-custom-popup">
@@ -135,12 +184,21 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
     }
     
-    // Modifiée pour utiliser maplibregl.Popup
     function handleMapClick(e) {
         if (e.features && e.features.length > 0) {
             const feature = e.features[0];
             const coordinates = feature.geometry.coordinates.slice();
             const properties = feature.properties;
+            const clickedFeatureId = feature.id; // L'ID du feature, promu depuis annonce.id
+
+            // Retirer l'état 'selected' de l'ancien pin
+            if (selectedFeatureId !== null) {
+                map.setFeatureState({ source: SOURCE_ID, id: selectedFeatureId }, { selected: false });
+            }
+
+            // Mettre l'état 'selected' sur le nouveau pin
+            map.setFeatureState({ source: SOURCE_ID, id: clickedFeatureId }, { selected: true });
+            selectedFeatureId = clickedFeatureId; // Mettre à jour l'ID sélectionné
 
             if (currentPopup) {
                 currentPopup.remove();
@@ -153,13 +211,22 @@ document.addEventListener('DOMContentLoaded', function() {
             const popupHTML = createPopupHTML(properties);
 
             currentPopup = new maplibregl.Popup({ 
-                    offset: 15, // Décalage par rapport au centre du cercle
-                    closeButton: false, // On n'affiche pas le bouton X par défaut
-                    className: 'airbnb-style-popup' // Pour styler le conteneur global du popup
+                    offset: 10, // Ajusté car plus de flèche
+                    closeButton: true, 
+                    className: 'airbnb-style-popup'
                 })
                 .setLngLat(coordinates)
                 .setHTML(popupHTML)
                 .addTo(map);
+
+            // Quand le popup est fermé, désélectionner le pin
+            currentPopup.on('close', () => {
+                if (selectedFeatureId !== null) {
+                    map.setFeatureState({ source: SOURCE_ID, id: selectedFeatureId }, { selected: false });
+                    selectedFeatureId = null;
+                }
+                currentPopup = null;
+            });
         }
     }
 
@@ -168,11 +235,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return path.split('.').reduce((acc, part) => (acc && acc[part] !== undefined) ? (isNaN(parseInt(part, 10)) ? acc[part] : acc[parseInt(part, 10)]) : undefined, obj);
     }
     
-    // Logique pour la grosse modale (si elle est toujours utilisée ailleurs)
-    // const modalCloseButton = document.getElementById('modal-close-button');
-    // if (modalCloseButton) modalCloseButton.addEventListener('click', () => modalElement.style.display = 'none');
-    // if (modalElement) modalElement.addEventListener('click', (e) => (e.target === modalElement) && (modalElement.style.display = 'none'));
-
     if (isMobile && mobileToggleButton) {
         mobileToggleButton.addEventListener('click', () => {
             const isMapActive = document.body.classList.contains('map-is-active');
