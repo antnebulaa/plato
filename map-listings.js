@@ -1,3 +1,4 @@
+
 // map-listings.js - VERSION AVEC POPUP AMÉLIORÉ ET PIN SÉLECTIONNÉ
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -39,40 +40,28 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-  
-// map-listings.js
-// map-listings.js
-function convertAnnoncesToGeoJSON(annonces) {
-    const features = annonces.map(annonce => {
-        const lat = getNestedValue(annonce, 'geo_location.data.lat');
-        const lng = getNestedValue(annonce, 'geo_location.data.lng');
+    function convertAnnoncesToGeoJSON(annonces) {
+        const features = annonces.map(annonce => {
+            const lat = getNestedValue(annonce, 'geo_location.data.lat');
+            const lng = getNestedValue(annonce, 'geo_location.data.lng');
+            if (!lat || !lng) return null;
 
-        if (annonce.id === undefined || annonce.id === null || lat === undefined || lng === undefined) {
-            console.warn('[GEOJSON_CONVERT] Annonce sans ID ou coordonnées valides, ignorée:', annonce);
-            return null;
-        }
-
-        let featureId = parseInt(annonce.id, 10); // Assurons-nous que c'est un nombre
-        if (isNaN(featureId)) {
-            console.warn('[GEOJSON_CONVERT] ID d\'annonce non numérique, ignorée:', annonce);
-            return null;
-        }
-
-        return {
-            type: 'Feature',
-            id: featureId, // ID numérique à la racine
-            geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] },
-            properties: {
-                // On peut garder l'id original ici aussi sous forme de string pour la liste
-                id_str: String(annonce.id), 
-                price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?',
-                title: getNestedValue(annonce, 'property_title'),
-                coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url')
-            }
-        };
-    }).filter(Boolean);
-    return { type: 'FeatureCollection', features };
-}
+            // IMPORTANT: L'ID doit être à la racine du feature pour setFeatureState
+            return {
+                type: 'Feature',
+                id: annonce.id, // ID à la racine du feature
+                geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] }, // Assurer que ce sont des nombres
+                properties: {
+                    // On peut toujours garder l'id dans les properties si d'autres parties du code s'en servent
+                    original_id: annonce.id, 
+                    price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?',
+                    title: getNestedValue(annonce, 'property_title'),
+                    coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url')
+                }
+            };
+        }).filter(Boolean);
+        return { type: 'FeatureCollection', features };
+    }
 
     function initializeMap(initialGeoJSON) {
         map = new maplibregl.Map({
@@ -161,49 +150,35 @@ function convertAnnoncesToGeoJSON(annonces) {
     
     // map-listings.js
 
-// map-listings.js
-// map-listings.js
 function updateVisibleList() {
     if (!map.isStyleLoaded() || !listContainer) {
-        // console.log('[UPDATE_LIST] Carte non prête ou listContainer non trouvé.'); // Déjà présent
+        console.log('[UPDATE_LIST] Carte non prête ou listContainer non trouvé.'); // LOG 5
         return;
     }
     const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_PINS] });
-
-    // On utilise l'ID des propriétés qui est une chaîne pour la comparaison avec data-attributes
-    const visiblePropertyIds = new Set(visibleFeatures.map(feature => feature.properties.id_str)); 
-
-    console.log(`[UPDATE_LIST] Annonces visibles sur la carte (IDs de propriété):`, Array.from(visiblePropertyIds));
+    const visibleIds = new Set(visibleFeatures.map(feature => feature.id)); 
+    
+    console.log(`[UPDATE_LIST] Annonces visibles sur la carte (IDs):`, Array.from(visibleIds)); // LOG 6
 
     const allListItems = listContainer.querySelectorAll('[data-property-id]');
-    // ... (le reste de la fonction reste pareil, car item.dataset.propertyId est déjà une chaîne)
-    // La comparaison sera visiblePropertyIds.has(itemIdString)
-
     if (allListItems.length === 0) {
-        console.warn('[UPDATE_LIST] Aucun item trouvé dans la liste HTML avec [data-property-id].');
+        console.warn('[UPDATE_LIST] Aucun item trouvé dans la liste HTML avec [data-property-id].'); // LOG 7
     }
 
     allListItems.forEach(item => {
-        // item.dataset.propertyId est DÉJÀ une chaîne.
-        const itemIdString = item.dataset.propertyId; 
-
-        if (!itemIdString) { // Si un item n'a pas de data-property-id
-            console.warn('[UPDATE_LIST] Item de liste sans data-property-id:', item);
-            item.classList.add('annonce-list-item-hidden'); // Le cacher par précaution
-            return;
-        }
-
-        const isVisibleOnMap = visibleIds.has(itemIdString);
-
-        console.log(`[UPDATE_LIST] Traitement item HTML ID: "${itemIdString}", visible sur carte: ${isVisibleOnMap}`); 
-
+        const itemId = parseInt(item.dataset.propertyId, 10);
+        const isVisibleOnMap = visibleIds.has(itemId);
+        
+        // LOG 8 : Très important pour chaque item de la liste
+        console.log(`[UPDATE_LIST] Traitement item HTML ID: ${itemId}, visible sur carte: ${isVisibleOnMap}, Élément:`, item); 
+        
         if (isVisibleOnMap) {
             item.classList.remove('annonce-list-item-hidden');
         } else {
             item.classList.add('annonce-list-item-hidden');
         }
     });
-
+    
     if (isMobile && mobileToggleButton) {
         mobileToggleButton.textContent = `Voir les ${visibleIds.size} logements`;
     }
@@ -215,7 +190,7 @@ function updateVisibleList() {
         const coverPhoto = properties.coverPhoto || placeholderImage;
         const title = properties.title || "Titre non disponible";
         const priceText = `${properties.price || '?'} € / mois`;
-        const detailLink = `annonce?id=${properties.id_str}`;
+        const detailLink = `annonce?id=${properties.original_id}`; 
 
         return `
             <div class="map-custom-popup">
