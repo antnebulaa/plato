@@ -1,49 +1,4 @@
 // Placeholder for XanoClient - In a real scenario, this comes from xano-client-utils.js
-        class XanoClient {
-            constructor(config) {
-                this.apiGroupBaseUrl = config.apiGroupBaseUrl;
-                this.authToken = null;
-            }
-            setAuthToken(token) { this.authToken = token; }
-            async _request(method, endpoint, paramsOrBody = null) {
-                const url = `${this.apiGroupBaseUrl}/${endpoint}${method === 'GET' && paramsOrBody ? '?' + new URLSearchParams(paramsOrBody) : ''}`;
-                const options = {
-                    method: method,
-                    headers: { 'Content-Type': 'application/json' }
-                };
-                if (this.authToken) {
-                    options.headers['Authorization'] = `Bearer ${this.authToken}`;
-                }
-                if (method !== 'GET' && paramsOrBody) {
-                    options.body = JSON.stringify(paramsOrBody);
-                }
-                console.log(`[XanoClient Request] ${method} ${url}`, paramsOrBody);
-                const response = await fetch(url, options);
-                if (response.status === 204) return null; // No Content
-                const data = await response.json();
-                console.log(`[XanoClient Response] ${method} ${url}`, data);
-                if (!response.ok) {
-                    throw new Error(data.message || `Erreur API ${response.status}`);
-                }
-                return data;
-            }
-            get(endpoint, params = null) { return this._request('GET', endpoint, params); }
-            post(endpoint, body = null) { return this._request('POST', endpoint, body); }
-            delete(endpoint, body = null) { return this._request('DELETE', endpoint, body); }
-        }
-
-        // Placeholder for getCookie - In a real scenario, this comes from xano-client-utils.js
-        function getCookie(name) {
-            const nameEQ = name + "=";
-            const ca = document.cookie.split(';');
-            for(let i=0;i < ca.length;i++) {
-                let c = ca[i];
-                while (c.charAt(0)==' ') c = c.substring(1,c.length);
-                if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
-            }
-            return null;
-        }
-
         document.addEventListener('DOMContentLoaded', function () {
             const FAVORITES_API_BASE_URL = 'https://xwxl-obyg-b3e3.p7.xano.io/api:7u3_oKu9'; // Your Xano API for favorites
             const favoritesXanoClient = new XanoClient({ apiGroupBaseUrl: FAVORITES_API_BASE_URL });
