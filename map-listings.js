@@ -87,11 +87,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 source: SOURCE_ID,
                 paint: {
                     'circle-color': [
-                        'case',
-                        ['boolean', ['feature-state', 'selected'], false],
-                        '#0056b3', // Couleur de fond si sélectionné (bleu foncé)
-                        '#FFFFFF'  // Couleur de fond par défaut (blanc)
-                    ],
+        'case',
+        ['boolean', ['feature-state', 'selected'], false],
+        '#007bff', // Bleu si sélectionné
+        '#FFFFFF'  // Blanc par défaut
+    ],
+    'circle-stroke-color': [
+        'case',
+        ['boolean', ['feature-state', 'selected'], false],
+        '#0056b3', // Bordure bleu foncé si sélectionné
+        '#CCCCCC'  // Bordure grise par défaut
+    ],
                     'circle-radius': 18, // Légèrement plus grand
                     'circle-stroke-width': [
                         'case',
@@ -121,11 +127,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 paint: {
                     'text-color': [
-                        'case',
-                        ['boolean', ['feature-state', 'selected'], false],
-                        '#FFFFFF', // Couleur du texte si sélectionné (blanc)
-                        '#007bff'  // Couleur du texte par défaut (bleu)
-                    ]
+        'case',
+        ['boolean', ['feature-state', 'selected'], false],
+        '#FFFFFF', // Texte blanc si sélectionné (sur fond bleu)
+        '#333333'  // Texte gris foncé par défaut (sur fond blanc)
+    ]
                 }
             });
 
@@ -141,28 +147,41 @@ document.addEventListener('DOMContentLoaded', function() {
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
     
-    function updateVisibleList() {
-        if (!map.isStyleLoaded() || !listContainer) return;
-        const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_PINS] });
-        // On utilise 'id' car c'est ce qu'on a promu comme ID de feature pour la source
-        const visibleIds = new Set(visibleFeatures.map(feature => feature.id)); 
-        
-        console.log(`[MAP_SCRIPT V3] ${visibleIds.size} annonces visibles. Mise à jour de la liste.`);
+    // map-listings.js
 
-        const allListItems = listContainer.querySelectorAll('[data-property-id]');
-        allListItems.forEach(item => {
-            const itemId = parseInt(item.dataset.propertyId, 10);
-            if (visibleIds.has(itemId)) {
-                item.classList.remove('annonce-list-item-hidden');
-            } else {
-                item.classList.add('annonce-list-item-hidden');
-            }
-        });
-        
-        if (isMobile && mobileToggleButton) {
-            mobileToggleButton.textContent = `Voir les ${visibleIds.size} logements`;
-        }
+function updateVisibleList() {
+    if (!map.isStyleLoaded() || !listContainer) {
+        console.log('[UPDATE_LIST] Carte non prête ou listContainer non trouvé.'); // LOG 5
+        return;
     }
+    const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_PINS] });
+    const visibleIds = new Set(visibleFeatures.map(feature => feature.id)); 
+    
+    console.log(`[UPDATE_LIST] Annonces visibles sur la carte (IDs):`, Array.from(visibleIds)); // LOG 6
+
+    const allListItems = listContainer.querySelectorAll('[data-property-id]');
+    if (allListItems.length === 0) {
+        console.warn('[UPDATE_LIST] Aucun item trouvé dans la liste HTML avec [data-property-id].'); // LOG 7
+    }
+
+    allListItems.forEach(item => {
+        const itemId = parseInt(item.dataset.propertyId, 10);
+        const isVisibleOnMap = visibleIds.has(itemId);
+        
+        // LOG 8 : Très important pour chaque item de la liste
+        console.log(`[UPDATE_LIST] Traitement item HTML ID: ${itemId}, visible sur carte: ${isVisibleOnMap}, Élément:`, item); 
+        
+        if (isVisibleOnMap) {
+            item.classList.remove('annonce-list-item-hidden');
+        } else {
+            item.classList.add('annonce-list-item-hidden');
+        }
+    });
+    
+    if (isMobile && mobileToggleButton) {
+        mobileToggleButton.textContent = `Voir les ${visibleIds.size} logements`;
+    }
+}
 
     function createPopupHTML(properties) {
         const placeholderImage = 'https://i.imgur.com/KpaGW6j.png';
@@ -191,12 +210,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const properties = feature.properties;
             const clickedFeatureId = feature.id; // L'ID du feature, promu depuis annonce.id
 
+            console.log('[HANDLE_MAP_CLICK] Clic sur feature ID:', clickedFeatureId, 'Propriétés:', properties); // LOG 1
+
             // Retirer l'état 'selected' de l'ancien pin
             if (selectedFeatureId !== null) {
+                console.log('[HANDLE_MAP_CLICK] Effacement état "selected" pour ID:', selectedFeatureId); // LOG 2
                 map.setFeatureState({ source: SOURCE_ID, id: selectedFeatureId }, { selected: false });
             }
 
             // Mettre l'état 'selected' sur le nouveau pin
+            console.log('[HANDLE_MAP_CLICK] Application état "selected" pour ID:', clickedFeatureId); // LOG 3
             map.setFeatureState({ source: SOURCE_ID, id: clickedFeatureId }, { selected: true });
             selectedFeatureId = clickedFeatureId; // Mettre à jour l'ID sélectionné
 
@@ -222,6 +245,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Quand le popup est fermé, désélectionner le pin
             currentPopup.on('close', () => {
                 if (selectedFeatureId !== null) {
+                    console.log('[POPUP_CLOSE] Effacement état "selected" à la fermeture du popup pour ID:', selectedFeatureId); // LOG 4
                     map.setFeatureState({ source: SOURCE_ID, id: selectedFeatureId }, { selected: false });
                     selectedFeatureId = null;
                 }
