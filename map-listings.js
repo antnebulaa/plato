@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('[MAP_SCRIPT] Initialisation du module de carte.');
 
     // --- Configuration ---
-    const MAPTILER_API_KEY = 'YOUR_MAPTILER_API_KEY'; // !! REMPLACEZ PAR VOTRE VRAIE CLÉ (MapTiler, Stadia, etc.)
+    const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL'; // !! REMPLACEZ PAR VOTRE VRAIE CLÉ (MapTiler, Stadia, etc.)
     const MAP_CONTAINER_ID = 'map-section';
     const LIST_CONTAINER_ID = 'annonce-list-section';
     const MOBILE_TOGGLE_BUTTON_ID = 'mobile-map-toggle';
