@@ -39,28 +39,33 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    function convertAnnoncesToGeoJSON(annonces) {
-        const features = annonces.map(annonce => {
-            const lat = getNestedValue(annonce, 'geo_location.data.lat');
-            const lng = getNestedValue(annonce, 'geo_location.data.lng');
-            if (!lat || !lng) return null;
+  
+function convertAnnoncesToGeoJSON(annonces) {
+    const features = annonces.map(annonce => {
+        const lat = getNestedValue(annonce, 'geo_location.data.lat');
+        const lng = getNestedValue(annonce, 'geo_location.data.lng');
 
-            // IMPORTANT: L'ID doit être à la racine du feature pour setFeatureState
-            return {
-                type: 'Feature',
-                id: annonce.id, // ID à la racine du feature
-                geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] }, // Assurer que ce sont des nombres
-                properties: {
-                    // On peut toujours garder l'id dans les properties si d'autres parties du code s'en servent
-                    original_id: annonce.id, 
-                    price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?',
-                    title: getNestedValue(annonce, 'property_title'),
-                    coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url')
-                }
-            };
-        }).filter(Boolean);
-        return { type: 'FeatureCollection', features };
-    }
+        if (annonce.id === undefined || annonce.id === null || lat === undefined || lng === undefined) { // Vérification plus stricte
+            console.warn('[GEOJSON_CONVERT] Annonce sans ID ou coordonnées valides, ignorée:', annonce);
+            return null;
+        }
+
+        return {
+            type: 'Feature',
+            id: String(annonce.id), // Assurer que l'ID est une chaîne de caractères
+            geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] },
+            properties: {
+                // Garder l'id original ici peut être utile pour d'autres usages si nécessaire
+                // mais feature.id (à la racine) sera utilisé par MapLibre
+                original_id_prop: annonce.id, 
+                price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?',
+                title: getNestedValue(annonce, 'property_title'),
+                coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url')
+            }
+        };
+    }).filter(Boolean); // Retire les annonces null (celles sans ID/coords)
+    return { type: 'FeatureCollection', features };
+}
 
     function initializeMap(initialGeoJSON) {
         map = new maplibregl.Map({
@@ -149,35 +154,45 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // map-listings.js
 
+// map-listings.js
 function updateVisibleList() {
     if (!map.isStyleLoaded() || !listContainer) {
-        console.log('[UPDATE_LIST] Carte non prête ou listContainer non trouvé.'); // LOG 5
+        console.log('[UPDATE_LIST] Carte non prête ou listContainer non trouvé.');
         return;
     }
     const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_PINS] });
+
+    // feature.id sera une chaîne si la conversion GeoJSON a utilisé String(annonce.id)
     const visibleIds = new Set(visibleFeatures.map(feature => feature.id)); 
-    
-    console.log(`[UPDATE_LIST] Annonces visibles sur la carte (IDs):`, Array.from(visibleIds)); // LOG 6
+
+    console.log(`[UPDATE_LIST] Annonces visibles sur la carte (IDs as strings):`, Array.from(visibleIds));
 
     const allListItems = listContainer.querySelectorAll('[data-property-id]');
     if (allListItems.length === 0) {
-        console.warn('[UPDATE_LIST] Aucun item trouvé dans la liste HTML avec [data-property-id].'); // LOG 7
+        console.warn('[UPDATE_LIST] Aucun item trouvé dans la liste HTML avec [data-property-id].');
     }
 
     allListItems.forEach(item => {
-        const itemId = parseInt(item.dataset.propertyId, 10);
-        const isVisibleOnMap = visibleIds.has(itemId);
-        
-        // LOG 8 : Très important pour chaque item de la liste
-        console.log(`[UPDATE_LIST] Traitement item HTML ID: ${itemId}, visible sur carte: ${isVisibleOnMap}, Élément:`, item); 
-        
+        // item.dataset.propertyId est DÉJÀ une chaîne.
+        const itemIdString = item.dataset.propertyId; 
+
+        if (!itemIdString) { // Si un item n'a pas de data-property-id
+            console.warn('[UPDATE_LIST] Item de liste sans data-property-id:', item);
+            item.classList.add('annonce-list-item-hidden'); // Le cacher par précaution
+            return;
+        }
+
+        const isVisibleOnMap = visibleIds.has(itemIdString);
+
+        console.log(`[UPDATE_LIST] Traitement item HTML ID: "${itemIdString}", visible sur carte: ${isVisibleOnMap}`); 
+
         if (isVisibleOnMap) {
             item.classList.remove('annonce-list-item-hidden');
         } else {
             item.classList.add('annonce-list-item-hidden');
         }
     });
-    
+
     if (isMobile && mobileToggleButton) {
         mobileToggleButton.textContent = `Voir les ${visibleIds.size} logements`;
     }
