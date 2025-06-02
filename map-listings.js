@@ -110,35 +110,34 @@ document.addEventListener('DOMContentLoaded', function() {
     /**
      * *** NOUVELLE FONCTION : Met à jour la liste HTML à gauche ***
      */
-    function updateVisibleList() {
-        if (!map.isStyleLoaded() || !listContainer) return;
+    // Dans map-listings.js
+function updateVisibleList() {
+    if (!map.isStyleLoaded() || !listContainer) return;
 
-        // 1. Demander à la carte tous les "features" (nos annonces) visibles
-        const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_PINS] });
-        
-        // 2. Créer un ensemble (Set) des IDs visibles pour une recherche rapide
-        const visibleIds = new Set(visibleFeatures.map(feature => feature.properties.id));
-        
-        console.log(`[MAP_SCRIPT FINAL] ${visibleIds.size} annonces visibles. Mise à jour de la liste.`);
+    const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_PINS] });
+    const visibleIds = new Set(visibleFeatures.map(feature => feature.properties.id));
 
-        // 3. Parcourir tous les éléments de la liste HTML
-        const allListItems = listContainer.querySelectorAll('[data-property-id]');
-        allListItems.forEach(item => {
-            const itemId = parseInt(item.dataset.propertyId, 10);
-            
-            // 4. Afficher ou masquer l'élément
-            if (visibleIds.has(itemId)) {
-                item.style.display = 'block'; // Ou 'flex', selon votre CSS
-            } else {
-                item.style.display = 'none';
-            }
-        });
-        
-        // Mettre à jour le bouton mobile (si on est sur mobile)
-        if (isMobile) {
-            mobileToggleButton.textContent = `Voir les ${visibleIds.size} logements`;
+    console.log(`[MAP_SCRIPT FINAL] ${visibleIds.size} annonces visibles. Mise à jour de la liste (avec classe).`);
+
+    const allListItems = listContainer.querySelectorAll('[data-property-id]');
+    allListItems.forEach(item => {
+        const itemId = parseInt(item.dataset.propertyId, 10);
+
+        if (visibleIds.has(itemId)) {
+            item.classList.remove('annonce-list-item-hidden');
+            // Si vos items ne sont pas 'display: block' par défaut (ex: 'flex' ou 'grid'),
+            // Webflow devrait déjà leur appliquer le bon style quand la classe 'hidden' est retirée.
+            // Sinon, vous pourriez avoir besoin de remettre explicitement le display :
+            // item.style.display = 'block'; // ou 'flex', 'grid', etc.
+        } else {
+            item.classList.add('annonce-list-item-hidden');
         }
+    });
+
+    if (isMobile) {
+        mobileToggleButton.textContent = `Voir les ${visibleIds.size} logements`;
     }
+}
 
     /**
      * Gère le clic sur un pin de la carte (devrait maintenant fonctionner)
@@ -155,12 +154,21 @@ document.addEventListener('DOMContentLoaded', function() {
      * Affiche l'aperçu de l'annonce dans une modale.
      */
     function showAnnonceModal(properties) {
-        document.getElementById('modal-title').textContent = properties.title || "Titre non disponible";
-        document.getElementById('modal-price').textContent = `${properties.price} € / mois`;
-        document.getElementById('modal-link').href = `annonce?id=${properties.id}`;
-        document.getElementById('modal-image').src = properties.coverPhoto || 'https://via.placeholder.com/400x250';
-        modalElement.style.display = 'flex';
-    }
+    console.log('Tentative d\'affichage de la modale pour :', properties);
+    const titleEl = document.getElementById('modal-title');
+    const priceEl = document.getElementById('modal-price');
+    const linkEl = document.getElementById('modal-link');
+    const imageEl = document.getElementById('modal-image');
+
+    console.log({ titleEl, priceEl, linkEl, imageEl }); // VOIR CE QUI EST NULL
+
+    if (titleEl) titleEl.textContent = properties.title || "Titre non disponible";
+    if (priceEl) priceEl.textContent = `${properties.price} € / mois`;
+    if (linkEl) linkEl.href = `annonce?id=${properties.id}`;
+    if (imageEl) imageEl.src = properties.coverPhoto || 'https://via.placeholder.com/400x250';
+
+    if (modalElement) modalElement.style.display = 'flex';
+}
 
     // --- Utilitaires et gestion mobile ---
     function getNestedValue(obj, path) {
