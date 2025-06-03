@@ -164,51 +164,44 @@ function convertAnnoncesToGeoJSON(annonces) {
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
 
-
-// Fichier : map-listings.js
+// map-listings.js -> Remplacer l'ancienne fonction updateVisibleList par celle-ci
 
 function updateVisibleList() {
-    if (!map.isStyleLoaded() || !listContainer) { // listContainer est document.getElementById('annonces-wrapper')
+    if (!map || !map.isStyleLoaded() || !listContainer) {
         return;
     }
+
     const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_PINS] });
-    const visiblePropertyIds = new Set(visibleFeatures.map(feature => feature.properties.id_str)); 
+    // Utiliser String() pour être sûr de comparer des chaînes de caractères (les ID d'attributs data-* sont des strings)
+    const visiblePropertyIds = new Set(visibleFeatures.map(feature => String(feature.properties.id))); 
 
-    console.log(`[UPDATE_LIST] Annonces visibles sur la carte (IDs de propriété):`, Array.from(visiblePropertyIds));
+    console.log(`[UPDATE_LIST] Annonces visibles sur la carte : ${visiblePropertyIds.size}`);
 
-    const allListItems = listContainer.querySelectorAll('[data-property-id]'); // Cible les div._w-dyn-item
+    const allListItems = listContainer.querySelectorAll('[data-property-id]');
     
     if (allListItems.length === 0) {
-        console.warn('[UPDATE_LIST] Aucun item (div._w-dyn-item) trouvé dans la liste HTML avec [data-property-id].');
+        console.warn('[UPDATE_LIST] Aucun item de liste avec [data-property-id] trouvé dans le conteneur HTML.');
     }
 
-    allListItems.forEach(item => { // item est ici le div._w-dyn-item
-        const itemIdString = item.dataset.propertyId; 
+    allListItems.forEach(itemDiv => {
+        const itemIdString = itemDiv.dataset.propertyId;
+        const anchorTag = itemDiv.parentElement; // On récupère la balise <a> parente
 
-        if (!itemIdString) { 
-            console.warn('[UPDATE_LIST] Item de liste sans data-property-id:', item);
-            item.classList.add('annonce-list-item-hidden');
+        // Vérification de sécurité pour s'assurer que la structure est correcte
+        if (!anchorTag || anchorTag.tagName !== 'A') {
+            console.warn('[UPDATE_LIST] L\'item de liste n\'est pas contenu dans une balise <a> comme attendu :', itemDiv);
+            // On masque l'item lui-même en dernier recours
+            itemDiv.style.display = visiblePropertyIds.has(itemIdString) ? '' : 'none';
             return;
         }
-        
-        const isVisibleOnMap = visiblePropertyIds.has(itemIdString);
-        // console.log(`[UPDATE_LIST] Traitement item HTML ID: "${itemIdString}", visible sur carte: ${isVisibleOnMap}`); 
 
-        if (isVisibleOnMap) {
-            item.classList.remove('annonce-list-item-hidden');
-            // Si le parent <a> avait été masqué par JS, on le réaffiche.
-            if (item.parentElement && item.parentElement.tagName === 'A' && item.parentElement.style.display === 'none') {
-                item.parentElement.style.display = ''; // Laisse CSS gérer, ou 'block' si c'était le style inline
-            }
+        // On vérifie si l'ID de l'annonce est dans la liste des annonces visibles sur la carte
+        if (visiblePropertyIds.has(itemIdString)) {
+            // Si oui, on s'assure qu'elle est visible en retirant la classe qui la masque
+            anchorTag.classList.remove('annonce-list-item-hidden');
         } else {
-            item.classList.add('annonce-list-item-hidden');
-            // Pour résoudre les trous, c'est le parent <a> qui doit aussi être masqué.
-            // On le fera via CSS en priorité, mais si le style inline persiste, on peut forcer ici.
-            if (item.parentElement && item.parentElement.tagName === 'A') {
-                 // Si on ne supprime pas le style inline de home-form-display-v4.js, il faudra forcer ici :
-                 // item.parentElement.style.display = 'none'; 
-                 // Mais la meilleure solution est à l'étape 2.
-            }
+            // Sinon, on la masque en ajoutant la classe
+            anchorTag.classList.add('annonce-list-item-hidden');
         }
     });
 
