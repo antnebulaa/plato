@@ -164,11 +164,11 @@ function convertAnnoncesToGeoJSON(annonces) {
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
 
-// Fichier : map-listings (4).js
-// Dans la fonction updateVisibleList :
+
+// Fichier : map-listings.js
 
 function updateVisibleList() {
-    if (!map.isStyleLoaded() || !listContainer) {
+    if (!map.isStyleLoaded() || !listContainer) { // listContainer est document.getElementById('annonces-wrapper')
         return;
     }
     const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_PINS] });
@@ -176,46 +176,38 @@ function updateVisibleList() {
 
     console.log(`[UPDATE_LIST] Annonces visibles sur la carte (IDs de propriété):`, Array.from(visiblePropertyIds));
 
-    // On sélectionne les cartes d'annonce qui ont l'attribut data-property-id
-    const announcementCards = listContainer.querySelectorAll('[data-property-id]'); 
-
-    if (announcementCards.length === 0) {
-        console.warn('[UPDATE_LIST] Aucun item (carte) trouvé dans la liste HTML avec [data-property-id].');
+    const allListItems = listContainer.querySelectorAll('[data-property-id]'); // Cible les div._w-dyn-item
+    
+    if (allListItems.length === 0) {
+        console.warn('[UPDATE_LIST] Aucun item (div._w-dyn-item) trouvé dans la liste HTML avec [data-property-id].');
     }
 
-    announcementCards.forEach(cardElement => { // cardElement est la div qui a data-property-id
-        const itemIdString = cardElement.dataset.propertyId; 
-        const anchorParent = cardElement.parentElement; // On cible le parent <a>
+    allListItems.forEach(item => { // item est ici le div._w-dyn-item
+        const itemIdString = item.dataset.propertyId; 
 
-        if (!itemIdString) {
-            console.warn('[UPDATE_LIST] Carte sans data-property-id:', cardElement);
-            // Tentative de masquage du parent <a> même si pas d'ID
-            if (anchorParent && anchorParent.tagName === 'A') {
-                anchorParent.classList.add('annonce-list-item-hidden');
-            } else {
-                cardElement.classList.add('annonce-list-item-hidden'); 
-            }
+        if (!itemIdString) { 
+            console.warn('[UPDATE_LIST] Item de liste sans data-property-id:', item);
+            item.classList.add('annonce-list-item-hidden');
             return;
         }
-
+        
         const isVisibleOnMap = visiblePropertyIds.has(itemIdString);
-        // Log retiré pour ne pas surcharger, mais vous pouvez le réactiver si besoin:
         // console.log(`[UPDATE_LIST] Traitement item HTML ID: "${itemIdString}", visible sur carte: ${isVisibleOnMap}`); 
 
-        // Appliquer la classe au conteneur <a> parent de la carte
-        if (anchorParent && anchorParent.tagName === 'A') {
-            if (isVisibleOnMap) {
-                anchorParent.classList.remove('annonce-list-item-hidden');
-            } else {
-                anchorParent.classList.add('annonce-list-item-hidden');
+        if (isVisibleOnMap) {
+            item.classList.remove('annonce-list-item-hidden');
+            // Si le parent <a> avait été masqué par JS, on le réaffiche.
+            if (item.parentElement && item.parentElement.tagName === 'A' && item.parentElement.style.display === 'none') {
+                item.parentElement.style.display = ''; // Laisse CSS gérer, ou 'block' si c'était le style inline
             }
         } else {
-            // Fallback si la structure n'est pas comme attendu (<a><div>carte</div></a>)
-            console.warn('[UPDATE_LIST] Structure parentale <a> non trouvée pour carte ID:', itemIdString, '. Classe appliquée directement à la carte.');
-            if (isVisibleOnMap) {
-                cardElement.classList.remove('annonce-list-item-hidden');
-            } else {
-                cardElement.classList.add('annonce-list-item-hidden');
+            item.classList.add('annonce-list-item-hidden');
+            // Pour résoudre les trous, c'est le parent <a> qui doit aussi être masqué.
+            // On le fera via CSS en priorité, mais si le style inline persiste, on peut forcer ici.
+            if (item.parentElement && item.parentElement.tagName === 'A') {
+                 // Si on ne supprime pas le style inline de home-form-display-v4.js, il faudra forcer ici :
+                 // item.parentElement.style.display = 'none'; 
+                 // Mais la meilleure solution est à l'étape 2.
             }
         }
     });
@@ -224,7 +216,6 @@ function updateVisibleList() {
         mobileToggleButton.textContent = `Voir les ${visiblePropertyIds.size} logements`;
     }
 }
-
     function createPopupHTML(properties) {
         const placeholderImage = 'https://i.imgur.com/KpaGW6j.png';
         // On utilise original_id car 'id' est maintenant l'ID du feature MapLibre
