@@ -164,49 +164,63 @@ function convertAnnoncesToGeoJSON(annonces) {
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
 
+// Fichier : map-listings (4).js
+// Dans la fonction updateVisibleList :
+
 function updateVisibleList() {
     if (!map.isStyleLoaded() || !listContainer) {
-        // console.log('[UPDATE_LIST] Carte non prête ou listContainer non trouvé.');
         return;
     }
     const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_PINS] });
-
-    // On utilise l'ID des propriétés qui est une chaîne pour la comparaison avec data-attributes
     const visiblePropertyIds = new Set(visibleFeatures.map(feature => feature.properties.id_str)); 
 
     console.log(`[UPDATE_LIST] Annonces visibles sur la carte (IDs de propriété):`, Array.from(visiblePropertyIds));
 
-    const allListItems = listContainer.querySelectorAll('[data-property-id]');
-    
-    if (allListItems.length === 0) {
-        console.warn('[UPDATE_LIST] Aucun item trouvé dans la liste HTML avec [data-property-id].');
+    // On sélectionne les cartes d'annonce qui ont l'attribut data-property-id
+    const announcementCards = listContainer.querySelectorAll('[data-property-id]'); 
+
+    if (announcementCards.length === 0) {
+        console.warn('[UPDATE_LIST] Aucun item (carte) trouvé dans la liste HTML avec [data-property-id].');
     }
 
-    allListItems.forEach(item => {
-        // item.dataset.propertyId est DÉJÀ une chaîne.
-        const itemIdString = item.dataset.propertyId; 
+    announcementCards.forEach(cardElement => { // cardElement est la div qui a data-property-id
+        const itemIdString = cardElement.dataset.propertyId; 
+        const anchorParent = cardElement.parentElement; // On cible le parent <a>
 
-        if (!itemIdString) { // Si un item n'a pas de data-property-id
-            console.warn('[UPDATE_LIST] Item de liste sans data-property-id:', item);
-            item.classList.add('annonce-list-item-hidden'); // Le cacher par précaution
+        if (!itemIdString) {
+            console.warn('[UPDATE_LIST] Carte sans data-property-id:', cardElement);
+            // Tentative de masquage du parent <a> même si pas d'ID
+            if (anchorParent && anchorParent.tagName === 'A') {
+                anchorParent.classList.add('annonce-list-item-hidden');
+            } else {
+                cardElement.classList.add('annonce-list-item-hidden'); 
+            }
             return;
         }
-        
-        // --- C'EST ICI LA CORRECTION ---
-        // On utilise bien `visiblePropertyIds` qui a été défini plus haut.
+
         const isVisibleOnMap = visiblePropertyIds.has(itemIdString);
+        // Log retiré pour ne pas surcharger, mais vous pouvez le réactiver si besoin:
+        // console.log(`[UPDATE_LIST] Traitement item HTML ID: "${itemIdString}", visible sur carte: ${isVisibleOnMap}`); 
 
-        console.log(`[UPDATE_LIST] Traitement item HTML ID: "${itemIdString}", visible sur carte: ${isVisibleOnMap}`); 
-
-        if (isVisibleOnMap) {
-            item.classList.remove('annonce-list-item-hidden');
+        // Appliquer la classe au conteneur <a> parent de la carte
+        if (anchorParent && anchorParent.tagName === 'A') {
+            if (isVisibleOnMap) {
+                anchorParent.classList.remove('annonce-list-item-hidden');
+            } else {
+                anchorParent.classList.add('annonce-list-item-hidden');
+            }
         } else {
-            item.classList.add('annonce-list-item-hidden');
+            // Fallback si la structure n'est pas comme attendu (<a><div>carte</div></a>)
+            console.warn('[UPDATE_LIST] Structure parentale <a> non trouvée pour carte ID:', itemIdString, '. Classe appliquée directement à la carte.');
+            if (isVisibleOnMap) {
+                cardElement.classList.remove('annonce-list-item-hidden');
+            } else {
+                cardElement.classList.add('annonce-list-item-hidden');
+            }
         }
     });
 
     if (isMobile && mobileToggleButton) {
-        // On utilise la taille du Set pour le compte
         mobileToggleButton.textContent = `Voir les ${visiblePropertyIds.size} logements`;
     }
 }
