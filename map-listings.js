@@ -153,7 +153,7 @@ function convertAnnoncesToGeoJSON(annonces) {
             });
 
             map.on('click', LAYER_ID_PINS, handleMapClick);
-            map.on('click', LAYER_ID_LABELS, handleMapClick); // On peut aussi cliquer sur le label
+            // map.on('click', LAYER_ID_LABELS, handleMapClick); // On peut aussi cliquer sur le label
             map.on('mouseenter', LAYER_ID_PINS, () => map.getCanvas().style.cursor = 'pointer');
             map.on('mouseleave', LAYER_ID_PINS, () => map.getCanvas().style.cursor = '');
             
