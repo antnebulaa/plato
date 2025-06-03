@@ -140,7 +140,6 @@ function convertAnnoncesToGeoJSON(annonces) {
                     'text-field': ['concat', ['to-string', ['get', 'price']], '€'],
                     'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
                     'text-size': 11, // Légèrement plus petit pour tenir dans le cercle
-                    'text-weight': 500,
                     'text-allow-overlap': true
                 },
                 paint: {
