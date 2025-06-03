@@ -288,7 +288,7 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
             anchor.href = `annonce?id=${propertyId}`; // Adaptez si besoin
             anchor.style.textDecoration = 'none';
             anchor.style.color = 'inherit';
-            anchor.style.display = 'block'; 
+            //anchor.style.display = 'block'; //
             
             anchor.appendChild(clone); // Met le clone (la carte) DANS le lien
             fragment.appendChild(anchor); // Ajoute le lien (avec la carte dedans) au fragment
