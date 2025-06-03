@@ -1,6 +1,6 @@
-// map-listings.js - VERSION AVEC POPUP AMÉLIORÉ ET PIN SÉLECTIONNÉ
+// map-listings.js - VERSION FINALE STABILISÉE
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V5] Initialisation avec bâtiments 3D corrigée.');
+    console.log('[MAP_SCRIPT V6] Initialisation stable.');
 
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const MAP_CONTAINER_ID = 'map-section';
@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentPopup = null;
     let selectedFeatureId = null;
 
+    // L'écouteur d'événement principal, gère les données entrantes
     document.addEventListener('annoncesChargeesEtRendues', (event) => {
         const annonces = event.detail.annonces;
         if (!annonces || !Array.isArray(annonces)) return;
@@ -27,18 +28,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const geojsonData = convertAnnoncesToGeoJSON(allAnnouncements);
 
         if (!map) {
+            // Si la carte n'existe pas, on l'initialise. Le reste se fera dans l'événement 'load' de la carte.
             initializeMap(geojsonData);
-            map.on('load', () => mettreAJourBatimentsSelectionnes(allAnnouncements));
         } else {
-            if (selectedFeatureId !== null) {
-                map.setFeatureState({ source: SOURCE_ID, id: selectedFeatureId }, { selected: false });
-                selectedFeatureId = null;
-            }
+            // Si la carte existe déjà, on met simplement à jour les données.
             map.getSource(SOURCE_ID).setData(geojsonData);
             mettreAJourBatimentsSelectionnes(allAnnouncements);
         }
     });
 
+    // Fonction pour convertir les annonces en points GeoJSON pour les pins
     function convertAnnoncesToGeoJSON(annonces) {
         const features = annonces.map(annonce => {
             const lat = getNestedValue(annonce, 'geo_location.data.lat');
@@ -50,18 +49,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 type: 'Feature',
                 id: featureId,
                 geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] },
-                properties: {
-                    id: featureId,
-                    id_str: String(annonce.id),
-                    price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?',
-                    title: getNestedValue(annonce, 'property_title'),
-                    coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url')
-                }
+                properties: { id: featureId, id_str: String(annonce.id), price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?', title: getNestedValue(annonce, 'property_title'), coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url') }
             };
         }).filter(Boolean);
         return { type: 'FeatureCollection', features };
     }
 
+    // Fonction pour trouver les IDs des bâtiments et mettre à jour la couche rose
     async function mettreAJourBatimentsSelectionnes(annonces) {
         if (!map.isStyleLoaded() || !annonces || annonces.length === 0) return;
         
@@ -72,12 +66,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const lng = getNestedValue(annonce, 'geo_location.data.lng');
             if (lat && lng) {
                 const point = map.project([lng, lat]);
-                // ============================ CORRECTION CLÉ ============================
-                // On interroge la couche de base qui contient TOUS les bâtiments gris
-                const features = map.queryRenderedFeatures(point, {
-                    layers: ['base-buildings-3d']
-                });
-                // ======================================================================
+                const features = map.queryRenderedFeatures(point, { layers: ['base-buildings-3d'] });
                 if (features.length > 0) {
                     buildingIds.add(features[0].id);
                 }
@@ -85,26 +74,28 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         const idsTrouves = Array.from(buildingIds);
         console.log(`Bâtiments trouvés et mis en surbrillance : ${idsTrouves.length}`);
-        // On met à jour le filtre de la couche rose avec les bons IDs
         map.setFilter('batiments-selectionnes-3d', ['in', ['id'], ...idsTrouves.length > 0 ? idsTrouves : ['']]);
     }
 
+    // Fonction principale d'initialisation de la carte
     function initializeMap(initialGeoJSON) {
         map = new maplibregl.Map({
             container: MAP_CONTAINER_ID,
             style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`,
             center: [2.3522, 48.8566],
             zoom: 15,
-            // ============================ AJOUT POUR LA 3D ============================
             pitch: 50,
             bearing: -15,
-            // ========================================================================
             renderWorldCopies: false
         });
 
+        // ============================ CORRECTION DE STRUCTURE MAJEURE ============================
+        // Il ne doit y avoir qu'un seul bloc map.on('load', ...).
+        // Tout ce qui dépend de la carte chargée (ajout de couches, etc.) doit être à l'intérieur.
         map.on('load', () => {
-            console.log('[MAP_SCRIPT V5] Carte chargée. Ajout des couches 3D.');
+            console.log('[MAP_SCRIPT V6] Carte chargée. Ajout de toutes les couches et données initiales.');
 
+            // 1. Ajout de la source pour les pins d'annonces
             map.addSource(SOURCE_ID, { 
                 type: 'geojson', 
                 data: initialGeoJSON,
@@ -113,47 +104,41 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const heightExpression = ['interpolate', ['linear'], ['zoom'], 15, 0, 16, ['get', 'height']];
 
-            // ============================ NOUVELLE COUCHE DE BASE ============================
-            // Couche pour afficher TOUS les bâtiments en 3D avec une couleur neutre
+            // 2. Ajout de la couche de base pour TOUS les bâtiments en gris
             map.addLayer({
-                'id': 'base-buildings-3d',
-                'type': 'fill-extrusion',
-                'source': 'maptiler',
-                'source-layer': 'building',
-                'paint': {
-                    'fill-extrusion-color': '#dfdfdf',
-                    'fill-extrusion-height': heightExpression,
-                    'fill-extrusion-base': ['get', 'min_height'],
-                    'fill-extrusion-opacity': 0.7
-                }
+                'id': 'base-buildings-3d', 'type': 'fill-extrusion', 'source': 'maptiler', 'source-layer': 'building',
+                'paint': { 'fill-extrusion-color': '#dfdfdf', 'fill-extrusion-height': heightExpression, 'fill-extrusion-base': ['get', 'min_height'], 'fill-extrusion-opacity': 0.7 }
             }, LAYER_ID_PINS);
-            // ===============================================================================
 
-            // Votre couche pour les bâtiments roses (qui vient se superposer à la couche de base)
+            // 3. Ajout de la couche pour les bâtiments sélectionnés en rose
             map.addLayer({
-                'id': 'batiments-selectionnes-3d',
-                'type': 'fill-extrusion',
-                'source': 'maptiler',
-                'source-layer': 'building',
+                'id': 'batiments-selectionnes-3d', 'type': 'fill-extrusion', 'source': 'maptiler', 'source-layer': 'building',
                 'filter': ['in', ['id'], ''], 
-                'paint': {
-                    'fill-extrusion-color': '#FF1493',
-                    'fill-extrusion-height': heightExpression,
-                    'fill-extrusion-base': ['get', 'min_height'],
-                    'fill-extrusion-opacity': 0.9
-                }
+                'paint': { 'fill-extrusion-color': '#FF1493', 'fill-extrusion-height': heightExpression, 'fill-extrusion-base': ['get', 'min_height'], 'fill-extrusion-opacity': 0.9 }
             }, LAYER_ID_PINS);
             
-            // Le reste de vos couches (pins, labels) reste inchangé
-            map.addLayer({ id: LAYER_ID_PINS, /* ... */ });
-            map.addLayer({ id: LAYER_ID_LABELS, /* ... */ });
+            // 4. Ajout des couches pour les pins et les labels (avec leur configuration complète)
+            map.addLayer({
+                id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID,
+                paint: { 'circle-radius': 18, 'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#007bff', '#FFFFFF'], 'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 2, 1.5], 'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#007bff'] }
+            });
+            map.addLayer({
+                id: LAYER_ID_LABELS, type: 'symbol', source: SOURCE_ID,
+                layout: { 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 11, 'text-allow-overlap': true },
+                paint: { 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] }
+            });
             
+            // 5. Ajout des interactions de la carte
             map.on('click', LAYER_ID_PINS, handleMapClick);
             map.on('mouseenter', LAYER_ID_PINS, () => map.getCanvas().style.cursor = 'pointer');
             map.on('mouseleave', LAYER_ID_PINS, () => map.getCanvas().style.cursor = '');
             map.on('moveend', updateVisibleList);
+
+            // 6. Lancement des mises à jour initiales
             updateVisibleList();
+            mettreAJourBatimentsSelectionnes(allAnnouncements);
         });
+        // ============================ FIN DE LA CORRECTION DE STRUCTURE ============================
 
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
