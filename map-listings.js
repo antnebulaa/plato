@@ -158,14 +158,10 @@ function convertAnnoncesToGeoJSON(annonces) {
 
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
-    
-    // map-listings.js
 
-// map-listings.js
-// map-listings.js
 function updateVisibleList() {
     if (!map.isStyleLoaded() || !listContainer) {
-        // console.log('[UPDATE_LIST] Carte non prête ou listContainer non trouvé.'); // Déjà présent
+        // console.log('[UPDATE_LIST] Carte non prête ou listContainer non trouvé.');
         return;
     }
     const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_PINS] });
@@ -176,9 +172,7 @@ function updateVisibleList() {
     console.log(`[UPDATE_LIST] Annonces visibles sur la carte (IDs de propriété):`, Array.from(visiblePropertyIds));
 
     const allListItems = listContainer.querySelectorAll('[data-property-id]');
-    // ... (le reste de la fonction reste pareil, car item.dataset.propertyId est déjà une chaîne)
-    // La comparaison sera visiblePropertyIds.has(itemIdString)
-
+    
     if (allListItems.length === 0) {
         console.warn('[UPDATE_LIST] Aucun item trouvé dans la liste HTML avec [data-property-id].');
     }
@@ -192,8 +186,10 @@ function updateVisibleList() {
             item.classList.add('annonce-list-item-hidden'); // Le cacher par précaution
             return;
         }
-
-        const isVisibleOnMap = visibleIds.has(itemIdString);
+        
+        // --- C'EST ICI LA CORRECTION ---
+        // On utilise bien `visiblePropertyIds` qui a été défini plus haut.
+        const isVisibleOnMap = visiblePropertyIds.has(itemIdString);
 
         console.log(`[UPDATE_LIST] Traitement item HTML ID: "${itemIdString}", visible sur carte: ${isVisibleOnMap}`); 
 
@@ -205,7 +201,8 @@ function updateVisibleList() {
     });
 
     if (isMobile && mobileToggleButton) {
-        mobileToggleButton.textContent = `Voir les ${visibleIds.size} logements`;
+        // On utilise la taille du Set pour le compte
+        mobileToggleButton.textContent = `Voir les ${visiblePropertyIds.size} logements`;
     }
 }
 
