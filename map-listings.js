@@ -231,56 +231,60 @@ function updateVisibleList() {
         `;
     }
     
-    function handleMapClick(e) {
-        if (e.features && e.features.length > 0) {
-            const feature = e.features[0];
-            const coordinates = feature.geometry.coordinates.slice();
-            const properties = feature.properties;
-            const clickedFeatureId = feature.id; // L'ID du feature, promu depuis annonce.id
+function handleMapClick(e) {
+    if (e.features && e.features.length > 0) {
+        const feature = e.features[0];
+        // console.log('[HANDLE_MAP_CLICK] Clicked feature object:', JSON.parse(JSON.stringify(feature))); // Décommentez pour inspecter l'objet feature entier si besoin
 
-            console.log('[HANDLE_MAP_CLICK] Clic sur feature ID:', clickedFeatureId, 'Propriétés:', properties); // LOG 1
+        const coordinates = feature.geometry.coordinates.slice();
+        const properties = feature.properties;
+        const clickedFeatureId = feature.id; 
 
-            // Retirer l'état 'selected' de l'ancien pin
-            if (selectedFeatureId !== null) {
-                console.log('[HANDLE_MAP_CLICK] Effacement état "selected" pour ID:', selectedFeatureId); // LOG 2
-                map.setFeatureState({ source: SOURCE_ID, id: selectedFeatureId }, { selected: false });
-            }
+        console.log('[HANDLE_MAP_CLICK] Clic sur feature ID:', clickedFeatureId, 'Propriétés:', properties);
 
-            // Mettre l'état 'selected' sur le nouveau pin
-            console.log('[HANDLE_MAP_CLICK] Application état "selected" pour ID:', clickedFeatureId); // LOG 3
-            map.setFeatureState({ source: SOURCE_ID, id: clickedFeatureId }, { selected: true });
-            selectedFeatureId = clickedFeatureId; // Mettre à jour l'ID sélectionné
-
-            if (currentPopup) {
-                currentPopup.remove();
-            }
-
-            while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
-                coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
-            }
-
-            const popupHTML = createPopupHTML(properties);
-
-            currentPopup = new maplibregl.Popup({ 
-                    offset: 10, // Ajusté car plus de flèche
-                    closeButton: true, 
-                    className: 'airbnb-style-popup'
-                })
-                .setLngLat(coordinates)
-                .setHTML(popupHTML)
-                .addTo(map);
-
-            // Quand le popup est fermé, désélectionner le pin
-            currentPopup.on('close', () => {
-                if (selectedFeatureId !== null) {
-                    console.log('[POPUP_CLOSE] Effacement état "selected" à la fermeture du popup pour ID:', selectedFeatureId); // LOG 4
-                    map.setFeatureState({ source: SOURCE_ID, id: selectedFeatureId }, { selected: false });
-                    selectedFeatureId = null;
-                }
-                currentPopup = null;
-            });
+        // Désélectionner l'ancien pin SEULEMENT s'il est différent du nouveau pin cliqué
+        if (selectedFeatureId !== null && selectedFeatureId !== clickedFeatureId) {
+            console.log('[HANDLE_MAP_CLICK] Effacement état "selected" pour ancien ID:', selectedFeatureId);
+            map.setFeatureState({ source: SOURCE_ID, id: selectedFeatureId }, { selected: false });
         }
+
+        // Mettre l'état 'selected' sur le nouveau pin (ou le réappliquer si c'est le même)
+        console.log('[HANDLE_MAP_CLICK] Application état "selected" pour ID:', clickedFeatureId);
+        map.setFeatureState({ source: SOURCE_ID, id: clickedFeatureId }, { selected: true });
+
+        // --- AJOUT IMPORTANT POUR DÉBOGAGE CI-DESSOUS ---
+        const currentState = map.getFeatureState({ source: SOURCE_ID, id: clickedFeatureId });
+        console.log('[HANDLE_MAP_CLICK] État actuel du feature après setFeatureState:', currentState); 
+        // --- FIN DE L'AJOUT POUR DÉBOGAGE ---
+
+        selectedFeatureId = clickedFeatureId; // Mettre à jour l'ID du pin actuellement sélectionné
+
+        if (currentPopup) {
+            currentPopup.remove();
+        }
+
+        // Création et affichage de la nouvelle popup
+        const popupHTML = createPopupHTML(properties);
+        currentPopup = new maplibregl.Popup({ 
+                offset: 10,
+                closeButton: true, 
+                className: 'airbnb-style-popup'
+            })
+            .setLngLat(coordinates)
+            .setHTML(popupHTML)
+            .addTo(map);
+
+        currentPopup.on('close', () => {
+            // À la fermeture de la popup, on désélectionne le pin UNIQUEMENT s'il est toujours celui qui est considéré comme selectedFeatureId
+            if (selectedFeatureId === clickedFeatureId) { 
+                console.log('[POPUP_CLOSE] Effacement état "selected" à la fermeture du popup pour ID:', clickedFeatureId);
+                map.setFeatureState({ source: SOURCE_ID, id: clickedFeatureId }, { selected: false });
+                selectedFeatureId = null; 
+            }
+            currentPopup = null;
+        });
     }
+}
 
     function getNestedValue(obj, path) {
         if (!path) return undefined;
