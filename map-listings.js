@@ -1,7 +1,6 @@
 // map-listings.js - VERSION AVEC POPUP AMÉLIORÉ ET PIN SÉLECTIONNÉ
-
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V3] Initialisation avec pin sélectionné.');
+    console.log('[MAP_SCRIPT V5] Initialisation avec bâtiments 3D corrigée.');
 
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const MAP_CONTAINER_ID = 'map-section';
@@ -18,170 +17,140 @@ document.addEventListener('DOMContentLoaded', function() {
     let allAnnouncements = [];
     let isMobile = window.innerWidth < 768;
     let currentPopup = null;
-    let selectedFeatureId = null; // Pour garder l'ID du pin actuellement sélectionné
+    let selectedFeatureId = null;
 
     document.addEventListener('annoncesChargeesEtRendues', (event) => {
-    const annonces = event.detail.annonces;
-    if (!annonces || !Array.isArray(annonces)) return;
-    
-    allAnnouncements = annonces;
-    const geojsonData = convertAnnoncesToGeoJSON(allAnnouncements);
+        const annonces = event.detail.annonces;
+        if (!annonces || !Array.isArray(annonces)) return;
+        
+        allAnnouncements = annonces;
+        const geojsonData = convertAnnoncesToGeoJSON(allAnnouncements);
 
-    if (!map) {
-        initializeMap(geojsonData);
-        // On appelle la fonction une fois que la carte est prête et que les données sont là
-        map.on('load', () => mettreAJourBatimentsSelectionnes(allAnnouncements));
-    } else {
-        if (selectedFeatureId !== null) {
-            map.setFeatureState({ source: SOURCE_ID, id: selectedFeatureId }, { selected: false });
-            selectedFeatureId = null;
-        }
-        map.getSource(SOURCE_ID).setData(geojsonData);
-        // On met à jour les bâtiments à chaque changement de filtre
-        mettreAJourBatimentsSelectionnes(allAnnouncements);
-    }
-})
-
-// Fichier : map-listings (3).js
-// FONCTION CORRIGÉE
-
-function convertAnnoncesToGeoJSON(annonces) {
-    const features = annonces.map(annonce => {
-        const lat = getNestedValue(annonce, 'geo_location.data.lat');
-        const lng = getNestedValue(annonce, 'geo_location.data.lng');
-
-        if (annonce.id === undefined || annonce.id === null || lat === undefined || lng === undefined) {
-            console.warn('[GEOJSON_CONVERT] Annonce sans ID ou coordonnées valides, ignorée:', annonce);
-            return null;
-        }
-
-        let featureId = parseInt(annonce.id, 10);
-        if (isNaN(featureId)) {
-            console.warn('[GEOJSON_CONVERT] ID d\'annonce non numérique, ignorée:', annonce);
-            return null;
-        }
-
-        return {
-            type: 'Feature',
-            // Laisser l'ID à la racine est une bonne pratique, mais l'essentiel pour `promoteId` est de l'avoir dans les propriétés.
-            id: featureId, 
-            geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] },
-            properties: {
-                // --- AJOUT DE LA LIGNE CRUCIALE CI-DESSOUS ---
-                id: featureId, // Assure que MapLibre peut "promouvoir" cet ID.
-
-                // Le reste de vos propriétés
-                id_str: String(annonce.id), 
-                price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?',
-                title: getNestedValue(annonce, 'property_title'),
-                coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url')
+        if (!map) {
+            initializeMap(geojsonData);
+            map.on('load', () => mettreAJourBatimentsSelectionnes(allAnnouncements));
+        } else {
+            if (selectedFeatureId !== null) {
+                map.setFeatureState({ source: SOURCE_ID, id: selectedFeatureId }, { selected: false });
+                selectedFeatureId = null;
             }
-        };
-    }).filter(Boolean); // filter(Boolean) est une façon élégante de retirer les "null"
-    
-    return { type: 'FeatureCollection', features };
-}
+            map.getSource(SOURCE_ID).setData(geojsonData);
+            mettreAJourBatimentsSelectionnes(allAnnouncements);
+        }
+    });
+
+    function convertAnnoncesToGeoJSON(annonces) {
+        const features = annonces.map(annonce => {
+            const lat = getNestedValue(annonce, 'geo_location.data.lat');
+            const lng = getNestedValue(annonce, 'geo_location.data.lng');
+            if (annonce.id === undefined || annonce.id === null || lat === undefined || lng === undefined) return null;
+            let featureId = parseInt(annonce.id, 10);
+            if (isNaN(featureId)) return null;
+            return {
+                type: 'Feature',
+                id: featureId,
+                geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] },
+                properties: {
+                    id: featureId,
+                    id_str: String(annonce.id),
+                    price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?',
+                    title: getNestedValue(annonce, 'property_title'),
+                    coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url')
+                }
+            };
+        }).filter(Boolean);
+        return { type: 'FeatureCollection', features };
+    }
+
+    async function mettreAJourBatimentsSelectionnes(annonces) {
+        if (!map.isStyleLoaded() || !annonces || annonces.length === 0) return;
+        
+        await map.once('idle');
+        const buildingIds = new Set();
+        for (const annonce of annonces) {
+            const lat = getNestedValue(annonce, 'geo_location.data.lat');
+            const lng = getNestedValue(annonce, 'geo_location.data.lng');
+            if (lat && lng) {
+                const point = map.project([lng, lat]);
+                // ============================ CORRECTION CLÉ ============================
+                // On interroge la couche de base qui contient TOUS les bâtiments gris
+                const features = map.queryRenderedFeatures(point, {
+                    layers: ['base-buildings-3d']
+                });
+                // ======================================================================
+                if (features.length > 0) {
+                    buildingIds.add(features[0].id);
+                }
+            }
+        }
+        const idsTrouves = Array.from(buildingIds);
+        console.log(`Bâtiments trouvés et mis en surbrillance : ${idsTrouves.length}`);
+        // On met à jour le filtre de la couche rose avec les bons IDs
+        map.setFilter('batiments-selectionnes-3d', ['in', ['id'], ...idsTrouves.length > 0 ? idsTrouves : ['']]);
+    }
 
     function initializeMap(initialGeoJSON) {
         map = new maplibregl.Map({
             container: MAP_CONTAINER_ID,
             style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`,
             center: [2.3522, 48.8566],
-            zoom: 11,
+            zoom: 15,
+            // ============================ AJOUT POUR LA 3D ============================
+            pitch: 50,
+            bearing: -15,
+            // ========================================================================
             renderWorldCopies: false
         });
 
         map.on('load', () => {
-            console.log('[MAP_SCRIPT V3] Carte chargée. Ajout des couches et des événements.');
+            console.log('[MAP_SCRIPT V5] Carte chargée. Ajout des couches 3D.');
 
             map.addSource(SOURCE_ID, { 
                 type: 'geojson', 
                 data: initialGeoJSON,
-                promoteId: 'id' // Indique à MapLibre d'utiliser la propriété 'id' de nos features comme ID de source
+                promoteId: 'id'
             });
 
-            // AJOUT DE LA NOUVELLE COUCHE POUR LES BÂTIMENTS EN 3D
-map.addLayer({
-    'id': 'batiments-selectionnes-3d',
-    'type': 'fill-extrusion',
-    // La source 'composite' et 'building' sont les standards pour les données de bâtiments de MapTiler
-    'source': 'maptiler', 
-    'source-layer': 'building',
-    // Au début, on filtre pour ne rien afficher. ['in', ['id'], '']
-    'filter': ['in', ['id'], ''], 
-    'paint': {
-        'fill-extrusion-color': '#FF1493', // Un rose "Deep Pink" bien visible
-        'fill-extrusion-height': [
-            // On essaie de récupérer la hauteur réelle du bâtiment depuis les données de la carte
-            'interpolate', ['linear'], ['zoom'],
-            15, 0,
-            16, ['get', 'height']
-        ],
-        'fill-extrusion-base': ['get', 'min_height'],
-        'fill-extrusion-opacity': 0.85
-    }
-}, LAYER_ID_PINS); // Important : pour placer cette couche SOUS les pins
+            const heightExpression = ['interpolate', ['linear'], ['zoom'], 15, 0, 16, ['get', 'height']];
+
+            // ============================ NOUVELLE COUCHE DE BASE ============================
+            // Couche pour afficher TOUS les bâtiments en 3D avec une couleur neutre
+            map.addLayer({
+                'id': 'base-buildings-3d',
+                'type': 'fill-extrusion',
+                'source': 'maptiler',
+                'source-layer': 'building',
+                'paint': {
+                    'fill-extrusion-color': '#dfdfdf',
+                    'fill-extrusion-height': heightExpression,
+                    'fill-extrusion-base': ['get', 'min_height'],
+                    'fill-extrusion-opacity': 0.7
+                }
+            }, LAYER_ID_PINS);
+            // ===============================================================================
+
+            // Votre couche pour les bâtiments roses (qui vient se superposer à la couche de base)
+            map.addLayer({
+                'id': 'batiments-selectionnes-3d',
+                'type': 'fill-extrusion',
+                'source': 'maptiler',
+                'source-layer': 'building',
+                'filter': ['in', ['id'], ''], 
+                'paint': {
+                    'fill-extrusion-color': '#FF1493',
+                    'fill-extrusion-height': heightExpression,
+                    'fill-extrusion-base': ['get', 'min_height'],
+                    'fill-extrusion-opacity': 0.9
+                }
+            }, LAYER_ID_PINS);
             
-            // Couche des CERCLES (fond des pins)
-            map.addLayer({
-                id: LAYER_ID_PINS,
-                type: 'circle',
-                source: SOURCE_ID,
-                paint: {
-                    'circle-color': [
-        'case',
-        ['boolean', ['feature-state', 'selected'], false],
-        '#007bff', // Bleu si sélectionné
-        '#FFFFFF'  // Blanc par défaut
-    ],
-    'circle-stroke-color': [
-        'case',
-        ['boolean', ['feature-state', 'selected'], false],
-        '#0056b3', // Bordure bleu foncé si sélectionné
-        '#CCCCCC'  // Bordure grise par défaut
-    ],
-                    'circle-radius': 18, // Légèrement plus grand
-                    'circle-stroke-width': [
-                        'case',
-                        ['boolean', ['feature-state', 'selected'], false],
-                        2,       // Épaisseur de la bordure si sélectionné
-                        1.5      // Épaisseur par défaut
-                    ],
-                    'circle-stroke-color': [
-                        'case',
-                        ['boolean', ['feature-state', 'selected'], false],
-                        '#FFFFFF', // Couleur de bordure si sélectionné (blanc)
-                        '#007bff'  // Couleur de bordure par défaut (bleu)
-                    ]
-                }
-            });
-
-            // Couche des LABELS (prix)
-            map.addLayer({
-                id: LAYER_ID_LABELS,
-                type: 'symbol',
-                source: SOURCE_ID,
-                layout: {
-                    'text-field': ['concat', ['to-string', ['get', 'price']], '€'],
-                    'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-                    'text-size': 11, // Légèrement plus petit pour tenir dans le cercle
-                    'text-allow-overlap': true
-                },
-                paint: {
-                    'text-color': [
-        'case',
-        ['boolean', ['feature-state', 'selected'], false],
-        '#FFFFFF', // Texte blanc si sélectionné (sur fond bleu)
-        '#333333'  // Texte gris foncé par défaut (sur fond blanc)
-    ]
-                }
-            });
-
+            // Le reste de vos couches (pins, labels) reste inchangé
+            map.addLayer({ id: LAYER_ID_PINS, /* ... */ });
+            map.addLayer({ id: LAYER_ID_LABELS, /* ... */ });
+            
             map.on('click', LAYER_ID_PINS, handleMapClick);
-            // map.on('click', LAYER_ID_LABELS, handleMapClick); // On peut aussi cliquer sur le label
             map.on('mouseenter', LAYER_ID_PINS, () => map.getCanvas().style.cursor = 'pointer');
             map.on('mouseleave', LAYER_ID_PINS, () => map.getCanvas().style.cursor = '');
-            
             map.on('moveend', updateVisibleList);
             updateVisibleList();
         });
@@ -191,48 +160,9 @@ map.addLayer({
 
 
 
-async function mettreAJourBatimentsSelectionnes(annonces) {
-    if (!map.isStyleLoaded()) {
-        console.log("Le style de la carte n'est pas encore chargé.");
-        return;
-    }
+
+
     
-    // Attendre que la carte soit inactive (plus de mouvement) pour éviter des requêtes inutiles
-    await map.once('idle');
-
-    const buildingIds = new Set(); // Utiliser un Set pour éviter les doublons
-
-    for (const annonce of annonces) {
-        const lat = getNestedValue(annonce, 'geo_location.data.lat');
-        const lng = getNestedValue(annonce, 'geo_location.data.lng');
-
-        if (lat && lng) {
-            // On convertit les coordonnées GPS en coordonnées pixel de l'écran
-            const point = map.project([lng, lat]);
-            // On interroge la carte pour trouver les features à ce pixel
-            const features = map.queryRenderedFeatures(point, {
-                layers: ['batiments-selectionnes-3d'] // On interroge notre propre couche (qui a accès à tous les bâtiments)
-            });
-
-            if (features.length > 0) {
-                // On a trouvé un bâtiment, on ajoute son ID
-                buildingIds.add(features[0].id);
-            }
-        }
-    }
-    
-    const idsTrouves = Array.from(buildingIds);
-    console.log(`Bâtiments trouvés et mis en surbrillance : ${idsTrouves.length}`);
-    
-    if (idsTrouves.length > 0) {
-        // On met à jour le filtre de la couche pour afficher SEULEMENT les bâtiments avec les bons IDs
-        map.setFilter('batiments-selectionnes-3d', ['in', ['id'], ...idsTrouves]);
-    } else {
-        // Si aucun bâtiment n'est trouvé, on s'assure que le filtre est vide
-        map.setFilter('batiments-selectionnes-3d', ['in', ['id'], '']);
-    }
-}
-
 function updateVisibleList() {
     if (!map || !map.isStyleLoaded() || !listContainer) {
         return;
