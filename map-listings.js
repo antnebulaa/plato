@@ -39,9 +39,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-  
-// map-listings.js
-// map-listings.js
+// Fichier : map-listings (3).js
+// FONCTION CORRIGÉE
+
 function convertAnnoncesToGeoJSON(annonces) {
     const features = annonces.map(annonce => {
         const lat = getNestedValue(annonce, 'geo_location.data.lat');
@@ -52,7 +52,7 @@ function convertAnnoncesToGeoJSON(annonces) {
             return null;
         }
 
-        let featureId = parseInt(annonce.id, 10); // Assurons-nous que c'est un nombre
+        let featureId = parseInt(annonce.id, 10);
         if (isNaN(featureId)) {
             console.warn('[GEOJSON_CONVERT] ID d\'annonce non numérique, ignorée:', annonce);
             return null;
@@ -60,17 +60,22 @@ function convertAnnoncesToGeoJSON(annonces) {
 
         return {
             type: 'Feature',
-            id: featureId, // ID numérique à la racine
+            // Laisser l'ID à la racine est une bonne pratique, mais l'essentiel pour `promoteId` est de l'avoir dans les propriétés.
+            id: featureId, 
             geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] },
             properties: {
-                // On peut garder l'id original ici aussi sous forme de string pour la liste
+                // --- AJOUT DE LA LIGNE CRUCIALE CI-DESSOUS ---
+                id: featureId, // Assure que MapLibre peut "promouvoir" cet ID.
+
+                // Le reste de vos propriétés
                 id_str: String(annonce.id), 
                 price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?',
                 title: getNestedValue(annonce, 'property_title'),
                 coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url')
             }
         };
-    }).filter(Boolean);
+    }).filter(Boolean); // filter(Boolean) est une façon élégante de retirer les "null"
+    
     return { type: 'FeatureCollection', features };
 }
 
