@@ -21,24 +21,26 @@ document.addEventListener('DOMContentLoaded', function() {
     let selectedFeatureId = null; // Pour garder l'ID du pin actuellement sélectionné
 
     document.addEventListener('annoncesChargeesEtRendues', (event) => {
-        const annonces = event.detail.annonces;
-        if (!annonces || !Array.isArray(annonces)) return;
-        
-        allAnnouncements = annonces;
-        const geojsonData = convertAnnoncesToGeoJSON(allAnnouncements);
-        const buildingPolygons = convertAnnoncesToBuildingPolygons(allAnnouncements); 
+    const annonces = event.detail.annonces;
+    if (!annonces || !Array.isArray(annonces)) return;
+    
+    allAnnouncements = annonces;
+    const geojsonData = convertAnnoncesToGeoJSON(allAnnouncements);
 
-        if (!map) {
-            initializeMap(geojsonData);
-        } else {
-            // Si la carte existe déjà, on met juste à jour la source et on efface la sélection
-            if (selectedFeatureId !== null) {
-                map.setFeatureState({ source: SOURCE_ID, id: selectedFeatureId }, { selected: false });
-                selectedFeatureId = null;
-            }
-            map.getSource(SOURCE_ID).setData(geojsonData);
+    if (!map) {
+        initializeMap(geojsonData);
+        // On appelle la fonction une fois que la carte est prête et que les données sont là
+        map.on('load', () => mettreAJourBatimentsSelectionnes(allAnnouncements));
+    } else {
+        if (selectedFeatureId !== null) {
+            map.setFeatureState({ source: SOURCE_ID, id: selectedFeatureId }, { selected: false });
+            selectedFeatureId = null;
         }
-    });
+        map.getSource(SOURCE_ID).setData(geojsonData);
+        // On met à jour les bâtiments à chaque changement de filtre
+        mettreAJourBatimentsSelectionnes(allAnnouncements);
+    }
+})
 
 // Fichier : map-listings (3).js
 // FONCTION CORRIGÉE
@@ -80,58 +82,14 @@ function convertAnnoncesToGeoJSON(annonces) {
     return { type: 'FeatureCollection', features };
 }
 
-    // À ajouter dans map-listings.js
-
-/**
- * Crée des polygones carrés pour chaque annonce pour simuler des bâtiments.
- * @param {Array} annonces - Le tableau des annonces.
- * @returns {GeoJSON.FeatureCollection} - Une FeatureCollection de polygones.
- */
-function convertAnnoncesToBuildingPolygons(annonces) {
-    const features = annonces.map(annonce => {
-        const lat = getNestedValue(annonce, 'geo_location.data.lat');
-        const lng = getNestedValue(annonce, 'geo_location.data.lng');
-
-        if (lat === undefined || lng === undefined) {
-            return null;
-        }
-
-        const size = 0.0001; // Taille du carré en degrés (ajustez si besoin)
-        const id = parseInt(annonce.id, 10);
-
-        // Crée les 4 coins du polygone carré autour du point central
-        const coordinates = [[
-            [lng - size, lat + size], // Top-left
-            [lng + size, lat + size], // Top-right
-            [lng + size, lat - size], // Bottom-right
-            [lng - size, lat - size], // Bottom-left
-            [lng - size, lat + size]  // On referme le polygone
-        ]];
-
-        return {
-            type: 'Feature',
-            properties: { id: id },
-            geometry: {
-                type: 'Polygon',
-                coordinates: coordinates
-            }
-        };
-    }).filter(Boolean);
-
-    return { type: 'FeatureCollection', features };
-}
-
     function initializeMap(initialGeoJSON) {
         map = new maplibregl.Map({
-        container: MAP_CONTAINER_ID,
-        style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`,
-        center: [2.3522, 48.8566],
-        zoom: 15, // Un peu plus de zoom pour mieux voir les bâtiments
-        pitch: 50, // Inclinaison de la carte pour la vue 3D (0 = plat, 60 = très incliné)
-        bearing: -15, // Rotation de la carte pour un angle intéressant
-        renderWorldCopies: false
-    });
-
+            container: MAP_CONTAINER_ID,
+            style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`,
+            center: [2.3522, 48.8566],
+            zoom: 11,
+            renderWorldCopies: false
+        });
 
         map.on('load', () => {
             console.log('[MAP_SCRIPT V3] Carte chargée. Ajout des couches et des événements.');
@@ -142,41 +100,27 @@ function convertAnnoncesToBuildingPolygons(annonces) {
                 promoteId: 'id' // Indique à MapLibre d'utiliser la propriété 'id' de nos features comme ID de source
             });
 
-            // ===================================================================
-    // == DÉBUT DES AJOUTS POUR LES BÂTIMENTS 3D ==
-    // ===================================================================
-
-    // 1. On crée les données GeoJSON pour les polygones des bâtiments
-    const buildingPolygons = convertAnnoncesToBuildingPolygons(allAnnouncements);
-
-    // 2. On ajoute une nouvelle source de données pour ces polygones
-    map.addSource('buildings-highlight-source', {
-        type: 'geojson',
-        data: buildingPolygons
-    });
-
-    // 3. On ajoute la couche 3D (fill-extrusion) qui utilise cette source
-    map.addLayer({
-        'id': 'highlighted-buildings-layer',
-        'type': 'fill-extrusion',
-        'source': 'buildings-highlight-source', // Utilise notre nouvelle source
-        'paint': {
-            // Couleur rose pour les bâtiments
-            'fill-extrusion-color': '#FFC0CB', // Rose
-            // Hauteur fixe pour les bâtiments en mètres
-            'fill-extrusion-height': 150,
-            // Opacité pour un effet plus subtil
-            'fill-extrusion-opacity': 0.85,
-            // Optionnel : couleur des bâtiments au survol de la souris
-            'fill-extrusion-color-transition': { duration: 300 },
-        }
-    }, 
-    LAYER_ID_PINS // Important : cet argument place la couche 3D SOUS les pins de prix
-    );
-
-    // ===================================================================
-    // == FIN DES AJOUTS POUR LES BÂTIMENTS 3D ==
-    // ===================================================================
+            // AJOUT DE LA NOUVELLE COUCHE POUR LES BÂTIMENTS EN 3D
+map.addLayer({
+    'id': 'batiments-selectionnes-3d',
+    'type': 'fill-extrusion',
+    // La source 'composite' et 'building' sont les standards pour les données de bâtiments de MapTiler
+    'source': 'maptiler', 
+    'source-layer': 'building',
+    // Au début, on filtre pour ne rien afficher. ['in', ['id'], '']
+    'filter': ['in', ['id'], ''], 
+    'paint': {
+        'fill-extrusion-color': '#FF1493', // Un rose "Deep Pink" bien visible
+        'fill-extrusion-height': [
+            // On essaie de récupérer la hauteur réelle du bâtiment depuis les données de la carte
+            'interpolate', ['linear'], ['zoom'],
+            15, 0,
+            16, ['get', 'height']
+        ],
+        'fill-extrusion-base': ['get', 'min_height'],
+        'fill-extrusion-opacity': 0.85
+    }
+}, LAYER_ID_PINS); // Important : pour placer cette couche SOUS les pins
             
             // Couche des CERCLES (fond des pins)
             map.addLayer({
@@ -245,7 +189,49 @@ function convertAnnoncesToBuildingPolygons(annonces) {
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
 
-// map-listings.js -> Remplacer l'ancienne fonction updateVisibleList par celle-ci
+
+
+async function mettreAJourBatimentsSelectionnes(annonces) {
+    if (!map.isStyleLoaded()) {
+        console.log("Le style de la carte n'est pas encore chargé.");
+        return;
+    }
+    
+    // Attendre que la carte soit inactive (plus de mouvement) pour éviter des requêtes inutiles
+    await map.once('idle');
+
+    const buildingIds = new Set(); // Utiliser un Set pour éviter les doublons
+
+    for (const annonce of annonces) {
+        const lat = getNestedValue(annonce, 'geo_location.data.lat');
+        const lng = getNestedValue(annonce, 'geo_location.data.lng');
+
+        if (lat && lng) {
+            // On convertit les coordonnées GPS en coordonnées pixel de l'écran
+            const point = map.project([lng, lat]);
+            // On interroge la carte pour trouver les features à ce pixel
+            const features = map.queryRenderedFeatures(point, {
+                layers: ['batiments-selectionnes-3d'] // On interroge notre propre couche (qui a accès à tous les bâtiments)
+            });
+
+            if (features.length > 0) {
+                // On a trouvé un bâtiment, on ajoute son ID
+                buildingIds.add(features[0].id);
+            }
+        }
+    }
+    
+    const idsTrouves = Array.from(buildingIds);
+    console.log(`Bâtiments trouvés et mis en surbrillance : ${idsTrouves.length}`);
+    
+    if (idsTrouves.length > 0) {
+        // On met à jour le filtre de la couche pour afficher SEULEMENT les bâtiments avec les bons IDs
+        map.setFilter('batiments-selectionnes-3d', ['in', ['id'], ...idsTrouves]);
+    } else {
+        // Si aucun bâtiment n'est trouvé, on s'assure que le filtre est vide
+        map.setFilter('batiments-selectionnes-3d', ['in', ['id'], '']);
+    }
+}
 
 function updateVisibleList() {
     if (!map || !map.isStyleLoaded() || !listContainer) {
