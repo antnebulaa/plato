@@ -1,6 +1,6 @@
-// map-listings.js - VERSION FINALE v9 - Noms de source/couche corrigés
+// map-listings.js - VERSION FINALE v9.1 - Ordre des couches corrigé
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V9] Noms de source/couche corrigés.');
+    console.log('[MAP_SCRIPT V9.1] Ordre des couches corrigé.');
 
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const MAP_CONTAINER_ID = 'map-section';
@@ -55,7 +55,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function mettreAJourBatimentsSelectionnes(annonces) {
         if (!map.isStyleLoaded() || !annonces || annonces.length === 0) {
-            // Si pas d'annonces, s'assurer que la couche des bâtiments sélectionnés est vide
             if (map.getLayer('batiments-selectionnes-3d')) {
                  map.setFilter('batiments-selectionnes-3d', ['in', ['id'], '']);
             }
@@ -69,7 +68,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (lat && lng) {
                 const point = map.project([lng, lat]);
                 const queryBox = [ [point.x - 10, point.y - 10], [point.x + 10, point.y + 10] ];
-                // On interroge la couche de base des bâtiments
                 const features = map.queryRenderedFeatures(queryBox, { layers: ['base-buildings-3d'] });
                 if (features.length > 0) {
                     buildingIds.add(features[0].id);
@@ -103,31 +101,39 @@ document.addEventListener('DOMContentLoaded', function() {
             renderWorldCopies: false
         });
         
-        // Rend la variable 'map' accessible depuis la console pour le débogage
         window.map = map;
-
 
         if (initialGeoJSON.features.length > 0) {
             const bounds = getBounds(initialGeoJSON);
             map.fitBounds(bounds, { padding: 80, duration: 0, maxZoom: 16 });
         } else {
-            // Si pas d'annonces, on centre sur Paris par défaut
             map.setCenter([2.3522, 48.8566]);
             map.setZoom(11);
         }
 
         map.on('load', () => {
-            console.log('[MAP_SCRIPT V9] Carte chargée. Ajout des couches.');
+            console.log('[MAP_SCRIPT V9.1] Carte chargée. Ajout des couches dans le bon ordre.');
             map.addSource(SOURCE_ID, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
 
-            const heightExpression = ['coalesce', ['get', 'height'], 20]; // Hauteur par défaut si non définie
-            
-            // ============================ NOMS CORRIGÉS ICI ============================
-            const SOURCE_NAME_FOR_BUILDINGS = 'maptiler_planet'; // Corrigé selon la console
-            const SOURCE_LAYER_NAME_FOR_BUILDINGS = 'building';    // Corrigé selon la console
-            // ===========================================================================
+            const heightExpression = ['coalesce', ['get', 'height'], 20]; 
+            const SOURCE_NAME_FOR_BUILDINGS = 'maptiler_planet'; 
+            const SOURCE_LAYER_NAME_FOR_BUILDINGS = 'building';    
 
-            // Couche de base grise pour tous les bâtiments
+            // ============================ ORDRE D'AJOUT CORRIGÉ ============================
+            // 1. D'abord, la couche des PINS (annonces-pins-layer)
+            map.addLayer({
+                id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID,
+                paint: { 'circle-radius': 18, 'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#007bff', '#FFFFFF'], 'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 2, 1.5], 'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#007bff'] }
+            });
+
+            // 2. Ensuite, la couche des LABELS (souvent liée aux pins)
+            map.addLayer({
+                id: LAYER_ID_LABELS, type: 'symbol', source: SOURCE_ID,
+                layout: { 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 11, 'text-allow-overlap': true },
+                paint: { 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] }
+            });
+
+            // 3. Maintenant, la couche de base grise pour tous les bâtiments, insérée AVANT les pins
             map.addLayer({
                 'id': 'base-buildings-3d',
                 'type': 'fill-extrusion',
@@ -136,36 +142,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 'paint': { 
                     'fill-extrusion-color': '#dfdfdf', 
                     'fill-extrusion-height': heightExpression, 
-                    'fill-extrusion-base': ['coalesce', ['get', 'min_height'], 0], // Base par défaut si non définie
+                    'fill-extrusion-base': ['coalesce', ['get', 'min_height'], 0], 
                     'fill-extrusion-opacity': 0.7 
                 }
-            }, LAYER_ID_PINS); // Afficher sous les pins
+            }, LAYER_ID_PINS); // Insérer AVANT la couche des pins (qui existe maintenant)
 
-            // Couche rose pour les bâtiments sélectionnés
+            // 4. Et la couche rose pour les bâtiments sélectionnés, aussi AVANT les pins
             map.addLayer({
                 'id': 'batiments-selectionnes-3d',
                 'type': 'fill-extrusion',
                 'source': SOURCE_NAME_FOR_BUILDINGS,
                 'source-layer': SOURCE_LAYER_NAME_FOR_BUILDINGS,
-                'filter': ['in', ['id'], ''], // Initialement vide
+                'filter': ['in', ['id'], ''], 
                 'paint': { 
                     'fill-extrusion-color': '#FF1493', 
                     'fill-extrusion-height': heightExpression, 
                     'fill-extrusion-base': ['coalesce', ['get', 'min_height'], 0], 
                     'fill-extrusion-opacity': 0.9 
                 }
-            }, LAYER_ID_PINS); // Afficher sous les pins, mais au-dessus de la couche grise si l'ordre est important
-            
-            // Couches pour les pins et labels (configuration complète)
-            map.addLayer({
-                id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID,
-                paint: { 'circle-radius': 18, 'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#007bff', '#FFFFFF'], 'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 2, 1.5], 'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#007bff'] }
-            });
-            map.addLayer({
-                id: LAYER_ID_LABELS, type: 'symbol', source: SOURCE_ID,
-                layout: { 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 11, 'text-allow-overlap': true },
-                paint: { 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] }
-            });
+            }, LAYER_ID_PINS); // Insérer AVANT la couche des pins
+            // ===========================================================================
             
             map.on('click', LAYER_ID_PINS, handleMapClick);
             map.on('mouseenter', LAYER_ID_PINS, () => map.getCanvas().style.cursor = 'pointer');
@@ -173,7 +169,7 @@ document.addEventListener('DOMContentLoaded', function() {
             map.on('moveend', updateVisibleList);
 
             updateVisibleList();
-            mettreAJourBatimentsSelectionnes(allAnnouncements); // Appel initial
+            mettreAJourBatimentsSelectionnes(allAnnouncements); 
         });
 
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
@@ -249,7 +245,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.body.classList.add('map-is-active');
                 if (map) map.resize();
             }
-            // Mettre à jour le texte du bouton en fonction de l'état
             mobileToggleButton.textContent = document.body.classList.contains('map-is-active') ? `Voir la liste` : `Afficher la carte`;
         });
     }
