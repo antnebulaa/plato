@@ -1,14 +1,19 @@
-// map-listings.js - VERSION FINALE v9.2 - Ordre des couches finalisé
+// map-listings.js - VERSION FINALE v10 - Une seule couche 3D et feature-state
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V9.2] Ordre des couches finalisé.');
+    console.log('[MAP_SCRIPT V10] Approche avec une seule couche 3D et feature-state.');
 
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const MAP_CONTAINER_ID = 'map-section';
     const LIST_CONTAINER_ID = 'annonces-wrapper';
     const MOBILE_TOGGLE_BUTTON_ID = 'mobile-map-toggle';
-    const SOURCE_ID = 'annonces-source'; // Source pour nos pins d'annonces
+    const SOURCE_ID_ANNONCES = 'annonces-source'; // Source pour nos pins d'annonces
     const LAYER_ID_PINS = 'annonces-pins-layer';
     const LAYER_ID_LABELS = 'annonces-labels-layer';
+
+    // Noms pour la source et la couche des bâtiments 3D (issus de vos logs console)
+    const SOURCE_NAME_BUILDINGS = 'maptiler_planet'; 
+    const SOURCE_LAYER_NAME_BUILDINGS = 'building';
+    const LAYER_ID_BUILDINGS_3D = 'buildings-3d-layer'; // ID pour notre unique couche de bâtiments 3D
 
     const listContainer = document.getElementById(LIST_CONTAINER_ID);
     const mobileToggleButton = document.getElementById(MOBILE_TOGGLE_BUTTON_ID);
@@ -17,7 +22,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let allAnnouncements = [];
     let isMobile = window.innerWidth < 768;
     let currentPopup = null;
-    let selectedFeatureId = null;
+    let selectedPinId = null; // Pour le pin sélectionné (celui des annonces)
+    let currentHighlightedBuildingIds = new Set(); // Pour suivre les bâtiments actuellement en rose
 
     document.addEventListener('annoncesChargeesEtRendues', (event) => {
         const annonces = event.detail.annonces;
@@ -29,8 +35,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!map) {
             initializeMap(geojsonData);
         } else {
-            map.getSource(SOURCE_ID).setData(geojsonData);
-            mettreAJourBatimentsSelectionnes(allAnnouncements);
+            map.getSource(SOURCE_ID_ANNONCES).setData(geojsonData);
+            // La mise à jour des bâtiments se fera après que la carte soit stable
+            if (map.isStyleLoaded()) {
+                 mettreAJourBatimentsSelectionnes(allAnnouncements);
+            }
             if (geojsonData.features.length > 0) {
                  const bounds = getBounds(geojsonData);
                  map.fitBounds(bounds, { padding: 80, maxZoom: 16 });
@@ -53,34 +62,47 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function mettreAJourBatimentsSelectionnes(annonces) {
-        if (!map.isStyleLoaded() || !annonces || annonces.length === 0) {
-            if (map.getLayer('batiments-selectionnes-3d')) {
-                 map.setFilter('batiments-selectionnes-3d', ['in', ['id'], '']);
-            }
+        if (!map.isStyleLoaded()) {
+            console.warn("[BÂTIMENTS DEBUG] Style non chargé, impossible de mettre à jour les bâtiments.");
             return;
         }
-        await map.once('idle');
-        const buildingIds = new Set();
+
+        // 1. Réinitialiser l'état des bâtiments précédemment mis en évidence
+        currentHighlightedBuildingIds.forEach(buildingId => {
+            map.setFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: buildingId }, { highlighted: false });
+        });
+        currentHighlightedBuildingIds.clear();
+
+        if (!annonces || annonces.length === 0) {
+            console.log("[BÂTIMENTS DEBUG] Aucune annonce, pas de bâtiments à mettre en évidence.");
+            return;
+        }
+        
+        await map.once('idle'); // Attendre que la carte soit stable
+        
+        const newBuildingIdsToHighlight = new Set();
+
         for (const annonce of annonces) {
             const lat = getNestedValue(annonce, 'geo_location.data.lat');
             const lng = getNestedValue(annonce, 'geo_location.data.lng');
             if (lat && lng) {
                 const point = map.project([lng, lat]);
                 const queryBox = [ [point.x - 10, point.y - 10], [point.x + 10, point.y + 10] ];
-                const features = map.queryRenderedFeatures(queryBox, { layers: ['base-buildings-3d'] });
-                if (features.length > 0) {
-                    buildingIds.add(features[0].id);
+                // On interroge notre unique couche de bâtiments 3D
+                const features = map.queryRenderedFeatures(queryBox, { layers: [LAYER_ID_BUILDINGS_3D] });
+                if (features.length > 0 && features[0].id !== undefined) { // S'assurer que le feature a un ID
+                    newBuildingIdsToHighlight.add(features[0].id);
                 }
             }
         }
-        const idsTrouves = Array.from(buildingIds);
-        console.log(`[BÂTIMENTS DEBUG] IDs trouvés pour coloration : ${idsTrouves.join(', ')} (Total: ${idsTrouves.length})`);
-        
-        if (map.getLayer('batiments-selectionnes-3d')) {
-            map.setFilter('batiments-selectionnes-3d', ['in', ['id'], ...idsTrouves.length > 0 ? idsTrouves : ['']]);
-        } else {
-            console.warn("[BÂTIMENTS DEBUG] Couche 'batiments-selectionnes-3d' non trouvée au moment du filtrage.");
-        }
+
+        // 2. Mettre en évidence les nouveaux bâtiments
+        newBuildingIdsToHighlight.forEach(buildingId => {
+            map.setFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: buildingId }, { highlighted: true });
+        });
+        currentHighlightedBuildingIds = newBuildingIdsToHighlight; // Mettre à jour la liste des bâtiments en rose
+
+        console.log(`[BÂTIMENTS DEBUG] IDs mis en évidence : ${Array.from(currentHighlightedBuildingIds).join(', ')} (Total: ${currentHighlightedBuildingIds.size})`);
     }
 
     function getBounds(geojson) {
@@ -100,7 +122,7 @@ document.addEventListener('DOMContentLoaded', function() {
             renderWorldCopies: false
         });
         
-        window.map = map;
+        window.map = map; // Pour le débogage console
 
         if (initialGeoJSON.features.length > 0) {
             const bounds = getBounds(initialGeoJSON);
@@ -111,57 +133,43 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         map.on('load', () => {
-            console.log('[MAP_SCRIPT V9.2] Carte chargée. Ajout des couches dans le bon ordre.');
-            map.addSource(SOURCE_ID, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
+            console.log('[MAP_SCRIPT V10] Carte chargée. Ajout des couches.');
+            map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
 
             const heightExpression = ['coalesce', ['get', 'height'], 20]; 
-            const SOURCE_NAME_FOR_BUILDINGS = 'maptiler_planet'; 
-            const SOURCE_LAYER_NAME_FOR_BUILDINGS = 'building';    
+            const minHeightExpression = ['coalesce', ['get', 'min_height'], 0];
 
-            // ============================ ORDRE D'AJOUT CORRIGÉ ============================
-            // 1. D'abord, la couche des PINS (annonces-pins-layer)
+            // ============================ UNE SEULE COUCHE 3D POUR LES BÂTIMENTS ============================
             map.addLayer({
-                id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID,
+                'id': LAYER_ID_BUILDINGS_3D, // Utilisation de la constante définie
+                'type': 'fill-extrusion',
+                'source': SOURCE_NAME_BUILDINGS,
+                'source-layer': SOURCE_LAYER_NAME_BUILDINGS,
+                // Pas de filtre ici, on dessine tous les bâtiments de la source
+                'paint': { 
+                    // Coloration conditionnelle basée sur le feature-state 'highlighted'
+                    'fill-extrusion-color': [
+                        'case',
+                        ['boolean', ['feature-state', 'highlighted'], false], // Si 'highlighted' est true
+                        '#FF1493', // Couleur rose
+                        '#dfdfdf'  // Couleur grise par défaut
+                    ],
+                    'fill-extrusion-height': heightExpression, 
+                    'fill-extrusion-base': minHeightExpression, 
+                    'fill-extrusion-opacity': 0.85 // Opacité unique pour éviter les conflits
+                }
+            }, LAYER_ID_PINS); // Insérer AVANT la couche des pins pour qu'ils soient au-dessus
+            // ========================================================================================
+            
+            map.addLayer({
+                id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID_ANNONCES,
                 paint: { 'circle-radius': 18, 'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#007bff', '#FFFFFF'], 'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 2, 1.5], 'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#007bff'] }
             });
-
-            // 2. Ensuite, la couche des LABELS (souvent liée aux pins)
             map.addLayer({
-                id: LAYER_ID_LABELS, type: 'symbol', source: SOURCE_ID,
+                id: LAYER_ID_LABELS, type: 'symbol', source: SOURCE_ID_ANNONCES,
                 layout: { 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 11, 'text-allow-overlap': true },
                 paint: { 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] }
             });
-
-            // 3. Maintenant, la couche de base grise pour tous les bâtiments, insérée AVANT les pins
-            //    La couche LAYER_ID_PINS existe maintenant, donc on peut l'utiliser comme référence.
-            map.addLayer({
-                'id': 'base-buildings-3d',
-                'type': 'fill-extrusion',
-                'source': SOURCE_NAME_FOR_BUILDINGS,
-                'source-layer': SOURCE_LAYER_NAME_FOR_BUILDINGS,
-                'paint': { 
-                    'fill-extrusion-color': '#dfdfdf', 
-                    'fill-extrusion-height': heightExpression, 
-                    'fill-extrusion-base': ['coalesce', ['get', 'min_height'], 0], 
-                    'fill-extrusion-opacity': 0.7 
-                }
-            }, LAYER_ID_PINS); // Insérer AVANT la couche des pins
-
-            // 4. Et la couche rose pour les bâtiments sélectionnés, aussi AVANT les pins
-            map.addLayer({
-                'id': 'batiments-selectionnes-3d',
-                'type': 'fill-extrusion',
-                'source': SOURCE_NAME_FOR_BUILDINGS,
-                'source-layer': SOURCE_LAYER_NAME_FOR_BUILDINGS,
-                'filter': ['in', ['id'], ''], 
-                'paint': { 
-                    'fill-extrusion-color': '#FF1493', 
-                    'fill-extrusion-height': heightExpression, 
-                    'fill-extrusion-base': ['coalesce', ['get', 'min_height'], 0], 
-                    'fill-extrusion-opacity': 0.9 
-                }
-            }, LAYER_ID_PINS); // Insérer AVANT la couche des pins
-            // ===========================================================================
             
             map.on('click', LAYER_ID_PINS, handleMapClick);
             map.on('mouseenter', LAYER_ID_PINS, () => map.getCanvas().style.cursor = 'pointer');
@@ -183,18 +191,11 @@ document.addEventListener('DOMContentLoaded', function() {
         allListItems.forEach(itemDiv => {
             const itemIdString = itemDiv.dataset.propertyId;
             const anchorTag = itemDiv.parentElement;
-            if (!anchorTag || anchorTag.tagName !== 'A') {
-                itemDiv.style.display = visiblePropertyIds.has(itemIdString) ? '' : 'none'; return;
-            }
-            if (visiblePropertyIds.has(itemIdString)) {
-                anchorTag.classList.remove('annonce-list-item-hidden');
-            } else {
-                anchorTag.classList.add('annonce-list-item-hidden');
-            }
+            if (!anchorTag || anchorTag.tagName !== 'A') { itemDiv.style.display = visiblePropertyIds.has(itemIdString) ? '' : 'none'; return; }
+            if (visiblePropertyIds.has(itemIdString)) { anchorTag.classList.remove('annonce-list-item-hidden'); } 
+            else { anchorTag.classList.add('annonce-list-item-hidden'); }
         });
-        if (isMobile && mobileToggleButton) {
-            mobileToggleButton.textContent = `Voir les ${visiblePropertyIds.size} logements`;
-        }
+        if (isMobile && mobileToggleButton) { mobileToggleButton.textContent = `Voir les ${visiblePropertyIds.size} logements`; }
     }
 
     function createPopupHTML(properties) {
@@ -211,19 +212,19 @@ document.addEventListener('DOMContentLoaded', function() {
             const feature = e.features[0];
             const coordinates = feature.geometry.coordinates.slice();
             const properties = feature.properties;
-            const clickedFeatureId = feature.id;
-            if (selectedFeatureId !== null && selectedFeatureId !== clickedFeatureId) {
-                map.setFeatureState({ source: SOURCE_ID, id: selectedFeatureId }, { selected: false });
+            const clickedPinId = feature.id; // C'est l'ID du pin (annonce)
+            if (selectedPinId !== null && selectedPinId !== clickedPinId) {
+                map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
             }
-            map.setFeatureState({ source: SOURCE_ID, id: clickedFeatureId }, { selected: true });
-            selectedFeatureId = clickedFeatureId;
+            map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: clickedPinId }, { selected: true });
+            selectedPinId = clickedPinId;
             if (currentPopup) currentPopup.remove();
             const popupHTML = createPopupHTML(properties);
             currentPopup = new maplibregl.Popup({ offset: 10, closeButton: true, className: 'airbnb-style-popup' }).setLngLat(coordinates).setHTML(popupHTML).addTo(map);
             currentPopup.on('close', () => {
-                if (selectedFeatureId === clickedFeatureId) {
-                    map.setFeatureState({ source: SOURCE_ID, id: clickedFeatureId }, { selected: false });
-                    selectedFeatureId = null;
+                if (selectedPinId === clickedPinId) {
+                    map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
+                    selectedPinId = null;
                 }
                 currentPopup = null;
             });
@@ -237,15 +238,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (isMobile && mobileToggleButton) {
         mobileToggleButton.addEventListener('click', () => {
-            const isMapActive = document.body.classList.contains('map-is-active');
-            if (isMapActive) {
-                document.body.classList.remove('map-is-active');
-                if (listContainer) listContainer.scrollTo(0, 0);
-            } else {
-                document.body.classList.add('map-is-active');
+            document.body.classList.toggle('map-is-active');
+            if (document.body.classList.contains('map-is-active')) {
                 if (map) map.resize();
+                mobileToggleButton.textContent = `Voir la liste`;
+            } else {
+                if (listContainer) listContainer.scrollTo(0, 0);
+                mobileToggleButton.textContent = `Afficher la carte`;
             }
-            mobileToggleButton.textContent = document.body.classList.contains('map-is-active') ? `Voir la liste` : `Afficher la carte`;
         });
     }
 });
