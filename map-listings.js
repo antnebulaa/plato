@@ -1,15 +1,16 @@
-// map-listings.js - VERSION 19 - Pins type Airbnb et Popups améliorés
+// map-listings.js - VERSION 20 - Retour aux couches MapLibre pour les pins, popups améliorés
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V19] Initialisation avec pins style Airbnb et popups améliorés.');
+    console.log('[MAP_SCRIPT V20] Utilisation des couches MapLibre pour les pins/prix, popups/sheets améliorés.');
 
     // --- CONSTANTES GLOBALES ---
-    const MAPTILER_API_KEY = 'Z8Gqj65EHchnshMYiN7P'; // Assurez-vous que c'est votre clé MapTiler active
+    const MAPTILER_API_KEY = 'Z8Gqj65EHchnshMYiN7P';
     const MAP_CONTAINER_ID = 'map-section';
     const LIST_CONTAINER_ID = 'annonces-wrapper';
     const MOBILE_TOGGLE_BUTTON_ID = 'mobile-map-toggle';
     
-    const SOURCE_ID_ANNONCES_INVISIBLE = 'annonces-source-invisible'; // Pour queryRenderedFeatures
-    const LAYER_ID_PINS_INVISIBLE = 'annonces-pins-invisible';   // Pour queryRenderedFeatures
+    const SOURCE_ID_ANNONCES = 'annonces-source';
+    const LAYER_ID_PINS = 'annonces-pins-circles'; // Cercles cliquables
+    const LAYER_ID_LABELS = 'annonces-pins-labels';  // Labels de prix
 
     const SOURCE_NAME_BUILDINGS = 'maptiler_planet';
     const SOURCE_LAYER_NAME_BUILDINGS = 'building';
@@ -28,11 +29,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let allAnnouncements = [];
     let isMobile = window.innerWidth < 768;
     let currentDesktopPopup = null;
-    let currentSelectedMarkerEl = null; // L'élément DOM du marqueur HTML sélectionné
     let currentSelectedPropertyId = null;
-    let htmlMarkers = []; // Pour stocker les marqueurs HTML
     let currentHighlightedBuildingIds = new Set();
-
 
     // --- ÉLÉMENTS DU DOM ---
     const listContainer = document.getElementById(LIST_CONTAINER_ID);
@@ -48,15 +46,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!map) {
             initializeMap(geojsonData);
         } else {
-            // Mettre à jour la source invisible pour updateVisibleList
-            const source = map.getSource(SOURCE_ID_ANNONCES_INVISIBLE);
+            const source = map.getSource(SOURCE_ID_ANNONCES);
             if (source) source.setData(geojsonData);
             
-            renderListingMarkers(geojsonData); // Re-créer les marqueurs HTML
-
             if (geojsonData.features.length > 0 && map.isStyleLoaded()) {
                 try { map.fitBounds(getBounds(geojsonData), { padding: {top: 50, bottom:50, left: 50, right: 50}, maxZoom: 16 }); }
-                catch (e) { console.warn("[MAP_SCRIPT V19] Erreur fitBounds (annonces MàJ):", e); }
+                catch (e) { console.warn("[MAP_SCRIPT V20] Erreur fitBounds (annonces MàJ):", e); }
+            } else if (map.isStyleLoaded()) { // Si pas de features, centrer par défaut
+                 map.flyTo({ center: [2.3522, 48.8566], zoom: 5 });
             }
             if (map.isStyleLoaded()) mettreAJourBatimentsSelectionnes(allAnnouncements);
         }
@@ -64,7 +61,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function initializeMap(initialGeoJSON) {
         if (!document.getElementById(MAP_CONTAINER_ID)) {
-            console.error(`[MAP_SCRIPT V19] Conteneur de carte #${MAP_CONTAINER_ID} introuvable.`);
+            console.error(`[MAP_SCRIPT V20] Conteneur de carte #${MAP_CONTAINER_ID} introuvable.`);
             return;
         }
         map = new maplibregl.Map({
@@ -78,18 +75,16 @@ document.addEventListener('DOMContentLoaded', function() {
         window.map = map;
 
         map.on('load', () => {
-            console.log('[MAP_SCRIPT V19] Carte chargée.');
-            // Source invisible pour la synchronisation map -> liste
-            map.addSource(SOURCE_ID_ANNONCES_INVISIBLE, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
-            addMapLayers(); // Ajoute la couche invisible et les bâtiments 3D
-            renderListingMarkers(initialGeoJSON); // Ajoute les marqueurs HTML visibles
+            console.log('[MAP_SCRIPT V20] Carte chargée.');
+            map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' }); // 'id' doit être un entier dans les properties
+            addMapLayers();
             setupEventListeners();
             
             if (initialGeoJSON && initialGeoJSON.features.length > 0) {
                  try { map.fitBounds(getBounds(initialGeoJSON), { padding: {top: 50, bottom:50, left: 50, right: 50}, maxZoom: 16, duration:0 }); }
-                 catch (e) { console.warn("[MAP_SCRIPT V19] Erreur fitBounds (init):", e); }
+                 catch (e) { console.warn("[MAP_SCRIPT V20] Erreur fitBounds (init):", e); }
             }
-            updateVisibleList(); // Basé sur la couche invisible
+            updateVisibleList();
             mettreAJourBatimentsSelectionnes(allAnnouncements); 
         });
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
@@ -99,42 +94,42 @@ document.addEventListener('DOMContentLoaded', function() {
     // GESTION DES COUCHES DE LA CARTE
     // ========================================================================
     function addMapLayers() { 
-        // Couche invisible, utilisée uniquement pour queryRenderedFeatures afin de synchroniser la liste
-        map.addLayer({
-            id: LAYER_ID_PINS_INVISIBLE,
-            type: 'circle',
-            source: SOURCE_ID_ANNONCES_INVISIBLE,
-            paint: { 'circle-radius': 0, 'circle-opacity': 0 } // Totalement invisible
-        });
-        // Couche bâtiments 3D
         map.addLayer({ 'id': LAYER_ID_BUILDINGS_3D, 'type': 'fill-extrusion', 'source': SOURCE_NAME_BUILDINGS, 'source-layer': SOURCE_LAYER_NAME_BUILDINGS, 'paint': { 'fill-extrusion-color': ['case', ['boolean', ['feature-state', 'highlighted'], false], '#FF1493', '#dfdfdf'], 'fill-extrusion-height': ['coalesce', ['get', 'height'], 20], 'fill-extrusion-base': ['coalesce', ['get', 'min_height'], 0], 'fill-extrusion-opacity': 0.85 }});
-    }
+        
+        // Couche des cercles (représentant les pins)
+        map.addLayer({ 
+            id: LAYER_ID_PINS, 
+            type: 'circle', 
+            source: SOURCE_ID_ANNONCES, 
+            paint: { 
+                'circle-radius': 12, // Taille du cercle
+                'circle-color': ['case', 
+                    ['boolean', ['feature-state', 'selected'], false], '#007bff', // Bleu si sélectionné
+                    '#FF385C'  // Rouge Airbnb par défaut
+                ],
+                'circle-stroke-width': 2,
+                'circle-stroke-color': 'white'
+            } 
+        });
 
-    function renderListingMarkers(geojsonData) {
-        // Supprimer les anciens marqueurs HTML
-        htmlMarkers.forEach(marker => marker.remove());
-        htmlMarkers = [];
-        if (currentDesktopPopup) currentDesktopPopup.remove();
-        if (mobilePopupSheet) mobilePopupSheet.classList.remove('active');
-
-        if (!geojsonData || !geojsonData.features) return;
-
-        geojsonData.features.forEach(feature => {
-            if (!feature.geometry || !feature.geometry.coordinates) return;
-
-            const el = document.createElement('div');
-            el.className = 'price-marker-pill';
-            el.textContent = `${feature.properties.price}€`;
-            el.dataset.propertyId = feature.properties.id;
-
-            const marker = new maplibregl.Marker(el)
-                .setLngLat(feature.geometry.coordinates)
-                .addTo(map);
-            
-            el.addEventListener('click', () => {
-                handleMarkerClick(feature, el);
-            });
-            htmlMarkers.push(marker);
+        // Couche des labels de prix
+        map.addLayer({ 
+            id: LAYER_ID_LABELS, 
+            type: 'symbol', 
+            source: SOURCE_ID_ANNONCES, 
+            layout: { 
+                'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 
+                'text-font': ['Noto Sans Bold'], // Police en gras
+                'text-size': 13,              // Taille de police augmentée
+                'text-allow-overlap': true,     // Permet aux labels de se chevaucher
+                'text-ignore-placement': true   // Important avec allow-overlap
+            }, 
+            paint: { 
+                'text-color': ['case',
+                    ['boolean', ['feature-state', 'selected'], false], 'white', // Blanc sur fond bleu
+                    '#222222' // Noir sur fond rouge/blanc par défaut
+                ]
+            } 
         });
     }
     
@@ -144,72 +139,42 @@ document.addEventListener('DOMContentLoaded', function() {
     // GESTIONNAIRES D'ÉVÉNEMENTS
     // ========================================================================
     function setupEventListeners() {
-        map.on('moveend', updateVisibleList); // Basé sur la couche invisible
+        map.on('click', LAYER_ID_PINS, handlePinClick); // Clic sur la couche des cercles
+        map.on('mouseenter', LAYER_ID_PINS, () => map.getCanvas().style.cursor = 'pointer');
+        map.on('mouseleave', LAYER_ID_PINS, () => map.getCanvas().style.cursor = '');
+        map.on('moveend', updateVisibleList);
         if (listContainer) listContainer.addEventListener('click', handleListItemClick);
-        if (isMobile && mobileToggleButton) {
+
+        if (mobileToggleButton) { // S'assurer que le bouton existe
+             isMobile = window.innerWidth < 768; // Vérifier l'état initial
+             if (isMobile) mobileToggleButton.style.display = 'block'; else mobileToggleButton.style.display = 'none';
+
             mobileToggleButton.addEventListener('click', () => {
                 document.body.classList.toggle('map-is-active');
                 const isActive = document.body.classList.contains('map-is-active');
                 if (isActive && map) map.resize();
-                const visibleCount = map.queryRenderedFeatures({layers: [LAYER_ID_PINS_INVISIBLE]}).length;
+                const visibleCount = map.queryRenderedFeatures({layers: [LAYER_ID_PINS]}).length;
                 mobileToggleButton.textContent = isActive ? `Voir la liste` : `Voir les ${visibleCount} logements`;
             });
+             window.addEventListener('resize', () => {
+                isMobile = window.innerWidth < 768;
+                if (isMobile) mobileToggleButton.style.display = 'block'; else mobileToggleButton.style.display = 'none';
+            });
         }
-        window.addEventListener('resize', () => { isMobile = window.innerWidth < 768; });
 
         if(closeMobilePopupSheetBtn) {
             closeMobilePopupSheetBtn.addEventListener('click', () => {
                 if(mobilePopupSheet) mobilePopupSheet.classList.remove('active');
-                unselectCurrentMarker();
+                unselectCurrentPin();
             });
         }
     }
 
-    function handleMarkerClick(feature, markerEl) {
-        isMobile = window.innerWidth < 768; // Re-vérifier au moment du clic
-        const properties = feature.properties;
-        const coordinates = feature.geometry.coordinates;
-
-        // Désélectionner l'ancien marqueur/popup
-        if (currentDesktopPopup) currentDesktopPopup.remove();
-        if (mobilePopupSheet) mobilePopupSheet.classList.remove('active');
-        unselectCurrentMarker();
-
-        // Sélectionner le nouveau
-        markerEl.classList.add('selected');
-        currentSelectedMarkerEl = markerEl;
-        currentSelectedPropertyId = properties.id;
-
-        map.flyTo({ center: coordinates, zoom: map.getZoom() < 15 ? 15 : map.getZoom(), speed: 0.7 });
-
-        if (isMobile) {
-            // Afficher la bottom sheet mobile
-            if(mobilePopupImage) mobilePopupImage.src = properties.coverPhoto || '';
-            if(mobilePopupImage && properties.coverPhoto) mobilePopupImage.style.display = 'block'; else if(mobilePopupImage) mobilePopupImage.style.display = 'none';
-            if(mobilePopupTitle) mobilePopupTitle.textContent = properties.title || 'Titre non disponible';
-            if(mobilePopupPrice) mobilePopupPrice.textContent = `${properties.price}€ / mois`;
-            if(mobilePopupLink) mobilePopupLink.href = `annonce?id=${properties.id_str}`;
-            if(mobilePopupSheet) mobilePopupSheet.classList.add('active');
-        } else {
-            // Afficher le popup desktop
-            currentDesktopPopup = new maplibregl.Popup({ offset: 25, className: 'airbnb-style-popup', maxWidth: "300px" })
-                .setLngLat(coordinates)
-                .setHTML(createDesktopPopupHTML(properties))
-                .addTo(map);
-
-            currentDesktopPopup.on('close', () => {
-                unselectCurrentMarker();
-                currentDesktopPopup = null;
-            });
+    function handlePinClick(e) { 
+        if (e.features && e.features.length > 0) {
+            const feature = e.features[0];
+            selectPin(feature.properties.id, feature.geometry.coordinates, feature.properties);
         }
-    }
-
-    function unselectCurrentMarker() {
-        if (currentSelectedMarkerEl) {
-            currentSelectedMarkerEl.classList.remove('selected');
-            currentSelectedMarkerEl = null;
-        }
-        currentSelectedPropertyId = null;
     }
     
     function handleListItemClick(e) {
@@ -222,25 +187,64 @@ document.addEventListener('DOMContentLoaded', function() {
             
             map.flyTo({ center: coordinates, zoom: 16, speed: 0.7 });
 
-            // Trouver le feature et le marqueur DOM correspondant
-            const feature = allAnnouncements.find(a => a.id === propertyId);
-            const markerEl = htmlMarkers.find(m => m.getElement().dataset.propertyId == propertyId)?.getElement();
+            // Trouver le feature correspondant pour passer toutes ses propriétés
+            const sourceFeatures = map.querySourceFeatures(SOURCE_ID_ANNONCES, {
+                filter: ['==', 'id', propertyId]
+            });
 
-            if (feature && markerEl) {
-                 map.once('moveend', () => handleMarkerClick(convertAnnoncesToGeoJSON([feature]).features[0], markerEl));
+            if (sourceFeatures.length > 0) {
+                 map.once('moveend', () => selectPin(propertyId, coordinates, sourceFeatures[0].properties));
             } else {
-                // Fallback si le marqueur n'est pas trouvé, juste centrer
-                console.warn(`Marqueur HTML non trouvé pour l'annonce ${propertyId}`);
+                console.warn(`Feature non trouvée pour l'annonce ${propertyId} lors du clic sur la liste.`);
             }
+        }
+    }
+
+    function selectPin(propertyId, coordinates, properties) {
+        isMobile = window.innerWidth < 768; 
+
+        if (currentDesktopPopup) currentDesktopPopup.remove();
+        if (mobilePopupSheet) mobilePopupSheet.classList.remove('active');
+        unselectCurrentPin(); // Désélectionne l'ancien pin (état visuel)
+
+        map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: propertyId }, { selected: true });
+        currentSelectedPropertyId = propertyId;
+
+        // map.flyTo({ center: coordinates, zoom: map.getZoom() < 15 ? 15 : map.getZoom(), speed: 0.7 });
+
+        if (isMobile) {
+            if(mobilePopupImage) mobilePopupImage.src = properties.coverPhoto || '';
+            if(mobilePopupImage && properties.coverPhoto) mobilePopupImage.style.display = 'block'; else if(mobilePopupImage) mobilePopupImage.style.display = 'none';
+            if(mobilePopupTitle) mobilePopupTitle.textContent = properties.title || 'Titre non disponible';
+            if(mobilePopupPrice) mobilePopupPrice.textContent = `${properties.price}€ / mois`;
+            if(mobilePopupLink) mobilePopupLink.href = `annonce?id=${properties.id_str}`;
+            if(mobilePopupSheet) mobilePopupSheet.classList.add('active');
+        } else {
+            currentDesktopPopup = new maplibregl.Popup({ offset: 15, className: 'airbnb-style-popup', maxWidth: "300px" })
+                .setLngLat(coordinates)
+                .setHTML(createDesktopPopupHTML(properties))
+                .addTo(map);
+
+            currentDesktopPopup.on('close', () => {
+                unselectCurrentPin();
+                currentDesktopPopup = null;
+            });
+        }
+    }
+
+    function unselectCurrentPin() {
+        if (currentSelectedPropertyId !== null) {
+            map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: currentSelectedPropertyId }, { selected: false });
+            currentSelectedPropertyId = null;
         }
     }
     
     // ========================================================================
     // FONCTIONS UTILITAIRES ET DE SYNCHRONISATION
     // ========================================================================
-    function updateVisibleList() { // Utilise la couche invisible
+    function updateVisibleList() {
         if (!map || !map.isStyleLoaded() || !listContainer) return;
-        const visibleIds = new Set(map.queryRenderedFeatures({ layers: [LAYER_ID_PINS_INVISIBLE] }).map(f => String(f.properties.id)));
+        const visibleIds = new Set(map.queryRenderedFeatures({ layers: [LAYER_ID_PINS] }).map(f => String(f.properties.id)));
         listContainer.querySelectorAll('a[data-property-id-link]').forEach(link => {
             link.classList.toggle('annonce-list-item-hidden', !visibleIds.has(link.dataset.propertyIdLink));
         });
@@ -249,7 +253,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function createDesktopPopupHTML(properties) {
         const detailLink = `annonce?id=${properties.id_str}`;
         return `<div class="map-custom-popup">
-                    <img src="${properties.coverPhoto || ''}" alt="${properties.title}" class="popup-image" onerror="this.style.display='none'">
+                    <img src="${properties.coverPhoto || ''}" alt="${properties.title}" class="popup-image" onerror="this.style.display='none'; this.onerror=null;">
                     <div class="popup-info">
                         <h4 class="popup-title">${properties.title || 'Titre non disponible'}</h4>
                         <p class="popup-price">${properties.price}€ / mois</p>
@@ -264,27 +268,67 @@ document.addEventListener('DOMContentLoaded', function() {
         return { type: 'FeatureCollection', features: annonces.map(annonce => {
             if (!annonce.id || annonce.latitude == null || annonce.longitude == null ) return null;
             const loyer = getNestedValue(annonce, '_property_lease_of_property.0.loyer') || getNestedValue(annonce, '_property_lease_of_property.0.loyer_cc');
+            
+            // L'ID pour 'promoteId' DOIT être un entier.
+            const idAsInt = parseInt(annonce.id, 10);
+            if (isNaN(idAsInt)) {
+                console.warn(`ID d'annonce non valide (non entier) ignoré: ${annonce.id}`);
+                return null;
+            }
+
             return {
-                type: 'Feature', id: parseInt(annonce.id, 10), // Utilisé par la couche invisible promoteId
+                type: 'Feature', 
+                id: idAsInt, // Utilisé par promoteId, doit être un nombre entier
                 geometry: { type: 'Point', coordinates: [parseFloat(annonce.longitude), parseFloat(annonce.latitude)] },
                 properties: { 
-                    id: parseInt(annonce.id, 10), // Nécessaire pour le dataset sur le marqueur HTML
-                    id_str: String(annonce.id), 
+                    // id: idAsInt, // Déjà présent au niveau supérieur pour promoteId
+                    id_str: String(annonce.id), // Garder une version string si besoin ailleurs
                     price: loyer != null ? loyer : '?', 
                     title: getNestedValue(annonce, 'property_title'), 
-                    coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url') 
+                    coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url'),
+                    // Passer toutes les propriétés de l'annonce pour le popup/sheet
+                    full_details: JSON.stringify(annonce) 
                 }
             };
         }).filter(Boolean)};
     }
     
-    function getBounds(geojson) { /* ... Identique à V17 ... */ }
-    function getNestedValue(obj, path) { /* ... Identique à V17 ... */ }
+    function getBounds(geojson) {
+        const bounds = new maplibregl.LngLatBounds();
+        if (geojson && geojson.features && geojson.features.length > 0) {
+            geojson.features.forEach(feature => {
+                if (feature && feature.geometry && feature.geometry.coordinates && feature.geometry.coordinates.length === 2) {
+                    try { bounds.extend(feature.geometry.coordinates); } 
+                    catch (e) { console.warn("[MAP_SCRIPT V20] Coordonnée invalide pour bounds.extend:", feature.geometry.coordinates, e); }
+                } else {
+                     console.warn("[MAP_SCRIPT V20] Feature invalide pour bounds:", feature);
+                }
+            });
+        } else {
+            // Retourner des limites par défaut ou null si aucune feature valide
+            // Pour éviter l'erreur "Cannot read properties of undefined (reading 'getNorthWest')"
+            // On peut retourner les limites de la France par exemple, ou laisser la carte gérer.
+            // Si on retourne null, fitBounds ne doit pas être appelé ou doit gérer le cas null.
+            // Pour l'instant, on laisse la fonction retourner un LngLatBounds vide si pas de features, 
+            // et le code appelant devra gérer cela.
+             console.warn("[MAP_SCRIPT V20] getBounds appelé avec geojson vide ou invalide.");
+        }
+        return bounds;
+    }
+
+    function getNestedValue(obj, path) {
+        if (!path || obj == null) return undefined;
+        return path.split('.').reduce((acc, part) => {
+            if (acc === undefined || acc === null) return undefined;
+            const i = !isNaN(parseInt(part, 10)) ? parseInt(part, 10) : -1;
+            return i !== -1 && Array.isArray(acc) ? acc[i] : acc[part];
+        }, obj);
+    }
 
     // Lancement initial
     if (document.getElementById(MAP_CONTAINER_ID)) {
-        console.log("[MAP_SCRIPT V19] En attente de 'annoncesChargeesEtRendues' pour initialiser la carte.");
+        console.log("[MAP_SCRIPT V20] En attente de 'annoncesChargeesEtRendues' pour initialiser la carte.");
     } else {
-        console.warn("[MAP_SCRIPT V19] Conteneur de carte non trouvé.");
+        console.warn("[MAP_SCRIPT V20] Conteneur de carte non trouvé.");
     }
 });
