@@ -96,6 +96,8 @@ document.addEventListener('DOMContentLoaded', function() {
             renderWorldCopies: false
         });
 
+        window.map = map;
+
         // ============================ CORRECTION DU CENTRAGE ============================
         // On centre la carte sur les annonces dès l'initialisation
         if (initialGeoJSON.features.length > 0) {
