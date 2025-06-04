@@ -1,6 +1,6 @@
-// map-listings.js - VERSION FINALE v10 - Une seule couche 3D et feature-state
+// map-listings.js - VERSION FINALE v10.1 - Débogage feature-state et repaint
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V10] Approche avec une seule couche 3D et feature-state.');
+    console.log('[MAP_SCRIPT V10.1] Débogage feature-state et repaint.');
 
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const MAP_CONTAINER_ID = 'map-section';
@@ -22,8 +22,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let allAnnouncements = [];
     let isMobile = window.innerWidth < 768;
     let currentPopup = null;
-    let selectedPinId = null; // Pour le pin sélectionné (celui des annonces)
-    let currentHighlightedBuildingIds = new Set(); // Pour suivre les bâtiments actuellement en rose
+    let selectedPinId = null; 
+    let currentHighlightedBuildingIds = new Set(); 
 
     document.addEventListener('annoncesChargeesEtRendues', (event) => {
         const annonces = event.detail.annonces;
@@ -36,7 +36,6 @@ document.addEventListener('DOMContentLoaded', function() {
             initializeMap(geojsonData);
         } else {
             map.getSource(SOURCE_ID_ANNONCES).setData(geojsonData);
-            // La mise à jour des bâtiments se fera après que la carte soit stable
             if (map.isStyleLoaded()) {
                  mettreAJourBatimentsSelectionnes(allAnnouncements);
             }
@@ -67,7 +66,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // 1. Réinitialiser l'état des bâtiments précédemment mis en évidence
         currentHighlightedBuildingIds.forEach(buildingId => {
             map.setFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: buildingId }, { highlighted: false });
         });
@@ -75,10 +73,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (!annonces || annonces.length === 0) {
             console.log("[BÂTIMENTS DEBUG] Aucune annonce, pas de bâtiments à mettre en évidence.");
+            // S'assurer qu'un repaint est déclenché même si aucun bâtiment n'est à mettre en évidence pour effacer les anciens.
+            map.triggerRepaint();
             return;
         }
         
-        await map.once('idle'); // Attendre que la carte soit stable
+        await map.once('idle'); 
         
         const newBuildingIdsToHighlight = new Set();
 
@@ -88,21 +88,29 @@ document.addEventListener('DOMContentLoaded', function() {
             if (lat && lng) {
                 const point = map.project([lng, lat]);
                 const queryBox = [ [point.x - 10, point.y - 10], [point.x + 10, point.y + 10] ];
-                // On interroge notre unique couche de bâtiments 3D
                 const features = map.queryRenderedFeatures(queryBox, { layers: [LAYER_ID_BUILDINGS_3D] });
-                if (features.length > 0 && features[0].id !== undefined) { // S'assurer que le feature a un ID
-                    newBuildingIdsToHighlight.add(features[0].id);
+                if (features.length > 0 && features[0].id !== undefined) { 
+                    const buildingId = features[0].id;
+                    newBuildingIdsToHighlight.add(buildingId);
+                    // Log de débogage ajouté
+                    console.log(`[BÂTIMENTS DEBUG] Annonce ID ${annonce.id_str || annonce.id} -> Building Feature ID: ${buildingId}, Properties:`, JSON.stringify(features[0].properties).substring(0, 200) + "...");
                 }
             }
         }
 
-        // 2. Mettre en évidence les nouveaux bâtiments
         newBuildingIdsToHighlight.forEach(buildingId => {
             map.setFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: buildingId }, { highlighted: true });
+            // Log de débogage ajouté pour vérifier l'état
+            const state = map.getFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: buildingId });
+            console.log(`[BÂTIMENTS DEBUG] État pour bâtiment ${buildingId} après set (highlighted:true):`, JSON.stringify(state));
         });
-        currentHighlightedBuildingIds = newBuildingIdsToHighlight; // Mettre à jour la liste des bâtiments en rose
+        
+        currentHighlightedBuildingIds = newBuildingIdsToHighlight; 
 
-        console.log(`[BÂTIMENTS DEBUG] IDs mis en évidence : ${Array.from(currentHighlightedBuildingIds).join(', ')} (Total: ${currentHighlightedBuildingIds.size})`);
+        console.log(`[BÂTIMENTS DEBUG] IDs finaux mis en évidence : ${Array.from(currentHighlightedBuildingIds).join(', ')} (Total: ${currentHighlightedBuildingIds.size})`);
+        
+        // Forcer un redessinage de la carte
+        map.triggerRepaint();
     }
 
     function getBounds(geojson) {
@@ -122,7 +130,7 @@ document.addEventListener('DOMContentLoaded', function() {
             renderWorldCopies: false
         });
         
-        window.map = map; // Pour le débogage console
+        window.map = map; 
 
         if (initialGeoJSON.features.length > 0) {
             const bounds = getBounds(initialGeoJSON);
@@ -133,33 +141,29 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         map.on('load', () => {
-            console.log('[MAP_SCRIPT V10] Carte chargée. Ajout des couches.');
+            console.log('[MAP_SCRIPT V10.1] Carte chargée. Ajout des couches.');
             map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
 
             const heightExpression = ['coalesce', ['get', 'height'], 20]; 
             const minHeightExpression = ['coalesce', ['get', 'min_height'], 0];
 
-            // ============================ UNE SEULE COUCHE 3D POUR LES BÂTIMENTS ============================
             map.addLayer({
-                'id': LAYER_ID_BUILDINGS_3D, // Utilisation de la constante définie
+                'id': LAYER_ID_BUILDINGS_3D, 
                 'type': 'fill-extrusion',
                 'source': SOURCE_NAME_BUILDINGS,
                 'source-layer': SOURCE_LAYER_NAME_BUILDINGS,
-                // Pas de filtre ici, on dessine tous les bâtiments de la source
                 'paint': { 
-                    // Coloration conditionnelle basée sur le feature-state 'highlighted'
                     'fill-extrusion-color': [
                         'case',
-                        ['boolean', ['feature-state', 'highlighted'], false], // Si 'highlighted' est true
-                        '#FF1493', // Couleur rose
-                        '#dfdfdf'  // Couleur grise par défaut
+                        ['boolean', ['feature-state', 'highlighted'], false], 
+                        '#FF1493', 
+                        '#dfdfdf'  
                     ],
                     'fill-extrusion-height': heightExpression, 
                     'fill-extrusion-base': minHeightExpression, 
-                    'fill-extrusion-opacity': 0.85 // Opacité unique pour éviter les conflits
+                    'fill-extrusion-opacity': 0.85 
                 }
-            }, LAYER_ID_PINS); // Insérer AVANT la couche des pins pour qu'ils soient au-dessus
-            // ========================================================================================
+            }, LAYER_ID_PINS); 
             
             map.addLayer({
                 id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID_ANNONCES,
@@ -212,7 +216,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const feature = e.features[0];
             const coordinates = feature.geometry.coordinates.slice();
             const properties = feature.properties;
-            const clickedPinId = feature.id; // C'est l'ID du pin (annonce)
+            const clickedPinId = feature.id; 
             if (selectedPinId !== null && selectedPinId !== clickedPinId) {
                 map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
             }
