@@ -1,246 +1,367 @@
-// map-listings.js - VERSION 12 - Corrigé et Amélioré
+// map-listings.js - VERSION 13 - Base stable + Itinéraires
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V12] Initialisation avec correctif des coordonnées et synchro liste -> carte.');
+    console.log('[MAP_SCRIPT V13] Réintégration de la fonctionnalité itinéraire sur une base stable.');
 
     // --- CONSTANTES ---
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
+    const DIRECTIONS_API_BASE = 'https://api.maptiler.com/routes';
     const MAP_CONTAINER_ID = 'map-section';
-    const LIST_CONTAINER_ID = 'annonces-wrapper'; // Assurez-vous que cet ID est bien celui de votre conteneur de liste
+    const LIST_CONTAINER_ID = 'annonces-wrapper';
+    const DIRECTIONS_MODAL_ID = 'directions-modal';
+
     const SOURCE_ID_ANNONCES = 'annonces-source';
     const LAYER_ID_PINS = 'annonces-pins-layer';
     const LAYER_ID_LABELS = 'annonces-labels-layer';
+    
+    // Constantes pour les bâtiments 3D
+    const SOURCE_NAME_BUILDINGS = 'maptiler_planet'; 
+    const SOURCE_LAYER_NAME_BUILDINGS = 'building';
+    const LAYER_ID_BUILDINGS_3D = 'buildings-3d-layer';
 
     // --- ÉLÉMENTS DU DOM ---
     const listContainer = document.getElementById(LIST_CONTAINER_ID);
+    const directionsModal = document.getElementById(DIRECTIONS_MODAL_ID);
 
     // --- ÉTAT GLOBAL ---
     let map = null;
     let allAnnouncements = [];
     let currentPopup = null;
     let selectedPinId = null;
+    let currentHighlightedBuildingIds = new Set();
 
-    // Se déclenche quand les annonces sont chargées par home-form-display-v4.js
+    // --- ÉTAT SPÉCIFIQUE AUX ITINÉRAIRES ---
+    let originA = null; // Point de départ [lng, lat] (le logement)
+    let destinationB = null; // Point d'arrivée [lng, lat] (clic long)
+    let destinationMarker = null;
+    let longPressTimer = null;
+    let currentRouteMode = 'drive';
+    let currentBikeType = 'personal';
+
+    // ========================================================================
+    // INITIALISATION PRINCIPALE
+    // ========================================================================
+
     document.addEventListener('annoncesChargeesEtRendues', (event) => {
         const annonces = event.detail.annonces;
-        if (!annonces || !Array.isArray(annonces)) {
-            console.error("[MAP_SCRIPT] Événement 'annoncesChargeesEtRendues' reçu mais sans données d'annonces valides.");
-            return;
-        }
+        if (!annonces || !Array.isArray(annonces)) return;
         
-        console.log(`[MAP_SCRIPT] Événement 'annoncesChargeesEtRendues' reçu avec ${annonces.length} annonces.`);
         allAnnouncements = annonces;
         const geojsonData = convertAnnoncesToGeoJSON(allAnnouncements);
-
-        if (geojsonData.features.length === 0) {
-            console.warn("[MAP_SCRIPT] Aucune annonce avec des coordonnées valides n'a été trouvée pour l'affichage sur la carte.");
-        }
 
         if (!map) {
             initializeMap(geojsonData);
         } else {
             map.getSource(SOURCE_ID_ANNONCES).setData(geojsonData);
             if (geojsonData.features.length > 0) {
-                map.fitBounds(getBounds(geojsonData), { padding: 80, maxZoom: 16 });
+                 map.fitBounds(getBounds(geojsonData), { padding: 80, maxZoom: 16 });
+            }
+            if (map.isStyleLoaded()) {
+                 mettreAJourBatimentsSelectionnes(allAnnouncements);
             }
         }
     });
-
-    /**
-     * CORRECTION CRITIQUE : Cette fonction utilise maintenant `annonce.latitude` et `annonce.longitude`
-     * pour correspondre à la structure de données de votre API Xano.
-     */
-    function convertAnnoncesToGeoJSON(annonces) {
-        const features = annonces.map(annonce => {
-            const lat = annonce.latitude;
-            const lng = annonce.longitude;
-            const loyer = getNestedValue(annonce, '_property_lease_of_property.0.loyer_cc') || getNestedValue(annonce, '_property_lease_of_property.0.loyer');
-
-            if (!annonce.id || !lat || !lng) {
-                console.warn("[MAP CONVERT] Annonce ignorée (ID ou coordonnées manquantes):", annonce.id);
-                return null;
-            }
-
-            return {
-                type: 'Feature',
-                id: parseInt(annonce.id, 10),
-                geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] },
-                properties: {
-                    id: parseInt(annonce.id, 10),
-                    id_str: String(annonce.id),
-                    price: loyer || '?',
-                    title: getNestedValue(annonce, 'property_title'),
-                    coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url')
-                }
-            };
-        }).filter(Boolean); // Retire les éléments null
-
-        console.log(`[MAP CONVERT] ${features.length} annonces valides converties en GeoJSON.`);
-        return { type: 'FeatureCollection', features };
-    }
-
 
     function initializeMap(initialGeoJSON) {
         map = new maplibregl.Map({
             container: MAP_CONTAINER_ID,
             style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`,
-            pitch: 45,
-            bearing: -10,
-            renderWorldCopies: false,
-            // Centre par défaut sur la France si aucune annonce n'est trouvée
-            center: initialGeoJSON.features.length > 0 ? initialGeoJSON.features[0].geometry.coordinates : [2.3522, 48.8566],
-            zoom: initialGeoJSON.features.length > 0 ? 12 : 5
+            pitch: 50,
+            bearing: -15,
+            renderWorldCopies: false
         });
-
-        window.map = map; // Pour débogage
+        
+        window.map = map;
 
         map.on('load', () => {
-            console.log('[MAP_SCRIPT] Carte chargée.');
+            console.log('[MAP_SCRIPT V13] Carte chargée.');
             map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
 
             addMapLayers();
             setupEventListeners();
+            initializeDirectionsLogic();
             
             if (initialGeoJSON.features.length > 0) {
                 map.fitBounds(getBounds(initialGeoJSON), { padding: 80, maxZoom: 16, duration: 0 });
             }
             updateVisibleList();
+            mettreAJourBatimentsSelectionnes(allAnnouncements); 
         });
 
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
 
+    // ========================================================================
+    // GESTION DES COUCHES DE LA CARTE
+    // ========================================================================
+
     function addMapLayers() {
-        // Couche des pins (cercles)
+        // Couche des bâtiments 3D
         map.addLayer({
-            id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID_ANNONCES,
-            paint: {
-                'circle-radius': 18,
-                'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#0052d4', '#FFFFFF'],
-                'circle-stroke-width': 2,
-                'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#0052d4']
+            'id': LAYER_ID_BUILDINGS_3D, 'type': 'fill-extrusion', 'source': SOURCE_NAME_BUILDINGS,
+            'source-layer': SOURCE_LAYER_NAME_BUILDINGS,
+            'paint': {
+                'fill-extrusion-color': ['case', ['boolean', ['feature-state', 'highlighted'], false], '#FF1493', '#dfdfdf'],
+                'fill-extrusion-height': ['coalesce', ['get', 'height'], 20],
+                'fill-extrusion-base': ['coalesce', ['get', 'min_height'], 0],
+                'fill-extrusion-opacity': 0.85
             }
         });
-        // Couche des labels (prix)
+        // Couches des pins et labels des annonces
+        map.addLayer({
+            id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID_ANNONCES,
+            paint: { 'circle-radius': 18, 'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#007bff', '#FFFFFF'], 'circle-stroke-width': 2, 'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#007bff'] }
+        });
         map.addLayer({
             id: LAYER_ID_LABELS, type: 'symbol', source: SOURCE_ID_ANNONCES,
-            layout: {
-                'text-field': ['concat', ['to-string', ['get', 'price']], '€'],
-                'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-                'text-size': 11,
-                'text-allow-overlap': true
-            },
-            paint: {
-                'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333']
-            }
+            layout: { 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 11, 'text-allow-overlap': true },
+            paint: { 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] }
         });
     }
 
+    function clearRouteLayers() {
+        const layers = map.getStyle().layers;
+        layers.forEach(layer => {
+            if (layer.id.startsWith('route-')) map.removeLayer(layer.id);
+        });
+        const sources = map.getStyle().sources;
+        for (const sourceId in sources) {
+            if (sourceId.startsWith('route-')) map.removeSource(sourceId);
+        }
+    }
+
+    function drawRoute(mode, geojson) {
+        clearRouteLayers();
+        if (!geojson || !geojson.features || geojson.features.length === 0) return;
+        const sourceId = `route-source-${mode}`;
+        map.addSource(sourceId, { type: 'geojson', data: geojson });
+        const paintProps = {
+            'drive': { 'line-color': '#007bff', 'line-width': 5 },
+            'walk': { 'line-color': '#8a2be2', 'line-width': 4, 'line-dasharray': [0, 2] },
+            'bicycle': { 'line-color': '#006400', 'line-width': 5 },
+            'transit_walk': { 'line-color': '#87CEFA', 'line-width': 4, 'line-dasharray': [0, 2] },
+            'transit_vehicle': { 'line-color': '#FFD700', 'line-width': 6 }
+        };
+        if (mode === 'transit') {
+            geojson.features.forEach((feature, index) => {
+                const legMode = feature.properties.mode === 'walk' ? 'transit_walk' : 'transit_vehicle';
+                map.addLayer({
+                    id: `route-layer-transit-${index}`, type: 'line', source: sourceId,
+                    filter: ['==', '$id', feature.id],
+                    layout: { 'line-join': 'round', 'line-cap': 'round' },
+                    paint: { ...paintProps[legMode], 'line-color': feature.properties.color || paintProps[legMode]['line-color'] }
+                });
+            });
+        } else {
+            map.addLayer({
+                id: `route-layer-${mode}`, type: 'line', source: sourceId,
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: paintProps[mode]
+            });
+        }
+    }
+
+    async function mettreAJourBatimentsSelectionnes(annonces) {
+        if (!map.isStyleLoaded()) return;
+        currentHighlightedBuildingIds.forEach(id => map.setFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id }, { highlighted: false }));
+        currentHighlightedBuildingIds.clear();
+        if (!annonces || annonces.length === 0) return;
+        await map.once('idle');
+        const newBuildingIds = new Set();
+        for (const annonce of annonces) {
+            if (annonce.latitude && annonce.longitude) {
+                const point = map.project([annonce.longitude, annonce.latitude]);
+                const features = map.queryRenderedFeatures([ [point.x - 5, point.y - 5], [point.x + 5, point.y + 5] ], { layers: [LAYER_ID_BUILDINGS_3D] });
+                if (features.length > 0 && features[0].id) newBuildingIds.add(features[0].id);
+            }
+        }
+        newBuildingIds.forEach(id => map.setFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id }, { highlighted: true }));
+        currentHighlightedBuildingIds = newBuildingIds;
+    }
+
+    // ========================================================================
+    // GESTIONNAIRES D'ÉVÉNEMENTS
+    // ========================================================================
+
     function setupEventListeners() {
-        // Interaction avec les pins sur la carte
         map.on('click', LAYER_ID_PINS, handlePinClick);
         map.on('mouseenter', LAYER_ID_PINS, () => map.getCanvas().style.cursor = 'pointer');
         map.on('mouseleave', LAYER_ID_PINS, () => map.getCanvas().style.cursor = '');
-        
-        // Synchronisation Carte -> Liste
         map.on('moveend', updateVisibleList);
-
-        // NOUVEAU : Synchronisation Liste -> Carte
-        if (listContainer) {
-            listContainer.addEventListener('click', handleListItemClick);
-        }
+        if (listContainer) listContainer.addEventListener('click', handleListItemClick);
     }
     
     function handlePinClick(e) {
-        if (e.features && e.features.length > 0) {
-            const feature = e.features[0];
-            selectPin(feature.id, feature.geometry.coordinates);
-        }
+        if (e.features.length > 0) selectPin(e.features[0].id, e.features[0].geometry.coordinates);
     }
 
-    // NOUVEAU : Gère le clic sur un élément de la liste
     function handleListItemClick(e) {
-        // On remonte dans l'arbre DOM pour trouver le lien parent qui a les coordonnées
         const link = e.target.closest('a[data-lng][data-lat]');
         if (link) {
-            e.preventDefault(); // Empêche la navigation immédiate
+            e.preventDefault();
             const { lng, lat, propertyIdLink } = link.dataset;
             const coordinates = [parseFloat(lng), parseFloat(lat)];
-            
             map.flyTo({ center: coordinates, zoom: 16 });
-            
-            // On attend que la carte finisse son mouvement pour sélectionner le pin
-            map.once('moveend', () => {
-                selectPin(parseInt(propertyIdLink, 10), coordinates);
-            });
+            map.once('moveend', () => selectPin(parseInt(propertyIdLink, 10), coordinates));
         }
     }
+    
+    // ========================================================================
+    // LOGIQUE DES ITINÉRAIRES
+    // ========================================================================
+
+    function initializeDirectionsLogic() {
+        setupLongPressListener();
+        map.getContainer().addEventListener('click', e => {
+            if (e.target.matches('.popup-directions-btn')) {
+                openDirectionsModal();
+                if(currentPopup) currentPopup.remove();
+            }
+        });
+        document.querySelector('#close-directions-modal').addEventListener('click', closeDirectionsModal);
+        document.querySelectorAll('#directions-modal .tab-button').forEach(b => b.addEventListener('click', () => handleTabClick(b.dataset.mode)));
+        document.querySelectorAll('#directions-modal .bike-option-btn').forEach(b => b.addEventListener('click', () => handleBikeOptionClick(b.dataset.bikeType)));
+    }
+
+    function setupLongPressListener() {
+        const handleDown = (e) => { longPressTimer = setTimeout(() => {
+            longPressTimer = null;
+            destinationB = [e.lngLat.lng, e.lngLat.lat];
+            if (destinationMarker) destinationMarker.setLngLat(destinationB);
+            else {
+                const el = document.createElement('div'); el.className = 'destination-marker';
+                destinationMarker = new maplibregl.Marker({element: el, draggable: true}).setLngLat(destinationB).addTo(map);
+                destinationMarker.on('dragend', () => {
+                    destinationB = destinationMarker.getLngLat().toArray();
+                    if(directionsModal.classList.contains('active')) fetchAllRouteTimesAndUpdateUI();
+                });
+            }
+            if (originA) openDirectionsModal();
+        }, 700);};
+        const handleUp = () => { if (longPressTimer) clearTimeout(longPressTimer); };
+        map.on('mousedown', handleDown); map.on('mouseup', handleUp); map.on('mousemove', handleUp);
+        map.on('touchstart', handleDown); map.on('touchend', handleUp); map.on('touchmove', handleUp);
+    }
+    
+    function openDirectionsModal() {
+        if (!originA) { alert("Veuillez sélectionner une annonce pour le point de départ."); return; }
+        if (!destinationB) { alert("Définissez une destination en faisant un clic long sur la carte."); return; }
+        directionsModal.classList.add('active');
+        fetchAllRouteTimesAndUpdateUI();
+    }
+    
+    function closeDirectionsModal() { directionsModal.classList.remove('active'); clearRouteLayers(); }
+
+    async function fetchAllRouteTimesAndUpdateUI() {
+        if (!originA || !destinationB) return;
+        document.querySelectorAll('.tab-button span').forEach(s => s.textContent = '...');
+        const modes = ['drive', 'transit', 'walk', 'bicycle'];
+        const results = await Promise.allSettled(modes.map(mode => getRouteData(mode, originA, destinationB)));
+        results.forEach((result, i) => {
+            const mode = modes[i];
+            const duration = result.status === 'fulfilled' ? result.value?.routes[0]?.duration : null;
+            document.getElementById(`time-${mode}`).textContent = formatDuration(duration);
+        });
+        handleTabClick(currentRouteMode);
+    }
+    
+    async function handleTabClick(mode) {
+        currentRouteMode = mode;
+        document.querySelectorAll('.tab-button').forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
+        document.getElementById('bicycle-options').style.display = mode === 'bicycle' ? 'block' : 'none';
+        
+        const data = await getRouteData(mode, originA, destinationB);
+        if (data && data.routes?.length > 0) {
+            const route = data.routes[0];
+            const geojson = mode === 'transit' 
+                ? { type: 'FeatureCollection', features: route.legs.map((leg, i) => ({ type: 'Feature', id:i, properties: { mode: leg.mode, color: leg.line_color }, geometry: leg.geometry })) }
+                : { type: 'FeatureCollection', features: [{ type: 'Feature', id:0, properties: {}, geometry: route.geometry }] };
+            drawRoute(mode, geojson);
+        } else {
+            clearRouteLayers();
+        }
+    }
+    
+    function handleBikeOptionClick(bikeType) {
+        currentBikeType = bikeType;
+        document.querySelectorAll('.bike-option-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.bikeType === bikeType));
+        handleTabClick('bicycle');
+    }
+
+    async function getRouteData(mode, start, end) {
+        const profile = mode === 'transit' ? 'transit' : (mode === 'drive' ? 'driving' : mode);
+        let url = `${DIRECTIONS_API_BASE}/${profile}/${start.join(',')};${end.join(',')}?key=${MAPTILER_API_KEY}&geometries=geojson&steps=true&language=fr`;
+        if(mode === 'bicycle' && currentBikeType === 'shared') url += '&bicycle_type=hybrid';
+        try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(res.statusText);
+            return await res.json();
+        } catch (error) { return null; }
+    }
+
+    // ========================================================================
+    // FONCTIONS UTILITAIRES ET DE SYNCHRONISATION
+    // ========================================================================
 
     function selectPin(pinId, coordinates) {
-        if (selectedPinId !== null) {
-            map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
-        }
+        if (selectedPinId) map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
         map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: pinId }, { selected: true });
         selectedPinId = pinId;
-
+        originA = coordinates; // Met à jour le point de départ pour l'itinéraire
         if (currentPopup) currentPopup.remove();
-        
-        const features = map.querySourceFeatures(SOURCE_ID_ANNONCES, { sourceLayer: LAYER_ID_PINS, filter: ['==', 'id', pinId] });
+        const features = map.querySourceFeatures(SOURCE_ID_ANNONCES, { filter: ['==', 'id', pinId] });
         if (features.length > 0) {
-            const properties = features[0].properties;
-            const popupHTML = createPopupHTML(properties);
             currentPopup = new maplibregl.Popup({ offset: 25, className: 'airbnb-style-popup' })
-                .setLngLat(coordinates)
-                .setHTML(popupHTML)
-                .addTo(map);
-
-            currentPopup.on('close', () => {
-                map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: pinId }, { selected: false });
-                selectedPinId = null;
-                currentPopup = null;
-            });
+                .setLngLat(coordinates).setHTML(createPopupHTML(features[0].properties, coordinates)).addTo(map)
+                .on('close', () => {
+                    map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: pinId }, { selected: false });
+                    selectedPinId = null; currentPopup = null; originA = null;
+                });
         }
     }
 
     function updateVisibleList() {
         if (!map || !map.isStyleLoaded() || !listContainer) return;
-
-        const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_PINS] });
-        const visiblePropertyIds = new Set(visibleFeatures.map(feature => String(feature.properties.id)));
-        
-        const allListItems = listContainer.querySelectorAll('a[data-property-id-link]');
-        
-        allListItems.forEach(itemLink => {
-            const itemIdString = itemLink.dataset.propertyIdLink;
-            if (visiblePropertyIds.has(itemIdString)) {
-                itemLink.classList.remove('annonce-list-item-hidden');
-            } else {
-                itemLink.classList.add('annonce-list-item-hidden');
-            }
+        const visibleIds = new Set(map.queryRenderedFeatures({ layers: [LAYER_ID_PINS] }).map(f => String(f.properties.id)));
+        listContainer.querySelectorAll('a[data-property-id-link]').forEach(link => {
+            link.classList.toggle('annonce-list-item-hidden', !visibleIds.has(link.dataset.propertyIdLink));
         });
     }
 
-    function createPopupHTML(properties) {
-        const placeholderImage = 'https://via.placeholder.com/280x150/cccccc/969696?text=Image';
-        const coverPhoto = properties.coverPhoto || placeholderImage;
-        const title = properties.title || "Titre non disponible";
-        const priceText = `${properties.price || '?'} € / mois`;
+    function createPopupHTML(properties, coordinates) {
         const detailLink = `annonce?id=${properties.id_str}`;
-    
+        const directionsButton = `<button class="popup-directions-btn" data-lng="${coordinates[0]}" data-lat="${coordinates[1]}">Itinéraire</button>`;
         return `<div class="map-custom-popup">
-                    <img src="${coverPhoto}" alt="${title}" class="popup-image" onerror="this.src='${placeholderImage}'">
+                    <img src="${properties.coverPhoto || ''}" alt="${properties.title}" class="popup-image">
                     <div class="popup-info">
-                        <h4 class="popup-title">${title}</h4>
-                        <p class="popup-price">${priceText}</p>
-                        <a href="${detailLink}" class="popup-link" target="_blank">Voir les détails</a>
+                        <h4 class="popup-title">${properties.title}</h4>
+                        <p class="popup-price">${properties.price} € / mois</p>
+                        <div class="popup-actions"><a href="${detailLink}" class="popup-link" target="_blank">Détails</a>${directionsButton}</div>
                     </div>
                 </div>`;
     }
     
+    function formatDuration(seconds) {
+        if (seconds === null || seconds === undefined) return "--:--";
+        if (seconds < 60) return "< 1 min";
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.round((seconds % 3600) / 60);
+        return hours > 0 ? `${hours}h ${minutes.toString().padStart(2, '0')}m` : `${minutes} min`;
+    }
+    
+    function convertAnnoncesToGeoJSON(annonces) {
+        return { type: 'FeatureCollection', features: annonces.map(annonce => {
+            if (!annonce.id || !annonce.latitude || !annonce.longitude) return null;
+            return {
+                type: 'Feature', id: parseInt(annonce.id, 10),
+                geometry: { type: 'Point', coordinates: [parseFloat(annonce.longitude), parseFloat(annonce.latitude)] },
+                properties: { id: parseInt(annonce.id, 10), id_str: String(annonce.id), price: getNestedValue(annonce, '_property_lease_of_property.0.loyer_cc') || '?', title: getNestedValue(annonce, 'property_title'), coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url') }
+            };
+        }).filter(Boolean)};
+    }
+    
     function getBounds(geojson) {
         const bounds = new maplibregl.LngLatBounds();
-        geojson.features.forEach(feature => {
-            bounds.extend(feature.geometry.coordinates);
-        });
+        geojson.features.forEach(feature => bounds.extend(feature.geometry.coordinates));
         return bounds;
     }
 
@@ -248,9 +369,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!path) return undefined;
         return path.split('.').reduce((acc, part) => {
             if (acc === undefined || acc === null) return undefined;
-            const index = !isNaN(parseInt(part, 10)) ? parseInt(part, 10) : -1;
-            if (index !== -1 && Array.isArray(acc)) return acc[index];
-            return acc[part];
+            const i = !isNaN(parseInt(part, 10)) ? parseInt(part, 10) : -1;
+            return i !== -1 && Array.isArray(acc) ? acc[i] : acc[part];
         }, obj);
     }
 });
