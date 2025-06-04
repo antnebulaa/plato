@@ -1,48 +1,46 @@
-// map-listings.js - VERSION 14 - Correctifs Prix, Itinéraire et Bouton Mobile
+// map-listings.js - VERSION 16 - Logique Origine/Destination Corrigée
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V14] Initialisation avec correctifs pour prix, API itinéraire et bouton mobile.');
+    console.log('[MAP_SCRIPT V16] Initialisation avec logique origine/destination itinéraire corrigée.');
 
-    // --- CONSTANTES ---
+    // --- CONSTANTES GLOBALES ---
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const DIRECTIONS_API_BASE = 'https://api.maptiler.com/routes';
     const MAP_CONTAINER_ID = 'map-section';
     const LIST_CONTAINER_ID = 'annonces-wrapper';
+    const MOBILE_TOGGLE_BUTTON_ID = 'mobile-map-toggle';
     const DIRECTIONS_MODAL_ID = 'directions-modal';
-    const MOBILE_TOGGLE_BUTTON_ID = 'mobile-map-toggle'; // ID du bouton mobile
-
     const SOURCE_ID_ANNONCES = 'annonces-source';
     const LAYER_ID_PINS = 'annonces-pins-layer';
     const LAYER_ID_LABELS = 'annonces-labels-layer';
-    
-    const SOURCE_NAME_BUILDINGS = 'maptiler_planet'; 
+    const SOURCE_NAME_BUILDINGS = 'maptiler_planet';
     const SOURCE_LAYER_NAME_BUILDINGS = 'building';
     const LAYER_ID_BUILDINGS_3D = 'buildings-3d-layer';
+    const SOURCE_ID_ROUTE = 'route-source';
+    const LAYER_ID_ROUTE = 'route-layer';
+
+    // --- VARIABLES D'ÉTAT GLOBAL (let) ---
+    let map = null;
+    let allAnnouncements = [];
+    let isMobile = window.innerWidth < 768;
+    let currentPopup = null;
+    let selectedPinId = null;
+    let currentHighlightedBuildingIds = new Set();
+    let originCoordinates = null;
+    let destinationCoordinates = null;
+    let destinationMarker = null;
+    let longPressTimer = null;
+    let routeGeometries = {};
+    let currentRouteMode = 'driving';
+    let currentBikeType = 'personal';
 
     // --- ÉLÉMENTS DU DOM ---
     const listContainer = document.getElementById(LIST_CONTAINER_ID);
     const directionsModal = document.getElementById(DIRECTIONS_MODAL_ID);
-    const mobileToggleButton = document.getElementById(MOBILE_TOGGLE_BUTTON_ID); // Récupération du bouton
-
-    // --- ÉTAT GLOBAL ---
-    let map = null;
-    let allAnnouncements = [];
-    let currentPopup = null;
-    let selectedPinId = null;
-    let currentHighlightedBuildingIds = new Set();
-    let isMobile = window.innerWidth < 768;
-
-    // --- ÉTAT SPÉCIFIQUE AUX ITINÉRAIRES ---
-    let originA = null;
-    let destinationB = null;
-    let destinationMarker = null;
-    let longPressTimer = null;
-    let currentRouteMode = 'drive';
-    let currentBikeType = 'personal';
+    const mobileToggleButton = document.getElementById(MOBILE_TOGGLE_BUTTON_ID);
 
     // ========================================================================
     // INITIALISATION
     // ========================================================================
-
 
     document.addEventListener('annoncesChargeesEtRendues', (event) => {
         allAnnouncements = event.detail.annonces || [];
@@ -58,10 +56,25 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function initializeMap(initialGeoJSON) {
-        map = new maplibregl.Map({ container: MAP_CONTAINER_ID, style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`, pitch: 50, bearing: -15, renderWorldCopies: false });
-        window.map = map;
+        if (!document.getElementById(MAP_CONTAINER_ID)) {
+            console.error(`[MAP_SCRIPT V16] Conteneur de carte #${MAP_CONTAINER_ID} introuvable.`);
+            return;
+        }
+        maplibregl.setRTLTextPlugin('https://api.maptiler.com/mapbox-gl-js/plugins/mapbox-gl-rtl-text/v0.2.3/mapbox-gl-rtl-text.js');
+        map = new maplibregl.Map({
+            container: MAP_CONTAINER_ID,
+            style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`,
+            pitch: 50,
+            bearing: -15,
+            renderWorldCopies: false,
+            center: initialGeoJSON.features.length > 0 ? initialGeoJSON.features[0].geometry.coordinates : [2.3522, 48.8566],
+            zoom: initialGeoJSON.features.length > 0 ? 12 : 5
+        });
+        
+        window.map = map; // Pour débogage
+
         map.on('load', () => {
-            console.log('[MAP_SCRIPT V14] Carte chargée.');
+            console.log('[MAP_SCRIPT V16] Carte chargée.');
             map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
             addMapLayers();
             setupEventListeners();
@@ -74,34 +87,38 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ========================================================================
-    // GESTION DES COUCHES
+    // GESTION DES COUCHES DE LA CARTE
     // ========================================================================
 
-
-   function addMapLayers() {
-        map.addLayer({ 'id': LAYER_ID_BUILDINGS_3D, 'type': 'fill-extrusion', 'source': SOURCE_NAME_BUILDINGS, 'source-layer': SOURCE_LAYER_NAME_BUILDINGS, 'paint': { 'fill-extrusion-color': ['case', ['boolean', ['feature-state', 'highlighted'], false], '#FF1493', '#dfdfdf'], 'fill-extrusion-height': ['coalesce', ['get', 'height'], 20], 'fill-extrusion-base': ['coalesce', ['get', 'min_height'], 0], 'fill-extrusion-opacity': 0.85 } });
-        map.addLayer({ id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID_ANNONCES, paint: { 'circle-radius': 18, 'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#007bff', '#FFFFFF'], 'circle-stroke-width': 2, 'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#007bff'] } });
-        map.addLayer({ id: LAYER_ID_LABELS, type: 'symbol', source: SOURCE_ID_ANNONCES, layout: { 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 11, 'text-allow-overlap': true }, paint: { 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] } });
+    function addMapLayers() {
+        map.addLayer({ 'id': LAYER_ID_BUILDINGS_3D, 'type': 'fill-extrusion', 'source': SOURCE_NAME_BUILDINGS, 'source-layer': SOURCE_LAYER_NAME_BUILDINGS, 'paint': { 'fill-extrusion-color': ['case', ['boolean', ['feature-state', 'highlighted'], false], '#FF1493', '#dfdfdf'], 'fill-extrusion-height': ['coalesce', ['get', 'height'], 20], 'fill-extrusion-base': ['coalesce', ['get', 'min_height'], 0], 'fill-extrusion-opacity': 0.85 }});
+        map.addLayer({ id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID_ANNONCES, paint: { 'circle-radius': 10, 'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#007bff', '#FF385C'], 'circle-stroke-width': 2, 'circle-stroke-color': 'white' } });
+        map.addLayer({ id: LAYER_ID_LABELS, type: 'symbol', source: SOURCE_ID_ANNONCES, layout: { 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Noto Sans Regular'], 'text-size': 12, 'text-offset': [0, -1.8], 'text-anchor': 'bottom' }, paint: { 'text-color': '#222222', 'text-halo-color': 'white', 'text-halo-width': 1 } });
     }
-
+    
     async function mettreAJourBatimentsSelectionnes(annonces) {
-        if (!map.isStyleLoaded()) return;
+        if (!map.isStyleLoaded() || !annonces) return;
         currentHighlightedBuildingIds.forEach(id => map.setFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id }, { highlighted: false }));
         currentHighlightedBuildingIds.clear();
-        if (!annonces || annonces.length === 0) return;
-        await map.once('idle');
-        const newBuildingIds = new Set();
-        for (const annonce of annonces) {
-            if (annonce.latitude && annonce.longitude) {
-                const point = map.project([annonce.longitude, annonce.latitude]);
-                const features = map.queryRenderedFeatures([ [point.x - 5, point.y - 5], [point.x + 5, point.y + 5] ], { layers: [LAYER_ID_BUILDINGS_3D] });
-                if (features.length > 0 && features[0].id) newBuildingIds.add(features[0].id);
+        if (annonces.length === 0) return;
+    
+        try {
+            await map.once('idle'); // Attend que la carte soit stable
+            const newBuildingIds = new Set();
+            for (const annonce of annonces) {
+                if (annonce.latitude && annonce.longitude) {
+                    const point = map.project([parseFloat(annonce.longitude), parseFloat(annonce.latitude)]);
+                    const features = map.queryRenderedFeatures([ [point.x - 5, point.y - 5], [point.x + 5, point.y + 5] ], { layers: [LAYER_ID_BUILDINGS_3D] });
+                    if (features.length > 0 && features[0].id !== undefined) newBuildingIds.add(features[0].id);
+                }
             }
+            newBuildingIds.forEach(id => map.setFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id }, { highlighted: true }));
+            currentHighlightedBuildingIds = newBuildingIds;
+        } catch (error) {
+            console.warn("Erreur pendant la mise à jour des bâtiments sélectionnés (map idle):", error);
         }
-        newBuildingIds.forEach(id => map.setFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id }, { highlighted: true }));
-        currentHighlightedBuildingIds = newBuildingIds;
     }
-
+    
     // ========================================================================
     // GESTIONNAIRES D'ÉVÉNEMENTS
     // ========================================================================
@@ -112,21 +129,23 @@ document.addEventListener('DOMContentLoaded', function() {
         map.on('mouseleave', LAYER_ID_PINS, () => map.getCanvas().style.cursor = '');
         map.on('moveend', updateVisibleList);
         if (listContainer) listContainer.addEventListener('click', handleListItemClick);
-        // CORRECTION : Ré-ajout de l'écouteur pour le bouton mobile
+
         if (isMobile && mobileToggleButton) {
             mobileToggleButton.addEventListener('click', () => {
                 document.body.classList.toggle('map-is-active');
                 const isActive = document.body.classList.contains('map-is-active');
                 if (isActive && map) map.resize();
-                mobileToggleButton.textContent = isActive ? `Voir la liste` : `Voir les ${map.queryRenderedFeatures({layers: [LAYER_ID_PINS]}).length} logements`;
+                const visibleCount = map.queryRenderedFeatures({layers: [LAYER_ID_PINS]}).length;
+                mobileToggleButton.textContent = isActive ? `Voir la liste` : `Voir les ${visibleCount} logements`;
             });
         }
     }
     
     function handlePinClick(e) { if (e.features.length > 0) selectPin(e.features[0].id, e.features[0].geometry.coordinates); }
+    
     function handleListItemClick(e) {
         const link = e.target.closest('a[data-lng][data-lat]');
-        if (link) {
+        if (link && map) {
             e.preventDefault();
             const { lng, lat, propertyIdLink } = link.dataset;
             const coordinates = [parseFloat(lng), parseFloat(lat)];
@@ -141,110 +160,205 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function initializeDirectionsLogic() {
         setupLongPressListener();
-        map.getContainer().addEventListener('click', e => {
-            if (e.target.matches('.popup-directions-btn')) {
-                openDirectionsModal();
-                if(currentPopup) currentPopup.remove();
-            }
-        });
-        document.querySelector('#close-directions-modal').addEventListener('click', closeDirectionsModal);
-        document.querySelectorAll('#directions-modal .tab-button').forEach(b => b.addEventListener('click', () => handleTabClick(b.dataset.mode)));
-        document.querySelectorAll('#directions-modal .bike-option-btn').forEach(b => b.addEventListener('click', () => handleBikeOptionClick(b.dataset.bikeType)));
+        if(directionsModal) {
+            map.getContainer().addEventListener('click', e => {
+                if (e.target.matches('.popup-directions-btn')) {
+                    openDirectionsModal();
+                    if(currentPopup) currentPopup.remove();
+                }
+            });
+            const closeBtn = directionsModal.querySelector('#close-directions-modal');
+            if(closeBtn) closeBtn.addEventListener('click', closeDirectionsModal);
+            
+            directionsModal.querySelectorAll('.tab-button').forEach(b => b.addEventListener('click', () => handleTabClick(b.dataset.mode)));
+            directionsModal.querySelectorAll('.bike-option-btn').forEach(b => b.addEventListener('click', () => handleBikeOptionClick(b.dataset.bikeType)));
+        } else {
+            console.warn("Modale d'itinéraire non trouvée. Fonctionnalité d'itinéraire désactivée.");
+        }
     }
 
     function setupLongPressListener() {
-        const handleDown = (e) => { longPressTimer = setTimeout(() => {
-            longPressTimer = null;
-            destinationB = [e.lngLat.lng, e.lngLat.lat];
-            if (destinationMarker) destinationMarker.setLngLat(destinationB);
-            else {
-                const el = document.createElement('div'); el.className = 'destination-marker';
-                destinationMarker = new maplibregl.Marker({element: el, draggable: true}).setLngLat(destinationB).addTo(map);
-                destinationMarker.on('dragend', () => {
-                    destinationB = destinationMarker.getLngLat().toArray();
-                    if(directionsModal.classList.contains('active')) fetchAllRouteTimesAndUpdateUI();
-                });
-            }
-            if (originA) openDirectionsModal();
-        }, 700);};
-        const handleUp = () => { if (longPressTimer) clearTimeout(longPressTimer); };
-        map.on('mousedown', handleDown); map.on('mouseup', handleUp); map.on('mousemove', handleUp);
-        map.on('touchstart', handleDown); map.on('touchend', handleUp); map.on('touchmove', handleUp);
+        const handleInteraction = (e, isTouchEvent = false) => {
+            const lngLat = isTouchEvent ? map.unproject([e.point.x, e.point.y]) : e.lngLat;
+            longPressTimer = setTimeout(() => {
+                longPressTimer = null;
+                destinationCoordinates = [lngLat.lng, lngLat.lat];
+                console.log("[MAP_SCRIPT V16] Destination (appui long) définie:", destinationCoordinates);
+                
+                if (destinationMarker) destinationMarker.setLngLat(destinationCoordinates);
+                else {
+                    const el = document.createElement('div'); el.className = 'destination-marker';
+                    destinationMarker = new maplibregl.Marker({element: el, draggable: true}).setLngLat(destinationCoordinates).addTo(map);
+                    destinationMarker.on('dragend', () => {
+                        destinationCoordinates = destinationMarker.getLngLat().toArray();
+                        if(directionsModal && directionsModal.classList.contains('active')) fetchAllRouteTimesAndUpdateUI();
+                    });
+                }
+                if (originCoordinates) openDirectionsModal(); // Ouvre si un pin d'origine est déjà sélectionné
+                 else alert("Veuillez d'abord sélectionner une annonce (point de départ) avant de définir une destination.");
+
+            }, 700);
+        };
+        const cancelLongPress = () => { if (longPressTimer) clearTimeout(longPressTimer); };
+
+        map.on('mousedown', (e) => handleInteraction(e));
+        map.on('mouseup', cancelLongPress);
+        map.on('mousemove', cancelLongPress);
+        map.on('touchstart', (e) => handleInteraction(e.originalEvent, true));
+        map.on('touchend', cancelLongPress);
+        map.on('touchmove', cancelLongPress);
     }
     
     function openDirectionsModal() {
-        if (!originA) { alert("Veuillez sélectionner une annonce pour le point de départ."); return; }
-        if (!destinationB) { alert("Définissez une destination en faisant un clic long sur la carte."); return; }
-        directionsModal.classList.add('active');
-        fetchAllRouteTimesAndUpdateUI();
+        if (!originCoordinates) { alert("Veuillez sélectionner une annonce (point de départ)."); return; }
+        if (!destinationCoordinates) { alert("Définissez une destination par un appui long sur la carte."); return; }
+        if (directionsModal) {
+            directionsModal.classList.add('active');
+            fetchAllRouteTimesAndUpdateUI();
+        }
     }
     
-    function closeDirectionsModal() { directionsModal.classList.remove('active'); clearRouteLayers(); }
+    function closeDirectionsModal() { 
+        if (directionsModal) directionsModal.classList.remove('active'); 
+        clearRouteLayers(); 
+    }
 
     async function fetchAllRouteTimesAndUpdateUI() {
-        if (!originA || !destinationB) return;
-        document.querySelectorAll('.tab-button span').forEach(s => s.textContent = '...');
-        const modes = ['drive', 'transit', 'walk', 'bicycle'];
-        const results = await Promise.allSettled(modes.map(mode => getRouteData(mode, originA, destinationB)));
-        results.forEach((result, i) => {
-            const mode = modes[i];
-            const duration = result.status === 'fulfilled' ? result.value?.routes[0]?.duration : null;
-            document.getElementById(`time-${mode}`).textContent = formatDuration(duration);
+        if (!originCoordinates || !destinationCoordinates) {
+            console.warn("[ROUTING] Coordonnées de départ ou d'arrivée manquantes.");
+            if(directionsModal) directionsModal.querySelector('.directions-instructions').textContent = "Veuillez sélectionner un point de départ et une destination.";
+            return;
+        }
+        if(!directionsModal) return;
+
+        directionsModal.querySelector('.directions-instructions').textContent = "Calcul des temps...";
+        const modes = ['driving', 'pedestrian', 'cycling']; // Profils MapTiler corrects, pas de 'transit'
+        
+        const timeElements = {
+            driving: directionsModal.querySelector('#time-drive'),
+            pedestrian: directionsModal.querySelector('#time-walk'),
+            cycling: directionsModal.querySelector('#time-bicycle'),
+        };
+
+        modes.forEach(mode => { if(timeElements[mode]) timeElements[mode].textContent = '...'; });
+
+        routeGeometries = {}; // Réinitialiser les géométries cachées
+
+        const promises = modes.map(mode => getRouteData(mode, originCoordinates, destinationCoordinates));
+        const results = await Promise.allSettled(promises);
+
+        let firstValidModeData = null;
+
+        results.forEach((result, index) => {
+            const mode = modes[index]; // Ici mode sera 'driving', 'pedestrian', ou 'cycling'
+            if (result.status === 'fulfilled' && result.value) {
+                const { duration, geometry } = result.value;
+                routeGeometries[mode] = geometry; // Stocker la géométrie
+                 // Les IDs des spans sont 'time-drive', 'time-walk', 'time-bicycle'
+                const uiMode = mode === 'driving' ? 'drive' : (mode === 'pedestrian' ? 'walk' : 'bicycle');
+                if (timeElements[uiMode]) timeElements[uiMode].textContent = formatDuration(duration);
+                
+                if (!firstValidModeData) firstValidModeData = { mode: uiMode, geometry: geometry };
+            } else {
+                const uiMode = mode === 'driving' ? 'drive' : (mode === 'pedestrian' ? 'walk' : 'bicycle');
+                if (timeElements[uiMode]) timeElements[uiMode].textContent = 'N/A';
+                console.error(`Échec itinéraire pour ${mode}:`, result.reason);
+            }
         });
-        handleTabClick(currentRouteMode);
+        
+        if (firstValidModeData) {
+            // Activer le premier onglet valide et dessiner sa route
+            handleTabClick(firstValidModeData.mode, firstValidModeData.geometry);
+        } else {
+             if(directionsModal) directionsModal.querySelector('.directions-instructions').textContent = "Aucun itinéraire trouvé.";
+        }
     }
     
-    async function handleTabClick(mode) {
-        currentRouteMode = mode;
-        document.querySelectorAll('.tab-button').forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
-        document.getElementById('bicycle-options').style.display = mode === 'bicycle' ? 'block' : 'none';
+    async function handleTabClick(uiMode, preloadedGeometry = null) { // uiMode est 'drive', 'walk', 'bicycle'
+        if(!directionsModal) return;
+        currentRouteMode = uiMode === 'drive' ? 'driving' : (uiMode === 'walk' ? 'pedestrian' : 'cycling');
+
+        directionsModal.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+        const activeTabButton = directionsModal.querySelector(`.tab-button[data-mode="${uiMode}"]`);
+        if (activeTabButton) activeTabButton.classList.add('active');
+
+        const bicycleOptionsDiv = directionsModal.querySelector('#bicycle-options');
+        if (bicycleOptionsDiv) bicycleOptionsDiv.style.display = uiMode === 'bicycle' ? 'block' : 'none';
         
-        const data = await getRouteData(mode, originA, destinationB);
-        if (data && data.routes?.length > 0) {
-            const route = data.routes[0];
-            const geojson = mode === 'transit' 
-                ? { type: 'FeatureCollection', features: route.legs.map((leg, i) => ({ type: 'Feature', id:i, properties: { mode: leg.mode, color: leg.line_color }, geometry: leg.geometry })) }
-                : { type: 'FeatureCollection', features: [{ type: 'Feature', id:0, properties: {}, geometry: route.geometry }] };
-            drawRoute(mode, geojson);
+        clearRouteLayers(); 
+
+        if (preloadedGeometry) {
+            drawRoute(currentRouteMode, preloadedGeometry);
+        } else if (routeGeometries[currentRouteMode]) {
+            drawRoute(currentRouteMode, routeGeometries[currentRouteMode]);
         } else {
-            clearRouteLayers();
+            try {
+                const data = await getRouteData(currentRouteMode, originCoordinates, destinationCoordinates);
+                if (data && data.geometry) {
+                    routeGeometries[currentRouteMode] = data.geometry;
+                    drawRoute(currentRouteMode, data.geometry);
+                } else {
+                     if(directionsModal) directionsModal.querySelector('.directions-instructions').textContent = `Itinéraire en ${uiMode} indisponible.`;
+                }
+            } catch (error) {
+                 if(directionsModal) directionsModal.querySelector('.directions-instructions').textContent = `Erreur itinéraire ${uiMode}.`;
+            }
         }
     }
     
     function handleBikeOptionClick(bikeType) {
         currentBikeType = bikeType;
-        document.querySelectorAll('.bike-option-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.bikeType === bikeType));
-        handleTabClick('bicycle');
+        if(directionsModal) {
+            directionsModal.querySelectorAll('.bike-option-btn').forEach(btn => btn.classList.remove('active'));
+            const activeBikeButton = directionsModal.querySelector(`.bike-option-btn[data-bike-type="${bikeType}"]`);
+            if (activeBikeButton) activeBikeButton.classList.add('active');
+        }
+        handleTabClick('bicycle'); // Relance le calcul pour le vélo avec la nouvelle option
     }
 
-    async function getRouteData(mode, start, end) {
-        if (!start || !end) {
-            console.error("Point de départ ou d'arrivée manquant pour le calcul d'itinéraire.");
-            return null;
+    async function getRouteData(profile, startCoords, endCoords) { // profile est 'driving', 'pedestrian', 'cycling'
+        if (!startCoords || !endCoords) {
+            console.error("Coordonnées de départ ou d'arrivée manquantes pour getRouteData.");
+            return Promise.reject("Missing coordinates");
         }
-        // CORRECTION : Utilisation de 'drive' au lieu de 'driving'.
-        const profile = mode === 'drive' ? 'drive' : mode; 
-        let url = `${DIRECTIONS_API_BASE}/${profile}/${start.join(',')};${end.join(',')}?key=${MAPTILER_API_KEY}&geometries=geojson&steps=true&language=fr`;
-        if(mode === 'bicycle' && currentBikeType === 'shared') url += '&bicycle_type=hybrid';
+        let url = `${DIRECTIONS_API_BASE}/${profile}/${startCoords.join(',')};${endCoords.join(',')}?key=${MAPTILER_API_KEY}&geometries=geojson&steps=true&language=fr`;
+        if(profile === 'cycling' && currentBikeType === 'shared') url += '&bicycle_type=hybrid'; // Pour simuler Vélib'
         try {
             const res = await fetch(url);
-            if (!res.ok) throw new Error(`API Error ${res.status}`);
-            return await res.json();
-        } catch (error) {
-            console.error(`Erreur de routage pour le mode ${mode}:`, error);
-            return null;
-        }
+            if (!res.ok) throw new Error(`API Error ${res.status}: ${await res.text()}`);
+            const data = await res.json();
+            if (data.routes && data.routes.length > 0) return { duration: data.routes[0].duration, geometry: data.routes[0].geometry };
+            else throw new Error("Aucun itinéraire trouvé dans la réponse.");
+        } catch (error) { console.error(`Erreur API routage (${profile}):`, error); throw error; }
     }
     
+    function clearRouteLayers() {
+        if (!map) return;
+        if (map.getLayer(LAYER_ID_ROUTE)) map.removeLayer(LAYER_ID_ROUTE);
+        if (map.getSource(SOURCE_ID_ROUTE)) map.removeSource(SOURCE_ID_ROUTE);
+    }
+
+    function drawRoute(modeUsed, geometry) { // modeUsed n'est plus directement utilisé pour le style, mais gardé pour logs potentiels
+        if (!map || !geometry) return;
+        clearRouteLayers();
+        map.addSource(SOURCE_ID_ROUTE, { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: geometry } });
+        map.addLayer({
+            id: LAYER_ID_ROUTE, type: 'line', source: SOURCE_ID_ROUTE,
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: { 'line-color': '#007cff', 'line-width': 5, 'line-opacity': 0.8 }
+        });
+    }
+
     // ========================================================================
     // FONCTIONS UTILITAIRES ET DE SYNCHRONISATION
     // ========================================================================
 
     function selectPin(pinId, coordinates) {
-        if (selectedPinId) map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
+        if (selectedPinId !== null) map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
         map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: pinId }, { selected: true });
         selectedPinId = pinId;
-        originA = coordinates; // Met à jour le point de départ pour l'itinéraire
+        originCoordinates = coordinates; // Définit l'origine pour l'itinéraire
+        
         if (currentPopup) currentPopup.remove();
         const features = map.querySourceFeatures(SOURCE_ID_ANNONCES, { filter: ['==', 'id', pinId] });
         if (features.length > 0) {
@@ -252,8 +366,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 .setLngLat(coordinates).setHTML(createPopupHTML(features[0].properties, coordinates)).addTo(map)
                 .on('close', () => {
                     map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: pinId }, { selected: false });
-                    selectedPinId = null; currentPopup = null; originA = null;
+                    selectedPinId = null; currentPopup = null; originCoordinates = null; closeDirectionsModal();
                 });
+        }
+         // Si une destination est déjà définie, ouvrir la modale
+        if (destinationCoordinates) {
+            openDirectionsModal();
         }
     }
 
@@ -265,62 +383,71 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function createPopupHTML(properties, coordinates) {
+    function createPopupHTML(properties, coords) { // coords sont les coordonnées du pin [lng, lat]
         const detailLink = `annonce?id=${properties.id_str}`;
-        const directionsButton = `<button class="popup-directions-btn" data-lng="${coordinates[0]}" data-lat="${coordinates[1]}">Itinéraire</button>`;
+        const directionsButton = `<button class="popup-directions-btn" data-lng="${coords[0]}" data-lat="${coords[1]}">Itinéraire</button>`;
         return `<div class="map-custom-popup">
-                    <img src="${properties.coverPhoto || ''}" alt="${properties.title}" class="popup-image">
+                    <img src="${properties.coverPhoto || ''}" alt="${properties.title}" class="popup-image" onerror="this.style.display='none'">
                     <div class="popup-info">
-                        <h4 class="popup-title">${properties.title}</h4>
-                        <p class="popup-price">${properties.price} € / mois</p>
-                        <div class="popup-actions"><a href="${detailLink}" class="popup-link" target="_blank">Détails</a>${directionsButton}</div>
+                        <h4 class="popup-title">${properties.title || 'Titre non disponible'}</h4>
+                        <p class="popup-price">${properties.price}€ / mois</p>
+                        <div class="popup-actions">
+                            <a href="${detailLink}" class="popup-link" target="_blank">Détails</a>
+                            ${directionsButton}
+                        </div>
                     </div>
                 </div>`;
     }
     
     function formatDuration(seconds) {
-        if (seconds === null || seconds === undefined) return "--:--";
+        if (seconds === null || seconds === undefined || isNaN(seconds)) return "--:--";
         if (seconds < 60) return "< 1 min";
         const hours = Math.floor(seconds / 3600);
         const minutes = Math.round((seconds % 3600) / 60);
-        return hours > 0 ? `${hours}h ${minutes.toString().padStart(2, '0')}m` : `${minutes} min`;
+        return hours > 0 ? `${hours}h ${minutes.toString().padStart(2, '0')}min` : `${minutes} min`;
+    }
+    
+    function convertAnnoncesToGeoJSON(annonces) {
+        return { type: 'FeatureCollection', features: annonces.map(annonce => {
+            if (!annonce.id || annonce.latitude == null || annonce.longitude == null ) return null;
+            // Assurez-vous que votre objet 'annonce' contient '_property_lease_of_property.0.loyer' ou 'loyer_cc'
+            const loyer = getNestedValue(annonce, '_property_lease_of_property.0.loyer') 
+                       || getNestedValue(annonce, '_property_lease_of_property.0.loyer_cc');
+            return {
+                type: 'Feature', id: parseInt(annonce.id, 10),
+                geometry: { type: 'Point', coordinates: [parseFloat(annonce.longitude), parseFloat(annonce.latitude)] },
+                properties: { id: parseInt(annonce.id, 10), id_str: String(annonce.id), price: loyer != null ? loyer : '?', title: getNestedValue(annonce, 'property_title'), coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url') }
+            };
+        }).filter(Boolean)};
     }
     
     function getBounds(geojson) {
         const bounds = new maplibregl.LngLatBounds();
-        geojson.features.forEach(feature => bounds.extend(feature.geometry.coordinates));
+        if (geojson && geojson.features) {
+            geojson.features.forEach(feature => {
+                if (feature && feature.geometry && feature.geometry.coordinates) {
+                    bounds.extend(feature.geometry.coordinates);
+                }
+            });
+        }
         return bounds;
     }
+
     function getNestedValue(obj, path) {
-        if (!path) return undefined;
+        if (!path || obj == null) return undefined;
         return path.split('.').reduce((acc, part) => {
             if (acc === undefined || acc === null) return undefined;
             const i = !isNaN(parseInt(part, 10)) ? parseInt(part, 10) : -1;
             return i !== -1 && Array.isArray(acc) ? acc[i] : acc[part];
         }, obj);
     }
-    /**
-     * CORRECTION : Le chemin vers le loyer est mis à jour pour être plus robuste.
-     * Note: Assurez-vous que votre API Xano renvoie bien `_property_lease_of_property` avec les annonces.
-     */
-    function convertAnnoncesToGeoJSON(annonces) {
-        return { type: 'FeatureCollection', features: annonces.map(annonce => {
-            if (!annonce.id || !annonce.latitude || !annonce.longitude) return null;
-            
-            const loyer = getNestedValue(annonce, '_property_lease_of_property.0.loyer') 
-                       || getNestedValue(annonce, '_property_lease_of_property.0.loyer_cc');
 
-            return {
-                type: 'Feature', id: parseInt(annonce.id, 10),
-                geometry: { type: 'Point', coordinates: [parseFloat(annonce.longitude), parseFloat(annonce.latitude)] },
-                properties: { 
-                    id: parseInt(annonce.id, 10), 
-                    id_str: String(annonce.id), 
-                    price: loyer || '?', // Affiche '?' si le loyer n'est pas trouvé
-                    title: getNestedValue(annonce, 'property_title'), 
-                    coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url') 
-                }
-            };
-        }).filter(Boolean)};
+    // Lancement initial
+    if (document.getElementById(MAP_CONTAINER_ID)) {
+        // On attend que les données initiales des annonces soient prêtes via l'événement 'annoncesChargeesEtRendues'
+        // initializeMap sera appelé à ce moment-là.
+        console.log("[MAP_SCRIPT V16] En attente de 'annoncesChargeesEtRendues' pour initialiser la carte.");
+    } else {
+        console.warn("[MAP_SCRIPT V16] Conteneur de carte non trouvé. Le script ne s'initialisera pas.");
     }
 });
