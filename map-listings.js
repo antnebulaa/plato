@@ -1,6 +1,6 @@
-// map-listings.js - VERSION FINALE v10.2 - Ordre des couches corrigé pour la 3D
+// map-listings.js - VERSION FINALE v10.3 - Ordre des couches robuste et correction artefacts
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V10.2] Ordre des couches corrigé pour la 3D.');
+    console.log('[MAP_SCRIPT V10.3] Ordre des couches robuste, gestion artefacts.');
 
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const MAP_CONTAINER_ID = 'map-section';
@@ -66,7 +66,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         currentHighlightedBuildingIds.forEach(buildingId => {
-            // Vérifier si la couche existe avant de tenter de modifier l'état de ses features
             if (map.getLayer(LAYER_ID_BUILDINGS_3D) && map.getSource(SOURCE_NAME_BUILDINGS)) {
                 map.setFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: buildingId }, { highlighted: false });
             }
@@ -89,7 +88,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (lat && lng) {
                 const point = map.project([lng, lat]);
                 const queryBox = [ [point.x - 10, point.y - 10], [point.x + 10, point.y + 10] ];
-                // S'assurer que la couche existe avant de la requêter
                 if (map.getLayer(LAYER_ID_BUILDINGS_3D)) {
                     const features = map.queryRenderedFeatures(queryBox, { layers: [LAYER_ID_BUILDINGS_3D] });
                     if (features.length > 0 && features[0].id !== undefined) { 
@@ -142,29 +140,25 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         map.on('load', () => {
-            console.log('[MAP_SCRIPT V10.2] Carte chargée. Ajout des couches dans l\'ordre corrigé.');
+            console.log('[MAP_SCRIPT V10.3] Carte chargée. Ajout des couches dans l\'ordre robuste.');
             map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
 
             const heightExpression = ['coalesce', ['get', 'height'], 20]; 
             const minHeightExpression = ['coalesce', ['get', 'min_height'], 0];
 
-            // --- ORDRE D'AJOUT DES COUCHES CORRIGÉ ---
-            // 1. Ajouter la couche des PINS en premier
-            map.addLayer({
-                id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID_ANNONCES,
-                paint: { 'circle-radius': 18, 'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#007bff', '#FFFFFF'], 'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 2, 1.5], 'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#007bff'] }
-            });
-            
-            // 2. Ajouter la couche des LABELS (souvent au-dessus des pins)
-            map.addLayer({
-                id: LAYER_ID_LABELS, type: 'symbol', source: SOURCE_ID_ANNONCES,
-                layout: { 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 11, 'text-allow-overlap': true },
-                paint: { 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] }
-            });
+            // --- NOUVEL ORDRE D'AJOUT DES COUCHES ---
+            // Trouver la première couche de symboles dans le style de la carte (pour les labels)
+            const layers = map.getStyle().layers;
+            let firstSymbolId;
+            for (let i = 0; i < layers.length; i++) {
+                if (layers[i].type === 'symbol') {
+                    firstSymbolId = layers[i].id;
+                    break;
+                }
+            }
 
-            // 3. Ajouter la couche des BÂTIMENTS 3D.
-            //    Le troisième argument de addLayer (beforeId) indique la couche AVANT laquelle insérer la nouvelle.
-            //    En spécifiant LAYER_ID_PINS, les bâtiments seront dessinés SOUS les pins.
+            // 1. Ajouter la couche des BÂTIMENTS 3D AVANT la première couche de symboles
+            //    Si firstSymbolId n'est pas trouvé, la couche sera ajoutée au-dessus de tout.
             map.addLayer({
                 'id': LAYER_ID_BUILDINGS_3D, 
                 'type': 'fill-extrusion',
@@ -181,8 +175,21 @@ document.addEventListener('DOMContentLoaded', function() {
                     'fill-extrusion-base': minHeightExpression, 
                     'fill-extrusion-opacity': 0.85 
                 }
-            }, LAYER_ID_PINS); // <-- Les bâtiments sont ajoutés AVANT la couche des pins.
-            // --- FIN DE LA CORRECTION DE L'ORDRE ---
+            }, firstSymbolId); // Insérer AVANT la première couche de symboles
+
+            // 2. Ajouter la couche des PINS (sera au-dessus des bâtiments 3D)
+            map.addLayer({
+                id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID_ANNONCES,
+                paint: { 'circle-radius': 18, 'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#007bff', '#FFFFFF'], 'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 2, 1.5], 'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#007bff'] }
+            });
+            
+            // 3. Ajouter la couche des LABELS (sera au-dessus des pins)
+            map.addLayer({
+                id: LAYER_ID_LABELS, type: 'symbol', source: SOURCE_ID_ANNONCES,
+                layout: { 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 11, 'text-allow-overlap': true },
+                paint: { 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] }
+            });
+            // --- FIN DU NOUVEL ORDRE ---
             
             map.on('click', LAYER_ID_PINS, handleMapClick);
             map.on('mouseenter', LAYER_ID_PINS, () => map.getCanvas().style.cursor = 'pointer');
