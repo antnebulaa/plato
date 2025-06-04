@@ -1,19 +1,18 @@
-// map-listings.js - VERSION FINALE v10.1 - Débogage feature-state et repaint
+// map-listings.js - VERSION FINALE v10.2 - Ordre des couches corrigé pour la 3D
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V10.1] Débogage feature-state et repaint.');
+    console.log('[MAP_SCRIPT V10.2] Ordre des couches corrigé pour la 3D.');
 
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const MAP_CONTAINER_ID = 'map-section';
     const LIST_CONTAINER_ID = 'annonces-wrapper';
     const MOBILE_TOGGLE_BUTTON_ID = 'mobile-map-toggle';
-    const SOURCE_ID_ANNONCES = 'annonces-source'; // Source pour nos pins d'annonces
+    const SOURCE_ID_ANNONCES = 'annonces-source'; 
     const LAYER_ID_PINS = 'annonces-pins-layer';
     const LAYER_ID_LABELS = 'annonces-labels-layer';
 
-    // Noms pour la source et la couche des bâtiments 3D (issus de vos logs console)
     const SOURCE_NAME_BUILDINGS = 'maptiler_planet'; 
     const SOURCE_LAYER_NAME_BUILDINGS = 'building';
-    const LAYER_ID_BUILDINGS_3D = 'buildings-3d-layer'; // ID pour notre unique couche de bâtiments 3D
+    const LAYER_ID_BUILDINGS_3D = 'buildings-3d-layer'; 
 
     const listContainer = document.getElementById(LIST_CONTAINER_ID);
     const mobileToggleButton = document.getElementById(MOBILE_TOGGLE_BUTTON_ID);
@@ -67,13 +66,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         currentHighlightedBuildingIds.forEach(buildingId => {
-            map.setFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: buildingId }, { highlighted: false });
+            // Vérifier si la couche existe avant de tenter de modifier l'état de ses features
+            if (map.getLayer(LAYER_ID_BUILDINGS_3D) && map.getSource(SOURCE_NAME_BUILDINGS)) {
+                map.setFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: buildingId }, { highlighted: false });
+            }
         });
         currentHighlightedBuildingIds.clear();
 
         if (!annonces || annonces.length === 0) {
             console.log("[BÂTIMENTS DEBUG] Aucune annonce, pas de bâtiments à mettre en évidence.");
-            // S'assurer qu'un repaint est déclenché même si aucun bâtiment n'est à mettre en évidence pour effacer les anciens.
             map.triggerRepaint();
             return;
         }
@@ -88,28 +89,28 @@ document.addEventListener('DOMContentLoaded', function() {
             if (lat && lng) {
                 const point = map.project([lng, lat]);
                 const queryBox = [ [point.x - 10, point.y - 10], [point.x + 10, point.y + 10] ];
-                const features = map.queryRenderedFeatures(queryBox, { layers: [LAYER_ID_BUILDINGS_3D] });
-                if (features.length > 0 && features[0].id !== undefined) { 
-                    const buildingId = features[0].id;
-                    newBuildingIdsToHighlight.add(buildingId);
-                    // Log de débogage ajouté
-                    console.log(`[BÂTIMENTS DEBUG] Annonce ID ${annonce.id_str || annonce.id} -> Building Feature ID: ${buildingId}, Properties:`, JSON.stringify(features[0].properties).substring(0, 200) + "...");
+                // S'assurer que la couche existe avant de la requêter
+                if (map.getLayer(LAYER_ID_BUILDINGS_3D)) {
+                    const features = map.queryRenderedFeatures(queryBox, { layers: [LAYER_ID_BUILDINGS_3D] });
+                    if (features.length > 0 && features[0].id !== undefined) { 
+                        const buildingId = features[0].id;
+                        newBuildingIdsToHighlight.add(buildingId);
+                        console.log(`[BÂTIMENTS DEBUG] Annonce ID ${annonce.id_str || annonce.id} -> Building Feature ID: ${buildingId}`);
+                    }
                 }
             }
         }
 
         newBuildingIdsToHighlight.forEach(buildingId => {
-            map.setFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: buildingId }, { highlighted: true });
-            // Log de débogage ajouté pour vérifier l'état
-            const state = map.getFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: buildingId });
-            console.log(`[BÂTIMENTS DEBUG] État pour bâtiment ${buildingId} après set (highlighted:true):`, JSON.stringify(state));
+            if (map.getLayer(LAYER_ID_BUILDINGS_3D) && map.getSource(SOURCE_NAME_BUILDINGS)) {
+                map.setFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: buildingId }, { highlighted: true });
+                const state = map.getFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: buildingId });
+                console.log(`[BÂTIMENTS DEBUG] État pour bâtiment ${buildingId} après set (highlighted:true):`, JSON.stringify(state));
+            }
         });
         
         currentHighlightedBuildingIds = newBuildingIdsToHighlight; 
-
         console.log(`[BÂTIMENTS DEBUG] IDs finaux mis en évidence : ${Array.from(currentHighlightedBuildingIds).join(', ')} (Total: ${currentHighlightedBuildingIds.size})`);
-        
-        // Forcer un redessinage de la carte
         map.triggerRepaint();
     }
 
@@ -141,12 +142,29 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         map.on('load', () => {
-            console.log('[MAP_SCRIPT V10.1] Carte chargée. Ajout des couches.');
+            console.log('[MAP_SCRIPT V10.2] Carte chargée. Ajout des couches dans l\'ordre corrigé.');
             map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
 
             const heightExpression = ['coalesce', ['get', 'height'], 20]; 
             const minHeightExpression = ['coalesce', ['get', 'min_height'], 0];
 
+            // --- ORDRE D'AJOUT DES COUCHES CORRIGÉ ---
+            // 1. Ajouter la couche des PINS en premier
+            map.addLayer({
+                id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID_ANNONCES,
+                paint: { 'circle-radius': 18, 'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#007bff', '#FFFFFF'], 'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 2, 1.5], 'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#007bff'] }
+            });
+            
+            // 2. Ajouter la couche des LABELS (souvent au-dessus des pins)
+            map.addLayer({
+                id: LAYER_ID_LABELS, type: 'symbol', source: SOURCE_ID_ANNONCES,
+                layout: { 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 11, 'text-allow-overlap': true },
+                paint: { 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] }
+            });
+
+            // 3. Ajouter la couche des BÂTIMENTS 3D.
+            //    Le troisième argument de addLayer (beforeId) indique la couche AVANT laquelle insérer la nouvelle.
+            //    En spécifiant LAYER_ID_PINS, les bâtiments seront dessinés SOUS les pins.
             map.addLayer({
                 'id': LAYER_ID_BUILDINGS_3D, 
                 'type': 'fill-extrusion',
@@ -163,17 +181,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     'fill-extrusion-base': minHeightExpression, 
                     'fill-extrusion-opacity': 0.85 
                 }
-            }, LAYER_ID_PINS); 
-            
-            map.addLayer({
-                id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID_ANNONCES,
-                paint: { 'circle-radius': 18, 'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#007bff', '#FFFFFF'], 'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 2, 1.5], 'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#007bff'] }
-            });
-            map.addLayer({
-                id: LAYER_ID_LABELS, type: 'symbol', source: SOURCE_ID_ANNONCES,
-                layout: { 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 11, 'text-allow-overlap': true },
-                paint: { 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] }
-            });
+            }, LAYER_ID_PINS); // <-- Les bâtiments sont ajoutés AVANT la couche des pins.
+            // --- FIN DE LA CORRECTION DE L'ORDRE ---
             
             map.on('click', LAYER_ID_PINS, handleMapClick);
             map.on('mouseenter', LAYER_ID_PINS, () => map.getCanvas().style.cursor = 'pointer');
