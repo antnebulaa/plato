@@ -1,6 +1,6 @@
-// map-listings.js - VERSION FINALE v9.1 - Ordre des couches corrigé
+// map-listings.js - VERSION FINALE v9.2 - Ordre des couches finalisé
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V9.1] Ordre des couches corrigé.');
+    console.log('[MAP_SCRIPT V9.2] Ordre des couches finalisé.');
 
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const MAP_CONTAINER_ID = 'map-section';
@@ -29,14 +29,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!map) {
             initializeMap(geojsonData);
         } else {
-            // Si la carte existe déjà, on met à jour les données et le centrage
             map.getSource(SOURCE_ID).setData(geojsonData);
             mettreAJourBatimentsSelectionnes(allAnnouncements);
             if (geojsonData.features.length > 0) {
                  const bounds = getBounds(geojsonData);
                  map.fitBounds(bounds, { padding: 80, maxZoom: 16 });
-            } else { // Si pas d'annonces, on peut recentrer sur une vue par défaut ou ne rien faire
-                map.flyTo({ center: [2.3522, 48.8566], zoom: 11 }); // Exemple: retour à Paris
+            } else { 
+                map.flyTo({ center: [2.3522, 48.8566], zoom: 11 }); 
             }
         }
     });
@@ -112,7 +111,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         map.on('load', () => {
-            console.log('[MAP_SCRIPT V9.1] Carte chargée. Ajout des couches dans le bon ordre.');
+            console.log('[MAP_SCRIPT V9.2] Carte chargée. Ajout des couches dans le bon ordre.');
             map.addSource(SOURCE_ID, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
 
             const heightExpression = ['coalesce', ['get', 'height'], 20]; 
@@ -134,6 +133,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             // 3. Maintenant, la couche de base grise pour tous les bâtiments, insérée AVANT les pins
+            //    La couche LAYER_ID_PINS existe maintenant, donc on peut l'utiliser comme référence.
             map.addLayer({
                 'id': 'base-buildings-3d',
                 'type': 'fill-extrusion',
@@ -145,7 +145,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     'fill-extrusion-base': ['coalesce', ['get', 'min_height'], 0], 
                     'fill-extrusion-opacity': 0.7 
                 }
-            }, LAYER_ID_PINS); // Insérer AVANT la couche des pins (qui existe maintenant)
+            }, LAYER_ID_PINS); // Insérer AVANT la couche des pins
 
             // 4. Et la couche rose pour les bâtiments sélectionnés, aussi AVANT les pins
             map.addLayer({
