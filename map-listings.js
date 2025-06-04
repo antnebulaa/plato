@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('[MAP_SCRIPT V17] Suppression du plugin RTL et focus sur la vérification de la clé API MapTiler pour les itinéraires.');
 
     // --- CONSTANTES GLOBALES ---
-    const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL'; // Votre clé API MapTiler
+    const MAPTILER_API_KEY = 'Z8Gqj65EHchnshMYiN7P'; // Votre clé API MapTiler
     const DIRECTIONS_API_BASE = 'https://api.maptiler.com/routes';
     const MAP_CONTAINER_ID = 'map-section';
     const LIST_CONTAINER_ID = 'annonces-wrapper';
