@@ -282,13 +282,21 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
         // --- FIN DE LA SECTION À MODIFIER/AJOUTER ---
         
             
-        // --- CRÉATION DU LIEN VERS LA PAGE DE DÉTAIL (RÉINTÉGRÉE) ---
+          // --- CRÉATION DU LIEN VERS LA PAGE DE DÉTAIL (MODIFIÉ) ---
         if (propertyId !== undefined && propertyId !== null) {
             const anchor = document.createElement('a');
-            anchor.href = `annonce?id=${propertyId}`; // Adaptez si besoin
+            anchor.href = `annonce?id=${propertyId}`;
             anchor.style.textDecoration = 'none';
             anchor.style.color = 'inherit';
-            //anchor.style.display = 'block'; //
+            
+            // NOUVEAU : On ajoute les coordonnées sur le lien pour la synchronisation liste -> carte
+            const lat = getNestedValue(itemData, 'latitude');
+            const lng = getNestedValue(itemData, 'longitude');
+            if (lat && lng) {
+                anchor.dataset.lng = lng;
+                anchor.dataset.lat = lat;
+                anchor.dataset.propertyIdLink = propertyId; // On ajoute aussi l'ID ici pour faciliter la recherche
+            }
             
             anchor.appendChild(clone); // Met le clone (la carte) DANS le lien
             fragment.appendChild(anchor); // Ajoute le lien (avec la carte dedans) au fragment
