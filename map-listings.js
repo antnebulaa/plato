@@ -1,18 +1,19 @@
-// map-listings.js - VERSION FINALE v11.1 - Timing robuste et Opacité
+// map-listings.js - VERSION FINALE v10 - Une seule couche 3D et feature-state
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V11.1] Timing robuste et Opacité.');
+    console.log('[MAP_SCRIPT V10] Approche avec une seule couche 3D et feature-state.');
 
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const MAP_CONTAINER_ID = 'map-section';
     const LIST_CONTAINER_ID = 'annonces-wrapper';
     const MOBILE_TOGGLE_BUTTON_ID = 'mobile-map-toggle';
-    const SOURCE_ID_ANNONCES = 'annonces-source'; 
+    const SOURCE_ID_ANNONCES = 'annonces-source'; // Source pour nos pins d'annonces
     const LAYER_ID_PINS = 'annonces-pins-layer';
     const LAYER_ID_LABELS = 'annonces-labels-layer';
 
+    // Noms pour la source et la couche des bâtiments 3D (issus de vos logs console)
     const SOURCE_NAME_BUILDINGS = 'maptiler_planet'; 
     const SOURCE_LAYER_NAME_BUILDINGS = 'building';
-    const LAYER_ID_BUILDINGS_3D = 'buildings-3d-layer'; 
+    const LAYER_ID_BUILDINGS_3D = 'buildings-3d-layer'; // ID pour notre unique couche de bâtiments 3D
 
     const listContainer = document.getElementById(LIST_CONTAINER_ID);
     const mobileToggleButton = document.getElementById(MOBILE_TOGGLE_BUTTON_ID);
@@ -21,9 +22,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let allAnnouncements = [];
     let isMobile = window.innerWidth < 768;
     let currentPopup = null;
-    let selectedPinId = null; 
-    let clickedBuildingId = null; 
-    let initialAnnouncementsLoaded = false; // Indicateur pour le premier chargement
+    let selectedPinId = null; // Pour le pin sélectionné (celui des annonces)
+    let currentHighlightedBuildingIds = new Set(); // Pour suivre les bâtiments actuellement en rose
 
     document.addEventListener('annoncesChargeesEtRendues', (event) => {
         const annonces = event.detail.annonces;
@@ -33,16 +33,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const geojsonData = convertAnnoncesToGeoJSON(allAnnouncements);
 
         if (!map) {
-            initialAnnouncementsLoaded = true; // Marquer que les données initiales sont prêtes
-            initializeMap(geojsonData); // L'initialisation s'occupera de la coloration après 'load'
+            initializeMap(geojsonData);
         } else {
             map.getSource(SOURCE_ID_ANNONCES).setData(geojsonData);
-            // Pour les mises à jour après le chargement initial de la carte
+            // La mise à jour des bâtiments se fera après que la carte soit stable
             if (map.isStyleLoaded()) {
-                // Attendre que la carte soit inactive avant de mettre à jour les bâtiments
-                map.once('idle', () => {
-                    mettreAJourBatimentsSelectionnes(allAnnouncements);
-                });
+                 mettreAJourBatimentsSelectionnes(allAnnouncements);
             }
             if (geojsonData.features.length > 0) {
                  const bounds = getBounds(geojsonData);
@@ -64,89 +60,50 @@ document.addEventListener('DOMContentLoaded', function() {
         }).filter(Boolean);
         return { type: 'FeatureCollection', features };
     }
-    
-    // Fonction pour la logique de clic sur les bâtiments (simplifiée pour le test)
-    function handleBuildingClick(e) {
-        if (e.features.length > 0) {
-            const newClickedBuildingId = e.features[0].id;
-            console.log(`[BÂTIMENT CLIC] ID du bâtiment cliqué: ${newClickedBuildingId}, Feature:`, e.features[0]);
 
-            if (clickedBuildingId !== null && clickedBuildingId !== newClickedBuildingId) {
-                map.setFeatureState(
-                    { source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: clickedBuildingId },
-                    { highlighted: false }
-                );
-                console.log(`[BÂTIMENT CLIC] Ancien bâtiment ${clickedBuildingId} réinitialisé.`);
-            }
-
-            map.setFeatureState(
-                { source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: newClickedBuildingId },
-                { highlighted: true }
-            );
-            const newState = map.getFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: newClickedBuildingId });
-            console.log(`[BÂTIMENT CLIC] Nouveau bâtiment ${newClickedBuildingId} mis en évidence. État actuel:`, JSON.stringify(newState));
-            
-            clickedBuildingId = newClickedBuildingId;
-            map.triggerRepaint();
-        }
-    }
-
-
-    // Rétablissement de la fonction pour colorer les bâtiments en fonction de la liste d'annonces
-    async function mettreAJourBatimentsSelectionnes(annoncesAffichees) {
+    async function mettreAJourBatimentsSelectionnes(annonces) {
         if (!map.isStyleLoaded()) {
-            console.warn("[BÂTIMENTS MAJ] Style non chargé, report de la mise à jour.");
-            map.once('styledata', () => mettreAJourBatimentsSelectionnes(annoncesAffichees)); // Réessayer une fois le style chargé
-            return;
-        }
-        if (!map.getSource(SOURCE_NAME_BUILDINGS)) {
-            console.warn(`[BÂTIMENTS MAJ] Source '${SOURCE_NAME_BUILDINGS}' non trouvée.`);
+            console.warn("[BÂTIMENTS DEBUG] Style non chargé, impossible de mettre à jour les bâtiments.");
             return;
         }
 
-        console.log("[BÂTIMENTS MAJ] Début de la mise à jour des bâtiments colorés.");
+        // 1. Réinitialiser l'état des bâtiments précédemment mis en évidence
+        currentHighlightedBuildingIds.forEach(buildingId => {
+            map.setFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: buildingId }, { highlighted: false });
+        });
+        currentHighlightedBuildingIds.clear();
 
-        // D'abord, réinitialiser tous les bâtiments précédemment colorés
-        if (window.lastHighlightedBuildingIds && window.lastHighlightedBuildingIds.size > 0) {
-            window.lastHighlightedBuildingIds.forEach(id => {
-                map.setFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: id }, { highlighted: false });
-            });
-        }
-        window.lastHighlightedBuildingIds = new Set(); // Réinitialiser l'ensemble global
-
-        if (!annoncesAffichees || annoncesAffichees.length === 0) {
-            console.log("[BÂTIMENTS MAJ] Aucune annonce à afficher, tous les bâtiments redeviennent gris.");
-            map.triggerRepaint();
+        if (!annonces || annonces.length === 0) {
+            console.log("[BÂTIMENTS DEBUG] Aucune annonce, pas de bâtiments à mettre en évidence.");
             return;
         }
         
-        // Attendre que la carte soit inactive pour éviter des requêtes pendant le mouvement
-        await map.once('idle'); 
+        await map.once('idle'); // Attendre que la carte soit stable
         
-        let featuresFoundCount = 0;
-        for (const annonce of annoncesAffichees) {
+        const newBuildingIdsToHighlight = new Set();
+
+        for (const annonce of annonces) {
             const lat = getNestedValue(annonce, 'geo_location.data.lat');
             const lng = getNestedValue(annonce, 'geo_location.data.lng');
             if (lat && lng) {
                 const point = map.project([lng, lat]);
                 const queryBox = [ [point.x - 10, point.y - 10], [point.x + 10, point.y + 10] ];
-                
-                if (map.getLayer(LAYER_ID_BUILDINGS_3D)) { // Vérifier si la couche existe
-                    const features = map.queryRenderedFeatures(queryBox, { layers: [LAYER_ID_BUILDINGS_3D] });
-                    if (features.length > 0 && features[0].id !== undefined) { 
-                        const buildingId = features[0].id;
-                        map.setFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: buildingId }, { highlighted: true });
-                        window.lastHighlightedBuildingIds.add(buildingId); // Ajouter à l'ensemble global
-                        featuresFoundCount++;
-                        // console.log(`[BÂTIMENTS MAJ] Annonce ${annonce.id} -> Building ID ${buildingId} mis à jour.`);
-                    }
+                // On interroge notre unique couche de bâtiments 3D
+                const features = map.queryRenderedFeatures(queryBox, { layers: [LAYER_ID_BUILDINGS_3D] });
+                if (features.length > 0 && features[0].id !== undefined) { // S'assurer que le feature a un ID
+                    newBuildingIdsToHighlight.add(features[0].id);
                 }
             }
         }
-        console.log(`[BÂTIMENTS MAJ] ${featuresFoundCount} bâtiments mis en évidence.`);
-        map.triggerRepaint();
-    }
 
+        // 2. Mettre en évidence les nouveaux bâtiments
+        newBuildingIdsToHighlight.forEach(buildingId => {
+            map.setFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: buildingId }, { highlighted: true });
+        });
+        currentHighlightedBuildingIds = newBuildingIdsToHighlight; // Mettre à jour la liste des bâtiments en rose
+
+        console.log(`[BÂTIMENTS DEBUG] IDs mis en évidence : ${Array.from(currentHighlightedBuildingIds).join(', ')} (Total: ${currentHighlightedBuildingIds.size})`);
+    }
 
     function getBounds(geojson) {
         const bounds = new maplibregl.LngLatBounds();
@@ -165,7 +122,7 @@ document.addEventListener('DOMContentLoaded', function() {
             renderWorldCopies: false
         });
         
-        window.map = map; 
+        window.map = map; // Pour le débogage console
 
         if (initialGeoJSON.features.length > 0) {
             const bounds = getBounds(initialGeoJSON);
@@ -176,67 +133,51 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         map.on('load', () => {
-            console.log('[MAP_SCRIPT V11.1] Carte chargée. Ajout des couches.');
+            console.log('[MAP_SCRIPT V10] Carte chargée. Ajout des couches.');
             map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
 
             const heightExpression = ['coalesce', ['get', 'height'], 20]; 
             const minHeightExpression = ['coalesce', ['get', 'min_height'], 0];
 
-            const layers = map.getStyle().layers;
-            let firstSymbolId;
-            for (let i = 0; i < layers.length; i++) {
-                if (layers[i].type === 'symbol') {
-                    firstSymbolId = layers[i].id;
-                    break;
-                }
-            }
-
+            // ============================ UNE SEULE COUCHE 3D POUR LES BÂTIMENTS ============================
             map.addLayer({
-                'id': LAYER_ID_BUILDINGS_3D, 
+                'id': LAYER_ID_BUILDINGS_3D, // Utilisation de la constante définie
                 'type': 'fill-extrusion',
                 'source': SOURCE_NAME_BUILDINGS,
                 'source-layer': SOURCE_LAYER_NAME_BUILDINGS,
+                // Pas de filtre ici, on dessine tous les bâtiments de la source
                 'paint': { 
+                    // Coloration conditionnelle basée sur le feature-state 'highlighted'
                     'fill-extrusion-color': [
                         'case',
-                        ['boolean', ['feature-state', 'highlighted'], false], 
-                        '#FF1493', 
-                        '#dfdfdf'  
+                        ['boolean', ['feature-state', 'highlighted'], false], // Si 'highlighted' est true
+                        '#FF1493', // Couleur rose
+                        '#dfdfdf'  // Couleur grise par défaut
                     ],
                     'fill-extrusion-height': heightExpression, 
                     'fill-extrusion-base': minHeightExpression, 
-                    'fill-extrusion-opacity': 1 // Opacité à 1 pour éviter les artefacts
+                    'fill-extrusion-opacity': 0.85 // Opacité unique pour éviter les conflits
                 }
-            }, firstSymbolId); 
-
+            }, LAYER_ID_PINS); // Insérer AVANT la couche des pins pour qu'ils soient au-dessus
+            // ========================================================================================
+            
             map.addLayer({
                 id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID_ANNONCES,
                 paint: { 'circle-radius': 18, 'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#007bff', '#FFFFFF'], 'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 2, 1.5], 'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#007bff'] }
             });
-            
             map.addLayer({
                 id: LAYER_ID_LABELS, type: 'symbol', source: SOURCE_ID_ANNONCES,
                 layout: { 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 11, 'text-allow-overlap': true },
                 paint: { 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] }
             });
             
-            map.on('click', LAYER_ID_PINS, handlePinClick);
-            map.on('click', LAYER_ID_BUILDINGS_3D, handleBuildingClick); // Écouteur pour le clic sur bâtiment
-
+            map.on('click', LAYER_ID_PINS, handleMapClick);
             map.on('mouseenter', LAYER_ID_PINS, () => map.getCanvas().style.cursor = 'pointer');
             map.on('mouseleave', LAYER_ID_PINS, () => map.getCanvas().style.cursor = '');
-            map.on('mouseenter', LAYER_ID_BUILDINGS_3D, () => map.getCanvas().style.cursor = 'pointer');
-            map.on('mouseleave', LAYER_ID_BUILDINGS_3D, () => map.getCanvas().style.cursor = '');
-
             map.on('moveend', updateVisibleList);
 
-            // Appel initial pour la liste et les bâtiments après que tout soit chargé
             updateVisibleList();
-            if (initialAnnouncementsLoaded) { // S'assurer que les données sont là
-                map.once('idle', () => { // Attendre que la carte soit complètement inactive
-                     mettreAJourBatimentsSelectionnes(allAnnouncements);
-                });
-            }
+            mettreAJourBatimentsSelectionnes(allAnnouncements); 
         });
 
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
@@ -266,22 +207,22 @@ document.addEventListener('DOMContentLoaded', function() {
         return `<div class="map-custom-popup"><img src="${coverPhoto}" alt="${title}" class="popup-image" onerror="this.src='${placeholderImage}'"><div class="popup-info"><h4 class="popup-title">${title}</h4><p class="popup-price">${priceText}</p><a href="${detailLink}" class="popup-link" target="_blank">Voir détails</a></div></div>`;
     }
     
-    function handlePinClick(e) {
-        if (e.features.length > 0) {
+    function handleMapClick(e) {
+        if (e.features && e.features.length > 0) {
             const feature = e.features[0];
             const coordinates = feature.geometry.coordinates.slice();
             const properties = feature.properties;
-            const clickedPinIdFromEvent = feature.id; 
-            if (selectedPinId !== null && selectedPinId !== clickedPinIdFromEvent) {
+            const clickedPinId = feature.id; // C'est l'ID du pin (annonce)
+            if (selectedPinId !== null && selectedPinId !== clickedPinId) {
                 map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
             }
-            map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: clickedPinIdFromEvent }, { selected: true });
-            selectedPinId = clickedPinIdFromEvent;
+            map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: clickedPinId }, { selected: true });
+            selectedPinId = clickedPinId;
             if (currentPopup) currentPopup.remove();
             const popupHTML = createPopupHTML(properties);
             currentPopup = new maplibregl.Popup({ offset: 10, closeButton: true, className: 'airbnb-style-popup' }).setLngLat(coordinates).setHTML(popupHTML).addTo(map);
             currentPopup.on('close', () => {
-                if (selectedPinId === clickedPinIdFromEvent) {
+                if (selectedPinId === clickedPinId) {
                     map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
                     selectedPinId = null;
                 }
