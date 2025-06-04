@@ -167,7 +167,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             map.addLayer({
                 id: LAYER_ID_LABELS, type: 'symbol', source: SOURCE_ID_ANNONCES,
-                layout: { 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14, 'text-allow-overlap': false },
+                layout: { 'text-field': ['concat', ['to-string', ['get', 'price']], '€'],'text-variable-anchor': ['top', 'bottom', 'left', 'right'], 'text-radial-offset': 0.5, 'text-justify': 'auto', 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14, 'text-allow-overlap': false },
                 paint: { 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] }
             });
             
