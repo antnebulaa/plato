@@ -1,6 +1,6 @@
-// map-listings.js - VERSION 13 - Base stable + Itinéraires
+// map-listings.js - VERSION 14 - Correctifs Prix, Itinéraire et Bouton Mobile
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V13] Réintégration de la fonctionnalité itinéraire sur une base stable.');
+    console.log('[MAP_SCRIPT V14] Initialisation avec correctifs pour prix, API itinéraire et bouton mobile.');
 
     // --- CONSTANTES ---
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
@@ -8,12 +8,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const MAP_CONTAINER_ID = 'map-section';
     const LIST_CONTAINER_ID = 'annonces-wrapper';
     const DIRECTIONS_MODAL_ID = 'directions-modal';
+    const MOBILE_TOGGLE_BUTTON_ID = 'mobile-map-toggle'; // ID du bouton mobile
 
     const SOURCE_ID_ANNONCES = 'annonces-source';
     const LAYER_ID_PINS = 'annonces-pins-layer';
     const LAYER_ID_LABELS = 'annonces-labels-layer';
     
-    // Constantes pour les bâtiments 3D
     const SOURCE_NAME_BUILDINGS = 'maptiler_planet'; 
     const SOURCE_LAYER_NAME_BUILDINGS = 'building';
     const LAYER_ID_BUILDINGS_3D = 'buildings-3d-layer';
@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- ÉLÉMENTS DU DOM ---
     const listContainer = document.getElementById(LIST_CONTAINER_ID);
     const directionsModal = document.getElementById(DIRECTIONS_MODAL_ID);
+    const mobileToggleButton = document.getElementById(MOBILE_TOGGLE_BUTTON_ID); // Récupération du bouton
 
     // --- ÉTAT GLOBAL ---
     let map = null;
@@ -28,136 +29,59 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentPopup = null;
     let selectedPinId = null;
     let currentHighlightedBuildingIds = new Set();
+    let isMobile = window.innerWidth < 768;
 
     // --- ÉTAT SPÉCIFIQUE AUX ITINÉRAIRES ---
-    let originA = null; // Point de départ [lng, lat] (le logement)
-    let destinationB = null; // Point d'arrivée [lng, lat] (clic long)
+    let originA = null;
+    let destinationB = null;
     let destinationMarker = null;
     let longPressTimer = null;
     let currentRouteMode = 'drive';
     let currentBikeType = 'personal';
 
     // ========================================================================
-    // INITIALISATION PRINCIPALE
+    // INITIALISATION
     // ========================================================================
 
-    document.addEventListener('annoncesChargeesEtRendues', (event) => {
-        const annonces = event.detail.annonces;
-        if (!annonces || !Array.isArray(annonces)) return;
-        
-        allAnnouncements = annonces;
-        const geojsonData = convertAnnoncesToGeoJSON(allAnnouncements);
 
+    document.addEventListener('annoncesChargeesEtRendues', (event) => {
+        allAnnouncements = event.detail.annonces || [];
+        const geojsonData = convertAnnoncesToGeoJSON(allAnnouncements);
         if (!map) {
             initializeMap(geojsonData);
         } else {
-            map.getSource(SOURCE_ID_ANNONCES).setData(geojsonData);
-            if (geojsonData.features.length > 0) {
-                 map.fitBounds(getBounds(geojsonData), { padding: 80, maxZoom: 16 });
-            }
-            if (map.isStyleLoaded()) {
-                 mettreAJourBatimentsSelectionnes(allAnnouncements);
-            }
+            const source = map.getSource(SOURCE_ID_ANNONCES);
+            if (source) source.setData(geojsonData);
+            if (geojsonData.features.length > 0) map.fitBounds(getBounds(geojsonData), { padding: 80, maxZoom: 16 });
+            if (map.isStyleLoaded()) mettreAJourBatimentsSelectionnes(allAnnouncements);
         }
     });
 
     function initializeMap(initialGeoJSON) {
-        map = new maplibregl.Map({
-            container: MAP_CONTAINER_ID,
-            style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`,
-            pitch: 50,
-            bearing: -15,
-            renderWorldCopies: false
-        });
-        
+        map = new maplibregl.Map({ container: MAP_CONTAINER_ID, style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`, pitch: 50, bearing: -15, renderWorldCopies: false });
         window.map = map;
-
         map.on('load', () => {
-            console.log('[MAP_SCRIPT V13] Carte chargée.');
+            console.log('[MAP_SCRIPT V14] Carte chargée.');
             map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
-
             addMapLayers();
             setupEventListeners();
             initializeDirectionsLogic();
-            
-            if (initialGeoJSON.features.length > 0) {
-                map.fitBounds(getBounds(initialGeoJSON), { padding: 80, maxZoom: 16, duration: 0 });
-            }
+            if (initialGeoJSON.features.length > 0) map.fitBounds(getBounds(initialGeoJSON), { padding: 80, maxZoom: 16, duration: 0 });
             updateVisibleList();
             mettreAJourBatimentsSelectionnes(allAnnouncements); 
         });
-
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
 
     // ========================================================================
-    // GESTION DES COUCHES DE LA CARTE
+    // GESTION DES COUCHES
     // ========================================================================
 
-    function addMapLayers() {
-        // Couche des bâtiments 3D
-        map.addLayer({
-            'id': LAYER_ID_BUILDINGS_3D, 'type': 'fill-extrusion', 'source': SOURCE_NAME_BUILDINGS,
-            'source-layer': SOURCE_LAYER_NAME_BUILDINGS,
-            'paint': {
-                'fill-extrusion-color': ['case', ['boolean', ['feature-state', 'highlighted'], false], '#FF1493', '#dfdfdf'],
-                'fill-extrusion-height': ['coalesce', ['get', 'height'], 20],
-                'fill-extrusion-base': ['coalesce', ['get', 'min_height'], 0],
-                'fill-extrusion-opacity': 0.85
-            }
-        });
-        // Couches des pins et labels des annonces
-        map.addLayer({
-            id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID_ANNONCES,
-            paint: { 'circle-radius': 18, 'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#007bff', '#FFFFFF'], 'circle-stroke-width': 2, 'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#007bff'] }
-        });
-        map.addLayer({
-            id: LAYER_ID_LABELS, type: 'symbol', source: SOURCE_ID_ANNONCES,
-            layout: { 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 11, 'text-allow-overlap': true },
-            paint: { 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] }
-        });
-    }
 
-    function clearRouteLayers() {
-        const layers = map.getStyle().layers;
-        layers.forEach(layer => {
-            if (layer.id.startsWith('route-')) map.removeLayer(layer.id);
-        });
-        const sources = map.getStyle().sources;
-        for (const sourceId in sources) {
-            if (sourceId.startsWith('route-')) map.removeSource(sourceId);
-        }
-    }
-
-    function drawRoute(mode, geojson) {
-        clearRouteLayers();
-        if (!geojson || !geojson.features || geojson.features.length === 0) return;
-        const sourceId = `route-source-${mode}`;
-        map.addSource(sourceId, { type: 'geojson', data: geojson });
-        const paintProps = {
-            'drive': { 'line-color': '#007bff', 'line-width': 5 },
-            'walk': { 'line-color': '#8a2be2', 'line-width': 4, 'line-dasharray': [0, 2] },
-            'bicycle': { 'line-color': '#006400', 'line-width': 5 },
-            'transit_walk': { 'line-color': '#87CEFA', 'line-width': 4, 'line-dasharray': [0, 2] },
-            'transit_vehicle': { 'line-color': '#FFD700', 'line-width': 6 }
-        };
-        if (mode === 'transit') {
-            geojson.features.forEach((feature, index) => {
-                const legMode = feature.properties.mode === 'walk' ? 'transit_walk' : 'transit_vehicle';
-                map.addLayer({
-                    id: `route-layer-transit-${index}`, type: 'line', source: sourceId,
-                    filter: ['==', '$id', feature.id],
-                    layout: { 'line-join': 'round', 'line-cap': 'round' },
-                    paint: { ...paintProps[legMode], 'line-color': feature.properties.color || paintProps[legMode]['line-color'] }
-                });
-            });
-        } else {
-            map.addLayer({
-                id: `route-layer-${mode}`, type: 'line', source: sourceId,
-                layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: paintProps[mode]
-            });
-        }
+   function addMapLayers() {
+        map.addLayer({ 'id': LAYER_ID_BUILDINGS_3D, 'type': 'fill-extrusion', 'source': SOURCE_NAME_BUILDINGS, 'source-layer': SOURCE_LAYER_NAME_BUILDINGS, 'paint': { 'fill-extrusion-color': ['case', ['boolean', ['feature-state', 'highlighted'], false], '#FF1493', '#dfdfdf'], 'fill-extrusion-height': ['coalesce', ['get', 'height'], 20], 'fill-extrusion-base': ['coalesce', ['get', 'min_height'], 0], 'fill-extrusion-opacity': 0.85 } });
+        map.addLayer({ id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID_ANNONCES, paint: { 'circle-radius': 18, 'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#007bff', '#FFFFFF'], 'circle-stroke-width': 2, 'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#007bff'] } });
+        map.addLayer({ id: LAYER_ID_LABELS, type: 'symbol', source: SOURCE_ID_ANNONCES, layout: { 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 11, 'text-allow-overlap': true }, paint: { 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] } });
     }
 
     async function mettreAJourBatimentsSelectionnes(annonces) {
@@ -188,12 +112,18 @@ document.addEventListener('DOMContentLoaded', function() {
         map.on('mouseleave', LAYER_ID_PINS, () => map.getCanvas().style.cursor = '');
         map.on('moveend', updateVisibleList);
         if (listContainer) listContainer.addEventListener('click', handleListItemClick);
+        // CORRECTION : Ré-ajout de l'écouteur pour le bouton mobile
+        if (isMobile && mobileToggleButton) {
+            mobileToggleButton.addEventListener('click', () => {
+                document.body.classList.toggle('map-is-active');
+                const isActive = document.body.classList.contains('map-is-active');
+                if (isActive && map) map.resize();
+                mobileToggleButton.textContent = isActive ? `Voir la liste` : `Voir les ${map.queryRenderedFeatures({layers: [LAYER_ID_PINS]}).length} logements`;
+            });
+        }
     }
     
-    function handlePinClick(e) {
-        if (e.features.length > 0) selectPin(e.features[0].id, e.features[0].geometry.coordinates);
-    }
-
+    function handlePinClick(e) { if (e.features.length > 0) selectPin(e.features[0].id, e.features[0].geometry.coordinates); }
     function handleListItemClick(e) {
         const link = e.target.closest('a[data-lng][data-lat]');
         if (link) {
@@ -288,16 +218,24 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function getRouteData(mode, start, end) {
-        const profile = mode === 'transit' ? 'transit' : (mode === 'drive' ? 'driving' : mode);
+        if (!start || !end) {
+            console.error("Point de départ ou d'arrivée manquant pour le calcul d'itinéraire.");
+            return null;
+        }
+        // CORRECTION : Utilisation de 'drive' au lieu de 'driving'.
+        const profile = mode === 'drive' ? 'drive' : mode; 
         let url = `${DIRECTIONS_API_BASE}/${profile}/${start.join(',')};${end.join(',')}?key=${MAPTILER_API_KEY}&geometries=geojson&steps=true&language=fr`;
         if(mode === 'bicycle' && currentBikeType === 'shared') url += '&bicycle_type=hybrid';
         try {
             const res = await fetch(url);
-            if (!res.ok) throw new Error(res.statusText);
+            if (!res.ok) throw new Error(`API Error ${res.status}`);
             return await res.json();
-        } catch (error) { return null; }
+        } catch (error) {
+            console.error(`Erreur de routage pour le mode ${mode}:`, error);
+            return null;
+        }
     }
-
+    
     // ========================================================================
     // FONCTIONS UTILITAIRES ET DE SYNCHRONISATION
     // ========================================================================
@@ -348,23 +286,11 @@ document.addEventListener('DOMContentLoaded', function() {
         return hours > 0 ? `${hours}h ${minutes.toString().padStart(2, '0')}m` : `${minutes} min`;
     }
     
-    function convertAnnoncesToGeoJSON(annonces) {
-        return { type: 'FeatureCollection', features: annonces.map(annonce => {
-            if (!annonce.id || !annonce.latitude || !annonce.longitude) return null;
-            return {
-                type: 'Feature', id: parseInt(annonce.id, 10),
-                geometry: { type: 'Point', coordinates: [parseFloat(annonce.longitude), parseFloat(annonce.latitude)] },
-                properties: { id: parseInt(annonce.id, 10), id_str: String(annonce.id), price: getNestedValue(annonce, '_property_lease_of_property.0.loyer_cc') || '?', title: getNestedValue(annonce, 'property_title'), coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url') }
-            };
-        }).filter(Boolean)};
-    }
-    
     function getBounds(geojson) {
         const bounds = new maplibregl.LngLatBounds();
         geojson.features.forEach(feature => bounds.extend(feature.geometry.coordinates));
         return bounds;
     }
-
     function getNestedValue(obj, path) {
         if (!path) return undefined;
         return path.split('.').reduce((acc, part) => {
@@ -372,5 +298,29 @@ document.addEventListener('DOMContentLoaded', function() {
             const i = !isNaN(parseInt(part, 10)) ? parseInt(part, 10) : -1;
             return i !== -1 && Array.isArray(acc) ? acc[i] : acc[part];
         }, obj);
+    }
+    /**
+     * CORRECTION : Le chemin vers le loyer est mis à jour pour être plus robuste.
+     * Note: Assurez-vous que votre API Xano renvoie bien `_property_lease_of_property` avec les annonces.
+     */
+    function convertAnnoncesToGeoJSON(annonces) {
+        return { type: 'FeatureCollection', features: annonces.map(annonce => {
+            if (!annonce.id || !annonce.latitude || !annonce.longitude) return null;
+            
+            const loyer = getNestedValue(annonce, '_property_lease_of_property.0.loyer') 
+                       || getNestedValue(annonce, '_property_lease_of_property.0.loyer_cc');
+
+            return {
+                type: 'Feature', id: parseInt(annonce.id, 10),
+                geometry: { type: 'Point', coordinates: [parseFloat(annonce.longitude), parseFloat(annonce.latitude)] },
+                properties: { 
+                    id: parseInt(annonce.id, 10), 
+                    id_str: String(annonce.id), 
+                    price: loyer || '?', // Affiche '?' si le loyer n'est pas trouvé
+                    title: getNestedValue(annonce, 'property_title'), 
+                    coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url') 
+                }
+            };
+        }).filter(Boolean)};
     }
 });
