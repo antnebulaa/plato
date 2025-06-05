@@ -30,19 +30,39 @@ document.addEventListener('DOMContentLoaded', function() {
     const mobileBottomSheetContent = document.getElementById('mobile-bottom-sheet-content'); // Reste inchangé
     const bottomSheetCloseButton = document.getElementById('bottom-sheet-close-button'); // Reste inchangé
 
-    window.addEventListener('resize', () => { // Reste inchangé
-        isMobile = window.innerWidth < 768;
+     // VÉRIFICATION IMMÉDIATE DES ÉLÉMENTS
+    console.log('[DEBUG_MODAL_INIT] mobileBottomSheet trouvé:', mobileBottomSheet);
+    console.log('[DEBUG_MODAL_INIT] mobileBottomSheetContent trouvé:', mobileBottomSheetContent);
+    console.log('[DEBUG_MODAL_INIT] bottomSheetCloseButton trouvé:', bottomSheetCloseButton);
+
+    if (!mobileBottomSheet || !mobileBottomSheetContent || !bottomSheetCloseButton) {
+        console.error("ERREUR CRITIQUE: Un ou plusieurs éléments de la modale mobile sont INTROUVABLES. Vérifiez les IDs HTML !");
+        // return; // Vous pourriez vouloir arrêter ici si les éléments sont manquants
+    }
+
+    window.addEventListener('resize', () => {
+        const newIsMobile = window.innerWidth < 768;
+        if (newIsMobile !== isMobile) { // Si l'état mobile a changé
+            console.log('[DEBUG_MODAL_RESIZE] isMobile a changé pour:', newIsMobile);
+            isMobile = newIsMobile;
+        }
+
         if (isMobile && currentPopup) {
+            console.log('[DEBUG_MODAL_RESIZE] Passage en mobile, fermeture popup desktop.');
             currentPopup.remove();
             currentPopup = null;
         }
         if (!isMobile && mobileBottomSheet && mobileBottomSheet.classList.contains('visible')) {
+            console.log('[DEBUG_MODAL_RESIZE] Passage en desktop, fermeture modale mobile.');
             closeMobileBottomSheet();
         }
     });
 
-    if (bottomSheetCloseButton) { // Reste inchangé
-        bottomSheetCloseButton.addEventListener('click', closeMobileBottomSheet);
+    if (bottomSheetCloseButton) {
+        bottomSheetCloseButton.addEventListener('click', () => {
+            console.log('[DEBUG_MODAL] Clic sur bouton fermer de la modale mobile.');
+            closeMobileBottomSheet();
+        });
     }
 
     document.addEventListener('annoncesChargeesEtRendues', (event) => { // Reste inchangé
@@ -178,76 +198,87 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function openMobileBottomSheet(properties) {
-    console.log('[DEBUG_MODAL] openMobileBottomSheet called with properties:', properties); // NOUVEAU LOG
-    console.log('[DEBUG_MODAL] mobileBottomSheet element:', mobileBottomSheet); // NOUVEAU LOG
-    console.log('[DEBUG_MODAL] mobileBottomSheetContent element:', mobileBottomSheetContent); // NOUVEAU LOG
-
-    if (!mobileBottomSheet || !mobileBottomSheetContent) {
-        console.error('[DEBUG_MODAL] ERROR: Bottom sheet elements not found!'); // NOUVEAU LOG
-        return;
+        console.log('[DEBUG_MODAL] Appel de openMobileBottomSheet. Properties:', properties);
+        if (!mobileBottomSheet || !mobileBottomSheetContent) {
+            console.error('[DEBUG_MODAL] Dans openMobileBottomSheet: Éléments de la modale non trouvés !');
+            return;
+        }
+        console.log('[DEBUG_MODAL] Éléments modale OK. Contenu HTML en création...');
+        const contentHTML = createPopupHTML(properties);
+        mobileBottomSheetContent.innerHTML = contentHTML;
+        console.log('[DEBUG_MODAL] Contenu injecté. Ajout de la classe "visible". Actuel classes:', mobileBottomSheet.classList);
+        mobileBottomSheet.classList.add('visible');
+        console.log('[DEBUG_MODAL] Classe "visible" ajoutée. Nouvelles classes:', mobileBottomSheet.classList);
     }
-    const contentHTML = createPopupHTML(properties);
-    mobileBottomSheetContent.innerHTML = contentHTML;
-    mobileBottomSheet.classList.add('visible');
-    console.log('[DEBUG_MODAL] "visible" class added to mobileBottomSheet.'); // NOUVEAU LOG
-}
-    
-    function closeMobileBottomSheet() { // Reste inchangé
-        if (!mobileBottomSheet) return;
+
+    function closeMobileBottomSheet() {
+        console.log('[DEBUG_MODAL] Appel de closeMobileBottomSheet.');
+        if (!mobileBottomSheet) {
+            console.error('[DEBUG_MODAL] Dans closeMobileBottomSheet: Élément mobileBottomSheet non trouvé !');
+            return;
+        }
         mobileBottomSheet.classList.remove('visible');
-        setTimeout(() => {
-            if (mobileBottomSheetContent) mobileBottomSheetContent.innerHTML = '';
-        }, 300); 
+        console.log('[DEBUG_MODAL] Classe "visible" retirée.');
+        
+        // setTimeout(() => { // Optionnel, pour vider après transition
+        //     if (mobileBottomSheetContent) mobileBottomSheetContent.innerHTML = '';
+        // }, 350); 
+
         if (map && selectedPinId !== null) {
+            console.log('[DEBUG_MODAL] Désélection du pin ID:', selectedPinId);
             map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
-            selectedPinId = null; 
+            selectedPinId = null;
         }
     }
-    
+
     function handleMapClick(e) {
-    console.log('[DEBUG_MODAL] handleMapClick triggered!'); // NOUVEAU LOG
-    console.log('[DEBUG_MODAL] isMobile:', isMobile); // NOUVEAU LOG
+        console.log('[DEBUG_MODAL] handleMapClick déclenché!');
+        console.log('[DEBUG_MODAL] Valeur de isMobile au moment du clic:', isMobile);
 
-    if (e.features && e.features.length > 0) {
-        const feature = e.features[0];
-        const coordinates = feature.geometry.coordinates.slice();
-        const properties = feature.properties;
-        const clickedPinId = feature.id;
+        if (e.features && e.features.length > 0) {
+            const feature = e.features[0];
+            // ... (reste de la logique pour properties, clickedPinId)
+            const properties = feature.properties;
+            const clickedPinId = feature.id;
+            console.log('[DEBUG_MODAL] Clic sur Pin ID:', clickedPinId, 'isMobile:', isMobile);
 
-        console.log('[DEBUG_MODAL] Clicked Pin ID:', clickedPinId, 'Properties:', properties); // NOUVEAU LOG
 
             if (selectedPinId !== null && selectedPinId !== clickedPinId) {
                 map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
             }
             map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: clickedPinId }, { selected: true });
-            selectedPinId = clickedPinId; 
+            selectedPinId = clickedPinId;
 
             if (isMobile) {
+                console.log('[DEBUG_MODAL] Condition isMobile VRAIE. Tentative d\'ouverture de la modale mobile.');
                 if (currentPopup) {
                     currentPopup.remove();
                     currentPopup = null;
                 }
                 openMobileBottomSheet(properties);
             } else {
+                console.log('[DEBUG_MODAL] Condition isMobile FAUSSE. Tentative d\'ouverture du popup desktop.');
                 if (mobileBottomSheet && mobileBottomSheet.classList.contains('visible')) {
-                    closeMobileBottomSheet(); 
+                    closeMobileBottomSheet();
                 }
-                if (currentPopup) currentPopup.remove(); 
+                if (currentPopup) currentPopup.remove();
 
                 const popupHTML = createPopupHTML(properties);
                 currentPopup = new maplibregl.Popup({ offset: 10, closeButton: true, className: 'airbnb-style-popup' })
-                    .setLngLat(coordinates)
+                    .setLngLat(feature.geometry.coordinates.slice()) // Assurez-vous d'utiliser les bonnes coordonnées
                     .setHTML(popupHTML)
                     .addTo(map);
 
                 currentPopup.on('close', () => {
-                    if (selectedPinId === clickedPinId) { 
+                    if (selectedPinId === clickedPinId) {
                         map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
-                        selectedPinId = null; 
+                        selectedPinId = null;
                     }
                     currentPopup = null;
                 });
             }
+        } else {
+            console.log('[DEBUG_MODAL] Clic sur la carte mais pas sur un feature (pin).');
         }
     }
 
