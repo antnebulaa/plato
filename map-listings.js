@@ -1,11 +1,16 @@
-// map-listings.js - VERSION 11.6 - Standard MapLibre Popup for mobile, robust ID
+// map-listings.js - VERSION 11.7 - Mobile modal popup, mobile pitch restored
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V11.6] Initialisation. Standard MapLibre Popup for mobile.');
+    console.log('[MAP_SCRIPT V11.7] Initialisation avec popup modale pour mobile et pitch mobile.');
 
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL'; 
     const MAP_CONTAINER_ID = 'map-section';
     const LIST_CONTAINER_ID = 'annonces-wrapper'; 
     const MOBILE_TOGGLE_BUTTON_ID = 'mobile-map-toggle';
+
+    // IDs pour la modale (à adapter si les vôtres sont différents)
+    const MODAL_ID = 'annonceDetailModal';
+    const MODAL_BODY_ID = 'annonceDetailModalBody';
+    const MODAL_CLOSE_BUTTON_ID = 'annonceDetailModalClose';
 
     const SOURCE_ID_ANNONCES = 'annonces-source';
     const LAYER_ID_PINS = 'annonces-pins-layer';
@@ -21,15 +26,37 @@ document.addEventListener('DOMContentLoaded', function() {
     let map = null;
     let allAnnouncements = [];
     let isMobile = window.innerWidth < 768;
-    let currentMapLibrePopup = null; // Un seul popup MapLibre géré
+    let currentMapLibrePopup = null; // Pour le popup sur desktop
     let selectedPinIdForState = null; 
     let currentHighlightedBuildingIds = new Set();
 
+    // Éléments de la modale
+    let modalElement = document.getElementById(MODAL_ID);
+    let modalBodyElement = document.getElementById(MODAL_BODY_ID);
+    let modalCloseButton = document.getElementById(MODAL_CLOSE_BUTTON_ID);
+
+    if (!modalElement) console.error(`[MAP_SCRIPT V11.7] CRITICAL: L'élément de la modale ID "${MODAL_ID}" est INTROUVABLE !`);
+    if (!modalBodyElement) console.error(`[MAP_SCRIPT V11.7] CRITICAL: L'élément body de la modale ID "${MODAL_BODY_ID}" est INTROUVABLE !`);
+    if (!modalCloseButton) console.error(`[MAP_SCRIPT V11.7] CRITICAL: Le bouton de fermeture de la modale ID "${MODAL_CLOSE_BUTTON_ID}" est INTROUVABLE !`);
+
+    if (modalCloseButton && modalElement) {
+        modalCloseButton.addEventListener('click', () => {
+            console.log('[MAP_SCRIPT V11.7] Bouton fermeture modale cliqué.');
+            modalElement.style.display = 'none'; // Logique simple pour cacher la modale
+            // Vous pourriez avoir une classe CSS ou une interaction Webflow à déclencher ici
+        });
+        // Optionnel: fermer la modale en cliquant à l'extérieur
+        modalElement?.addEventListener('click', function(event) {
+            if (event.target === modalElement) { // Si le clic est sur le fond de la modale
+                modalElement.style.display = 'none';
+            }
+        });
+    }
+
     document.addEventListener('annoncesChargeesEtRendues', (event) => {
-        console.log('[MAP_SCRIPT V11.6] Événement "annoncesChargeesEtRendues".');
+        console.log('[MAP_SCRIPT V11.7] Événement "annoncesChargeesEtRendues".');
         const annonces = event.detail.annonces;
         allAnnouncements = (annonces && Array.isArray(annonces)) ? annonces : [];
-        console.log(`[MAP_SCRIPT V11.6] Nb annonces après event: ${allAnnouncements.length}`);
         const geojsonData = convertAnnoncesToGeoJSON(allAnnouncements);
 
         if (!map) {
@@ -51,7 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (geojsonData.features.length > 0) {
                     const bounds = getBounds(geojsonData);
                     if (bounds.getSouthWest() && bounds.getNorthEast()){
-                         map.fitBounds(bounds, { padding: isMobile ? 60 : 80, maxZoom: 16, duration:0 }); // Increased mobile padding slightly
+                         map.fitBounds(bounds, { padding: isMobile ? 60 : 80, maxZoom: 16, duration:0 });
                     }
                 } else { 
                     map.flyTo({ center: [2.3522, 48.8566], zoom: 11, duration:0 }); 
@@ -70,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (annonce.id === undefined || annonce.id === null || lat === undefined || lng === undefined) return null;
             let featureId = parseInt(annonce.id, 10); 
             if (isNaN(featureId)) {
-                console.warn(`[MAP_SCRIPT V11.6] Annonce ID "${annonce.id}" non numérique, ignorée pour feature 'id'.`);
+                console.warn(`[MAP_SCRIPT V11.7] Annonce ID "${annonce.id}" non numérique, ignorée pour feature 'id'.`);
                 return null; 
             }
             return {
@@ -84,7 +111,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             };
         }).filter(feature => feature !== null);
-        console.log(`[MAP_SCRIPT V11.6] ${features.length} features GeoJSON valides créés.`);
+        console.log(`[MAP_SCRIPT V11.7] ${features.length} features GeoJSON valides créés.`);
         return { type: 'FeatureCollection', features };
     }
     
@@ -136,10 +163,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function initializeMap(initialGeoJSON) {
-        console.log('[MAP_SCRIPT V11.6] Initialisation MapLibre.');
+        const mobilePitch = 30; // Pitch pour mobile, à ajuster selon vos préférences
+        const desktopPitch = 50;
+
+        console.log('[MAP_SCRIPT V11.7] Initialisation MapLibre.');
         map = new maplibregl.Map({
             container: MAP_CONTAINER_ID, style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`,
-            pitch: isMobile ? 0 : 50, bearing: isMobile ? 0 : -15, center: [2.3522, 48.8566], zoom: 11,
+            pitch: isMobile ? mobilePitch : desktopPitch, // Pitch ajusté
+            bearing: isMobile ? 0 : -15, 
+            center: [2.3522, 48.8566], zoom: 11,
             navigationControl: false, renderWorldCopies: false, interactive: true,
         });
         window.map = map; 
@@ -150,9 +182,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         map.on('load', () => {
-            console.log('[MAP_SCRIPT V11.6] Événement "load" carte MapLibre.');
+            console.log('[MAP_SCRIPT V11.7] Événement "load" carte MapLibre.');
             map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
-            console.log(`[MAP_SCRIPT V11.6] Source "${SOURCE_ID_ANNONCES}" ajoutée.`);
             const heightExpression = ['coalesce', ['get', 'height'], 20]; 
             const minHeightExpression = ['coalesce', ['get', 'min_height'], 0];
             if (map.getSource(SOURCE_NAME_BUILDINGS)) {
@@ -164,8 +195,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         'fill-extrusion-height': heightExpression, 'fill-extrusion-base': minHeightExpression, 'fill-extrusion-opacity': 0.85
                     }
                 }); 
-                 console.log(`[MAP_SCRIPT V11.6] Couche "${LAYER_ID_BUILDINGS_3D}" ajoutée.`);
-            } else { console.warn(`[MAP_SCRIPT V11.6] Source bâtiments "${SOURCE_NAME_BUILDINGS}" non trouvée.`); }
+            } else { console.warn(`[MAP_SCRIPT V11.7] Source bâtiments "${SOURCE_NAME_BUILDINGS}" non trouvée.`); }
             map.addLayer({
                 id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID_ANNONCES,
                 paint: { 
@@ -174,7 +204,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#007bff']
                 }
             });
-            console.log(`[MAP_SCRIPT V11.6] Couche "${LAYER_ID_PINS}" ajoutée.`);
             map.addLayer({
                 id: LAYER_ID_LABELS, type: 'symbol', source: SOURCE_ID_ANNONCES,
                 layout: { 
@@ -184,7 +213,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 paint: { 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] }
             });
-            console.log(`[MAP_SCRIPT V11.6] Couche "${LAYER_ID_LABELS}" ajoutée.`);
             map.on('click', LAYER_ID_PINS, handleMapClick);
             map.on('mouseenter', LAYER_ID_PINS, () => map.getCanvas().style.cursor = 'pointer');
             map.on('mouseleave', LAYER_ID_PINS, () => map.getCanvas().style.cursor = '');
@@ -194,7 +222,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 mettreAJourBatimentsSelectionnes(allAnnouncements);
             }
         });
-        map.on('error', (e) => { console.error('[MAP_SCRIPT V11.6] Erreur MapLibre:', e.error ? e.error.message : e); });
+        map.on('error', (e) => { console.error('[MAP_SCRIPT V11.7] Erreur MapLibre:', e.error ? e.error.message : e); });
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
 
@@ -226,38 +254,39 @@ document.addEventListener('DOMContentLoaded', function() {
         updateMobileButtonAndViewState();
     }
 
-    function createPopupHTML(properties) {
+    function createPopupHTML(properties) { // Cette fonction est maintenant utilisée pour le contenu de la modale mobile ET du popup desktop
         const placeholderImage = 'https://placehold.co/280x150/EFEFEF/AAAAAA?text=Image';
         const coverPhoto = properties.coverPhoto || placeholderImage;
         const title = properties.title || "Titre non disponible";
         const priceText = `${properties.price || '?'} € / mois`;
         const detailLink = `annonce?id=${properties.id_str}`; 
-        return `<div class="map-custom-popup"><img src="${coverPhoto}" alt="${title}" class="popup-image" onerror="this.onerror=null;this.src='${placeholderImage}';"><div class="popup-info"><h4 class="popup-title">${title}</h4><p class="popup-price">${priceText}</p><a href="${detailLink}" class="popup-link" target="_blank">Voir détails</a></div></div>`;
+        // La classe .map-custom-popup sera utilisée pour styler ce contenu
+        return `<div class="map-custom-popup"> 
+                    <img src="${coverPhoto}" alt="${title}" class="popup-image" onerror="this.onerror=null;this.src='${placeholderImage}';">
+                    <div class="popup-info">
+                        <h4 class="popup-title">${title}</h4>
+                        <p class="popup-price">${priceText}</p>
+                        <a href="${detailLink}" class="popup-link" target="_blank">Voir détails</a>
+                    </div>
+                </div>`;
     }
 
     function handleMapClick(e) {
-        console.log('[MAP_SCRIPT V11.6] Entrée handleMapClick. Event features:', e.features);
-        if (!e.features || e.features.length === 0) {
-            console.log('[MAP_SCRIPT V11.6] Aucun feature cliqué.');
-            return;
-        }
+        console.log('[MAP_SCRIPT V11.7] Entrée handleMapClick.');
+        if (!e.features || e.features.length === 0) return;
+        
         const feature = e.features[0];
         const properties = feature.properties; 
         const coordinates = feature.geometry.coordinates.slice();
         let idPourFeatureState;
-
-        console.log('[MAP_SCRIPT V11.6] Feature brut du clic:', feature);
 
         if (typeof feature.id === 'number') {
             idPourFeatureState = feature.id;
         } else if (properties && properties.id_str !== undefined) {
             const parsedId = parseInt(properties.id_str, 10);
             if (!isNaN(parsedId)) idPourFeatureState = parsedId;
-            else console.error(`[MAP_SCRIPT V11.6] ERREUR: Impossible de parser properties.id_str ("${properties.id_str}") en nombre.`);
-        } else {
-            console.error(`[MAP_SCRIPT V11.6] ERREUR: feature.id ET properties.id_str non utilisables pour ID.`);
         }
-        console.log(`[MAP_SCRIPT V11.6] ID pour setFeatureState: ${idPourFeatureState} (type: ${typeof idPourFeatureState})`);
+        console.log(`[MAP_SCRIPT V11.7] ID pour setFeatureState: ${idPourFeatureState}`);
 
         if (typeof idPourFeatureState === 'number') {
             if (selectedPinIdForState !== null && selectedPinIdForState !== idPourFeatureState) {
@@ -265,69 +294,60 @@ document.addEventListener('DOMContentLoaded', function() {
                   if (map.getLayer(LAYER_ID_PINS) && map.getSource(SOURCE_ID_ANNONCES)) { 
                     map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinIdForState }, { selected: false });
                   }
-                } catch (error) { console.warn("[MAP_SCRIPT V11.6] Erreur désélection ancien pin:", error.message); }
+                } catch (error) { /* ignore */ }
             }
             try {
                 if (map.getLayer(LAYER_ID_PINS) && map.getSource(SOURCE_ID_ANNONCES)) {
                      map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: idPourFeatureState }, { selected: true });
-                     console.log(`[MAP_SCRIPT V11.6] setFeatureState (select) OK pour ID: ${idPourFeatureState}`);
                 }
-            } catch (error) { console.error("[MAP_SCRIPT V11.6] Erreur setFeatureState (select):", error.message); }
+            } catch (error) { /* ignore */ }
             selectedPinIdForState = idPourFeatureState;
         } else {
-            console.warn("[MAP_SCRIPT V11.6] Aucun ID numérique valide pour setFeatureState.");
             if(selectedPinIdForState !== null) {
-                 try { 
-                    if (map.getLayer(LAYER_ID_PINS) && map.getSource(SOURCE_ID_ANNONCES)) {
-                        map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinIdForState }, { selected: false }); 
-                    }
-                 } catch(e) {/*ignore*/}
+                 try { if (map.getLayer(LAYER_ID_PINS) && map.getSource(SOURCE_ID_ANNONCES)) map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinIdForState }, { selected: false }); } catch(e) {/*ignore*/}
                  selectedPinIdForState = null;
             }
         }
 
-        // Utilisation de maplibregl.Popup pour tous les appareils
-        if (currentMapLibrePopup) {
-            currentMapLibrePopup.remove();
-            currentMapLibrePopup = null;
-        }
-
-        const popupHTML = createPopupHTML(properties);
-        currentMapLibrePopup = new maplibregl.Popup({ 
-            offset: isMobile ? 15 : 25, // Offset légèrement différent pour mobile si besoin
-            closeButton: true, 
-            className: 'airbnb-style-popup' // Assurez-vous que ce style est bien défini dans votre CSS
-        })
-        .setLngLat(coordinates)
-        .setHTML(popupHTML)
-        .addTo(map);
-        console.log('[MAP_SCRIPT V11.6] Popup MapLibre ajouté/mis à jour.');
-
-        currentMapLibrePopup.on('close', () => {
-            console.log('[MAP_SCRIPT V11.6] Popup MapLibre fermé.');
-            if (typeof idPourFeatureState === 'number' && selectedPinIdForState === idPourFeatureState) { 
-                try {
-                    if (map.getLayer(LAYER_ID_PINS) && map.getSource(SOURCE_ID_ANNONCES)) {
-                         map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinIdForState }, { selected: false });
-                    }
-                } catch (error) { /* ignore */ }
-                selectedPinIdForState = null;
-            }
-            currentMapLibrePopup = null;
-        });
-
-        // Centrer la carte sur le pin cliqué, surtout utile sur mobile
-        // Le padding [top, right, bottom, left] peut aider à ne pas cacher le popup par les contrôles de la carte
-        const flyToPadding = isMobile ? {bottom: 150, top:50, left:30, right:30} : {bottom: 50, top:50, left:50, right:50}; 
-        map.flyTo({ 
-            center: coordinates, 
-            zoom: Math.max(map.getZoom(), 15), 
-            essential: true,
-            padding: flyToPadding 
-        });
-
         if (isMobile) {
-            scrollListItemIntoView(properties.id_str); 
+            console.log('[MAP_SCRIPT V11.7] Mode mobile: tentative d\'affichage de la modale.');
+            if (currentMapLibrePopup) { currentMapLibrePopup.remove(); currentMapLibrePopup = null; } // Fermer le popup desktop s'il était ouvert (ex: redimensionnement)
+
+            if (modalElement && modalBodyElement) {
+                const popupHTML = createPopupHTML(properties);
+                modalBodyElement.innerHTML = popupHTML;
+                modalElement.style.display = 'flex'; // Ou la méthode de Webflow pour ouvrir une modale
+                console.log(`[MAP_SCRIPT V11.7] Modale (ID: ${MODAL_ID}) affichée avec contenu pour annonce ID ${properties.id_str}.`);
+                
+                // Optionnel: centrer la carte un peu, mais sans popup dessus, moins critique
+                map.flyTo({ center: coordinates, zoom: Math.max(map.getZoom(), 15), essential: true, padding: {top:50, bottom:50, left:30, right:30} });
+                scrollListItemIntoView(properties.id_str);
+            } else {
+                console.error('[MAP_SCRIPT V11.7] ERREUR: Éléments de la modale non trouvés pour affichage.');
+            }
+
+        } else { // Mode Desktop
+            console.log('[MAP_SCRIPT V11.7] Mode desktop: affichage popup MapLibre.');
+            if (currentMapLibrePopup) currentMapLibrePopup.remove();
+            
+            const popupHTML = createPopupHTML(properties);
+            currentMapLibrePopup = new maplibregl.Popup({ offset: 25, closeButton: true, className: 'airbnb-style-popup' })
+                .setLngLat(coordinates)
+                .setHTML(popupHTML)
+                .addTo(map);
+            currentMapLibrePopup.on('close', () => {
+                if (typeof idPourFeatureState === 'number' && selectedPinIdForState === idPourFeatureState) { 
+                    try {
+                        if (map.getLayer(LAYER_ID_PINS) && map.getSource(SOURCE_ID_ANNONCES)) {
+                             map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinIdForState }, { selected: false });
+                        }
+                    } catch (error) { /* ignore */ }
+                    selectedPinIdForState = null;
+                }
+                currentMapLibrePopup = null;
+            });
+            // Sur desktop, le flyTo peut aussi avoir un padding pour mieux voir le popup
+            map.flyTo({ center: coordinates, zoom: Math.max(map.getZoom(), 15), essential: true, padding: {top:50, bottom:50, left:50, right:50} });
         }
     }
 
@@ -344,28 +364,29 @@ document.addEventListener('DOMContentLoaded', function() {
     if (mobileToggleButton) {
         mobileToggleButton.addEventListener('click', () => {
             if (!isMobile) return; document.body.classList.toggle('map-is-active');
-            console.log(`[MAP_SCRIPT V11.6] Bascule mobile. map-is-active: ${document.body.classList.contains('map-is-active')}`);
+            console.log(`[MAP_SCRIPT V11.7] Bascule mobile. map-is-active: ${document.body.classList.contains('map-is-active')}`);
             if (document.body.classList.contains('map-is-active')) { if (map) map.resize(); } 
             else { if (listContainer) listContainer.scrollTo(0, 0); }
             updateMobileButtonAndViewState(); 
         });
-    } else { console.warn(`[MAP_SCRIPT V11.6] Bouton bascule mobile (ID: ${MOBILE_TOGGLE_BUTTON_ID}) non trouvé.`); }
+    } else { console.warn(`[MAP_SCRIPT V11.7] Bouton bascule mobile (ID: ${MOBILE_TOGGLE_BUTTON_ID}) non trouvé.`); }
     
     window.addEventListener('resize', () => {
-        const previouslyMobile = isMobile; isMobile = window.innerWidth < 768;
+        const mobilePitch = 30; // Doit correspondre à initializeMap
+        const desktopPitch = 50;
+        const previouslyMobile = isMobile; 
+        isMobile = window.innerWidth < 768;
+
         if (previouslyMobile !== isMobile) {
-            console.log(`[MAP_SCRIPT V11.6] Changement mode: ${previouslyMobile ? 'Mobile -> Desktop' : 'Desktop -> Mobile'}`);
-            if (currentMapLibrePopup) { // Si un popup est ouvert, le fermer lors du changement de mode
-                currentMapLibrePopup.remove();
-                currentMapLibrePopup = null;
-                 if (selectedPinIdForState !== null) { // Et désélectionner le pin
-                    try {
-                        map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinIdForState }, { selected: false });
-                    } catch(e) {/* ignore */}
-                    selectedPinIdForState = null;
-                }
+            console.log(`[MAP_SCRIPT V11.7] Changement mode: ${previouslyMobile ? 'Mobile -> Desktop' : 'Desktop -> Mobile'}`);
+            if (currentMapLibrePopup) { currentMapLibrePopup.remove(); currentMapLibrePopup = null; }
+            if (modalElement && modalElement.style.display !== 'none') modalElement.style.display = 'none'; // Fermer modale si ouverte
+
+            if (selectedPinIdForState !== null) { 
+                 try { map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinIdForState }, { selected: false }); } catch(e) {/*ignore*/}
+                 selectedPinIdForState = null;
             }
-            if (map) { map.setPitch(isMobile ? 0 : 50); map.setBearing(isMobile ? 0 : -15); }
+            if (map) { map.setPitch(isMobile ? mobilePitch : desktopPitch); map.setBearing(isMobile ? 0 : -15); }
         }
         updateMobileButtonAndViewState(); 
     });
@@ -380,6 +401,5 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    console.log('[MAP_SCRIPT V11.6] Appel initial updateMobileButtonAndViewState.');
-    updateMobileButtonAndViewState();
+    updateMobileButtonAndViewState(); // Appel initial
 });
