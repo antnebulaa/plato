@@ -1,6 +1,6 @@
-// map-listings.js - VERSION 11.1 - Popup mobile et bascule mobile corrigée
+// map-listings.js - VERSION 11.2 - Correction affichage popup mobile et diagnostics
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V11.1] Popup mobile fixe et bascule mobile corrigée.');
+    console.log('[MAP_SCRIPT V11.2] Initialisation avec correction popup mobile.');
 
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL'; // Remplacez par votre clé MapTiler
     const MAP_CONTAINER_ID = 'map-section';
@@ -33,74 +33,96 @@ document.addEventListener('DOMContentLoaded', function() {
     let mobilePopupCloseButton = document.getElementById(MOBILE_POPUP_CLOSE_BUTTON_ID);
     let currentHighlightedBuildingIds = new Set();
 
+    // Vérifications cruciales au démarrage
+    if (!mobilePopupElement) {
+        console.error(`[MAP_SCRIPT V11.2] CRITICAL: Element du popup mobile avec ID "${MOBILE_POPUP_ID}" NON TROUVÉ! Le popup mobile ne fonctionnera pas.`);
+    }
+    if (!mobilePopupContentElement) {
+        console.error(`[MAP_SCRIPT V11.2] CRITICAL: Element de contenu du popup mobile avec ID "${MOBILE_POPUP_CONTENT_ID}" NON TROUVÉ!`);
+    }
+    if (!mobilePopupCloseButton) {
+        console.error(`[MAP_SCRIPT V11.2] CRITICAL: Bouton de fermeture du popup mobile avec ID "${MOBILE_POPUP_CLOSE_BUTTON_ID}" NON TROUVÉ!`);
+    }
+
+
     if (mobilePopupCloseButton && mobilePopupElement) {
         mobilePopupCloseButton.addEventListener('click', () => {
+            console.log('[MAP_SCRIPT V11.2] Clic sur le bouton de fermeture du popup mobile.');
             mobilePopupElement.classList.remove('visible');
+            // Cache l'élément après la fin de la transition CSS
             setTimeout(() => {
+                // Vérifie si la classe 'visible' n'a pas été rajoutée entre-temps
                 if (!mobilePopupElement.classList.contains('visible')) {
                      mobilePopupElement.style.display = 'none';
                 }
-            }, 300);
+            }, 300); // Durée de la transition CSS
 
             if (selectedPinId !== null && map && map.getSource(SOURCE_ID_ANNONCES) && map.getLayer(LAYER_ID_PINS)) {
                 try {
                     map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
                 } catch (error) {
-                    console.warn("Error unsetting feature state on mobile popup close:", error);
+                    console.warn("[MAP_SCRIPT V11.2] Erreur lors de la désélection du feature state (fermeture popup mobile):", error.message);
                 }
                 selectedPinId = null;
             }
         });
-    } else {
-        console.warn("[MAP_SCRIPT V11.1] Éléments du DOM pour le popup mobile non trouvés.");
     }
 
     document.addEventListener('annoncesChargeesEtRendues', (event) => {
+        console.log('[MAP_SCRIPT V11.2] Événement "annoncesChargeesEtRendues" reçu.');
         const annonces = event.detail.annonces;
         if (!annonces || !Array.isArray(annonces)) {
-            console.warn("[MAP_SCRIPT V11.1] Aucune annonce reçue ou format incorrect.");
+            console.warn("[MAP_SCRIPT V11.2] Aucune annonce reçue ou format incorrect dans l'événement.");
             allAnnouncements = [];
         } else {
             allAnnouncements = annonces;
+            console.log(`[MAP_SCRIPT V11.2] ${allAnnouncements.length} annonces chargées.`);
         }
         
         const geojsonData = convertAnnoncesToGeoJSON(allAnnouncements);
 
         if (!map) {
+            console.log("[MAP_SCRIPT V11.2] Carte non initialisée, appel de initializeMap.");
             initializeMap(geojsonData);
         } else {
+            console.log("[MAP_SCRIPT V11.2] Carte existante, mise à jour des données.");
             if (map.getSource(SOURCE_ID_ANNONCES)) {
                 map.getSource(SOURCE_ID_ANNONCES).setData(geojsonData);
             } else {
-                map.once('styledata', () => { // Ensure style is ready
+                console.warn("[MAP_SCRIPT V11.2] Source d'annonces non trouvée sur carte existante. Tentative d'ajout sur 'styledata'.");
+                map.once('styledata', () => { 
                     if (map.getSource(SOURCE_ID_ANNONCES)) {
                          map.getSource(SOURCE_ID_ANNONCES).setData(geojsonData);
                     } else {
+                        console.log("[MAP_SCRIPT V11.2] Ajout de la source d'annonces après 'styledata'.");
                         map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: geojsonData, promoteId: 'id' });
                     }
                 });
             }
             
-            if (map.isStyleLoaded()) {
-                 mettreAJourBatimentsSelectionnes(allAnnouncements);
-                 if (geojsonData.features.length > 0) {
+            const updateAfterLoad = () => {
+                mettreAJourBatimentsSelectionnes(allAnnouncements);
+                if (geojsonData.features.length > 0) {
                     const bounds = getBounds(geojsonData);
-                    map.fitBounds(bounds, { padding: isMobile ? 40: 80, maxZoom: 16 });
-                 } else { 
-                    map.flyTo({ center: [2.3522, 48.8566], zoom: 11 }); 
-                 }
-            } else {
-                map.once('load', () => {
-                    mettreAJourBatimentsSelectionnes(allAnnouncements);
-                    if (geojsonData.features.length > 0) {
-                        const bounds = getBounds(geojsonData);
-                        map.fitBounds(bounds, { padding: isMobile ? 40: 80, maxZoom: 16 });
-                    } else { 
-                        map.flyTo({ center: [2.3522, 48.8566], zoom: 11 }); 
+                    if (bounds.getSouthWest() && bounds.getNorthEast()){ // Vérifie que les limites sont valides
+                         console.log("[MAP_SCRIPT V11.2] Ajustement des limites de la carte aux nouvelles annonces.");
+                         map.fitBounds(bounds, { padding: isMobile ? 40: 80, maxZoom: 16, duration:0 });
+                    } else {
+                        console.warn("[MAP_SCRIPT V11.2] Limites invalides pour les annonces, pas d'ajustement.");
                     }
-                });
+                } else { 
+                    console.log("[MAP_SCRIPT V11.2] Aucune annonce à afficher, centrage par défaut.");
+                    map.flyTo({ center: [2.3522, 48.8566], zoom: 11, duration:0 }); 
+                }
+                updateVisibleList();
+            };
+
+            if (map.isStyleLoaded()) {
+                 updateAfterLoad();
+            } else {
+                console.log("[MAP_SCRIPT V11.2] Style de carte non chargé, attente de l'événement 'load'.");
+                map.once('load', updateAfterLoad);
             }
-             // updateVisibleList() is often called after map movements, which will update button text
         }
     });
 
@@ -108,9 +130,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const features = annonces.map(annonce => {
             const lat = getNestedValue(annonce, 'geo_location.data.lat');
             const lng = getNestedValue(annonce, 'geo_location.data.lng');
-            if (annonce.id === undefined || annonce.id === null || lat === undefined || lng === undefined) return null;
+            if (annonce.id === undefined || annonce.id === null || lat === undefined || lng === undefined) {
+                // console.warn("[MAP_SCRIPT V11.2] Annonce ignorée (ID ou coordonnées manquantes):", annonce.id);
+                return null;
+            }
             let featureId = parseInt(annonce.id, 10); 
-            if (isNaN(featureId)) return null;
+            if (isNaN(featureId)) {
+                // console.warn("[MAP_SCRIPT V11.2] Annonce ignorée (ID non numérique après conversion):", annonce.id);
+                return null;
+            }
 
             return {
                 type: 'Feature',
@@ -124,12 +152,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             };
         }).filter(feature => feature !== null);
+        // console.log(`[MAP_SCRIPT V11.2] ${features.length} features GeoJSON créés.`);
         return { type: 'FeatureCollection', features };
     }
     
     async function mettreAJourBatimentsSelectionnes(annonces) {
         if (!map || !map.isStyleLoaded() || !map.getSource(SOURCE_NAME_BUILDINGS)) {
-            // console.warn("[BÂTIMENTS DEBUG] Style ou source non chargé."); // Peut être bruyant
             return;
         }
 
@@ -138,14 +166,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (map.getFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: buildingId })?.highlighted) {
                     map.setFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: buildingId }, { highlighted: false });
                 }
-             } catch(e){ /* console.warn("Erreur réinitialisation état bâtiment:", e.message) */ }
+             } catch(e){ /* Ignorer discrètement */ }
         });
         currentHighlightedBuildingIds.clear();
 
         if (!annonces || annonces.length === 0) return;
         
-        await map.once('idle');
-        
+        try { await map.once('idle'); } catch(e) { /* map already idle or error loading it */ }
+                
         const newBuildingIdsToHighlight = new Set();
         for (const annonce of annonces) {
             const lat = getNestedValue(annonce, 'geo_location.data.lat');
@@ -165,7 +193,7 @@ document.addEventListener('DOMContentLoaded', function() {
         newBuildingIdsToHighlight.forEach(buildingId => {
             try {
                 map.setFeatureState({ source: SOURCE_NAME_BUILDINGS, sourceLayer: SOURCE_LAYER_NAME_BUILDINGS, id: buildingId }, { highlighted: true });
-            } catch(e){ /* console.warn("Erreur màj état bâtiment:", e.message) */ }
+            } catch(e){ /* Ignorer discrètement */ }
         });
         currentHighlightedBuildingIds = newBuildingIdsToHighlight;
     }
@@ -174,8 +202,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const bounds = new maplibregl.LngLatBounds();
         if (geojson && geojson.features) {
             geojson.features.forEach(feature => {
-                if(feature && feature.geometry && feature.geometry.coordinates) {
-                    bounds.extend(feature.geometry.coordinates);
+                if(feature && feature.geometry && feature.geometry.coordinates && 
+                   typeof feature.geometry.coordinates[0] === 'number' && 
+                   typeof feature.geometry.coordinates[1] === 'number') {
+                    try {
+                        bounds.extend(feature.geometry.coordinates);
+                    } catch (e) {
+                        console.warn("[MAP_SCRIPT V11.2] Coordonnées invalides pour calcul des limites:", feature.geometry.coordinates, e.message);
+                    }
+                } else {
+                     // console.warn("[MAP_SCRIPT V11.2] Feature avec coordonnées invalides ou manquantes ignoré pour les limites:", feature);
                 }
             });
         }
@@ -183,6 +219,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function initializeMap(initialGeoJSON) {
+        console.log('[MAP_SCRIPT V11.2] Initialisation de la carte MapLibre.');
         map = new maplibregl.Map({
             container: MAP_CONTAINER_ID,
             style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`,
@@ -195,17 +232,19 @@ document.addEventListener('DOMContentLoaded', function() {
             interactive: true,
         });
         
-        window.map = map; 
+        window.map = map; // Pour débogage
 
         if (initialGeoJSON && initialGeoJSON.features && initialGeoJSON.features.length > 0) {
             const bounds = getBounds(initialGeoJSON);
-            if (bounds.getSouthWest() && bounds.getNorthEast()) { // Check if bounds are valid
+            if (bounds.getSouthWest() && bounds.getNorthEast()) { 
                  map.fitBounds(bounds, { padding: isMobile ? 40 : 80, duration: 0, maxZoom: 16 });
+            } else {
+                console.warn("[MAP_SCRIPT V11.2] Limites initiales invalides, pas d'ajustement.");
             }
         }
 
         map.on('load', () => {
-            console.log('[MAP_SCRIPT V11.1] Carte chargée.');
+            console.log('[MAP_SCRIPT V11.2] Carte MapLibre chargée (événement "load").');
             map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
 
             const heightExpression = ['coalesce', ['get', 'height'], 20]; 
@@ -223,9 +262,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         'fill-extrusion-base': minHeightExpression, 
                         'fill-extrusion-opacity': 0.85
                     }
-                }, LAYER_ID_PINS); 
+                }, LAYER_ID_PINS); // Insérer avant les pins
             } else {
-                console.warn(`[MAP_SCRIPT V11.1] Source '${SOURCE_NAME_BUILDINGS}' non trouvée.`);
+                console.warn(`[MAP_SCRIPT V11.2] Source des bâtiments '${SOURCE_NAME_BUILDINGS}' non trouvée. La couche 3D ne sera pas ajoutée.`);
             }
 
             map.addLayer({
@@ -256,29 +295,33 @@ document.addEventListener('DOMContentLoaded', function() {
             map.on('mouseleave', LAYER_ID_PINS, () => map.getCanvas().style.cursor = '');
             
             map.on('moveend', updateVisibleList); 
-            map.on('idle', updateVisibleList); // Also update when map becomes idle
+            map.on('idle', updateVisibleList); 
 
             updateVisibleList(); 
-            updateMobileButtonAndViewState(); // Set initial button text and view state
+            updateMobileButtonAndViewState(); 
             if (map.isStyleLoaded() && map.getSource(SOURCE_NAME_BUILDINGS)) {
                 mettreAJourBatimentsSelectionnes(allAnnouncements);
             }
         });
         
         map.on('error', (e) => {
-            console.error('Erreur MapLibre:', e.error ? e.error.message : e);
+            console.error('[MAP_SCRIPT V11.2] Erreur MapLibre:', e.error ? e.error.message : e);
         });
 
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
 
     function updateMobileButtonAndViewState() {
-        if (!mobileToggleButton) return;
+        if (!mobileToggleButton) {
+            // console.warn("[MAP_SCRIPT V11.2] Bouton de bascule mobile non trouvé pour mise à jour.");
+            return;
+        }
 
         if (isMobile) {
-            mobileToggleButton.style.display = ''; // Make button visible on mobile
+            mobileToggleButton.style.display = ''; // Afficher le bouton sur mobile
+            console.log(`[MAP_SCRIPT V11.2] Mode mobile. Classe 'map-is-active' sur body: ${document.body.classList.contains('map-is-active')}`);
             if (document.body.classList.contains('map-is-active')) {
-                // Map is active, count visible pins
+                // La carte est active
                 if (map && map.isStyleLoaded() && map.getSource(SOURCE_ID_ANNONCES)) {
                     const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_PINS] });
                     const count = visibleFeatures.length;
@@ -287,19 +330,25 @@ document.addEventListener('DOMContentLoaded', function() {
                      mobileToggleButton.textContent = `Voir les logements`; // Fallback
                 }
             } else {
-                // List is active
+                // La liste est active
                 mobileToggleButton.textContent = 'Afficher la carte';
             }
         } else {
-            mobileToggleButton.style.display = 'none'; // Hide button on desktop
+            console.log('[MAP_SCRIPT V11.2] Mode desktop, masquage du bouton de bascule mobile.');
+            mobileToggleButton.style.display = 'none'; // Masquer le bouton sur desktop
         }
     }
     
     function updateVisibleList() {
-        if (!map || !map.isStyleLoaded() || !listContainer || !map.getSource(SOURCE_ID_ANNONCES)) return;
+        // console.log('[MAP_SCRIPT V11.2] Appel de updateVisibleList.');
+        if (!map || !map.isStyleLoaded() || !listContainer || !map.getSource(SOURCE_ID_ANNONCES)) {
+            // console.warn("[MAP_SCRIPT V11.2] Conditions non remplies pour updateVisibleList (carte, style, conteneur liste ou source).");
+            return;
+        }
         
         const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_PINS] });
         const visiblePropertyIds = new Set(visibleFeatures.map(feature => String(feature.properties.id_str || feature.id)));
+        // console.log(`[MAP_SCRIPT V11.2] IDs des propriétés visibles sur la carte:`, visiblePropertyIds);
         
         const allListItems = listContainer.querySelectorAll('[data-property-id]'); 
         allListItems.forEach(itemDiv => {
@@ -312,7 +361,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        updateMobileButtonAndViewState(); // Update button text after list visibility changes
+        updateMobileButtonAndViewState();
     }
 
     function createPopupHTML(properties) {
@@ -334,43 +383,59 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function handleMapClick(e) {
+        console.log('[MAP_SCRIPT V11.2] Clic sur la carte détecté. Features:', e.features);
         if (!e.features || e.features.length === 0) return;
 
         const feature = e.features[0];
         const coordinates = feature.geometry.coordinates.slice();
         const properties = feature.properties; 
         const clickedPinId = feature.id; 
+        console.log(`[MAP_SCRIPT V11.2] Pin cliqué: ID=${clickedPinId}, Propriétés:`, properties);
+
 
         if (selectedPinId !== null && selectedPinId !== clickedPinId) {
             try {
-              if (map.getLayer(LAYER_ID_PINS) && map.getSource(SOURCE_ID_ANNONCES)) { // Check layer exists
+              if (map.getLayer(LAYER_ID_PINS) && map.getSource(SOURCE_ID_ANNONCES)) { 
                 map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
               }
-            } catch (error) { console.warn("Error unsetting feature state:", error); }
+            } catch (error) { console.warn("[MAP_SCRIPT V11.2] Erreur désélection feature state:", error.message); }
         }
         try {
             if (map.getLayer(LAYER_ID_PINS) && map.getSource(SOURCE_ID_ANNONCES)) {
                  map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: clickedPinId }, { selected: true });
             }
-        } catch (error) { console.warn("Error setting feature state:", error); }
+        } catch (error) { console.warn("[MAP_SCRIPT V11.2] Erreur sélection feature state:", error.message); }
         selectedPinId = clickedPinId;
 
         if (isMobile) {
+            console.log('[MAP_SCRIPT V11.2] Mode mobile détecté pour handleMapClick.');
             if (mapLibrePopup) {
                 mapLibrePopup.remove();
                 mapLibrePopup = null;
             }
 
             if (mobilePopupElement && mobilePopupContentElement) {
+                console.log('[MAP_SCRIPT V11.2] Éléments du popup mobile trouvés. Affichage du popup.');
                 const popupHTML = createPopupHTML(properties);
                 mobilePopupContentElement.innerHTML = popupHTML;
-                mobilePopupElement.style.display = 'flex'; 
-                void mobilePopupElement.offsetWidth; 
-                mobilePopupElement.classList.add('visible');
+                
+                // Assurez-vous que l'élément est prêt à être affiché avant d'ajouter la classe 'visible'
+                mobilePopupElement.style.display = 'flex'; // Ou 'block' selon votre CSS
+
+                // Utilisez requestAnimationFrame pour s'assurer que le style 'display' est appliqué
+                // avant que la classe 'visible' ne soit ajoutée, ce qui permet à la transition de se déclencher.
+                requestAnimationFrame(() => {
+                    mobilePopupElement.classList.add('visible');
+                    console.log('[MAP_SCRIPT V11.2] Classe "visible" ajoutée au popup mobile.');
+                });
+                
                 map.flyTo({ center: coordinates, zoom: Math.max(map.getZoom(), 15), essential: true });
                 scrollListItemIntoView(properties.id_str); 
+            } else {
+                console.error('[MAP_SCRIPT V11.2] ERREUR: mobilePopupElement ou mobilePopupContentElement est null en mode mobile.');
             }
         } else { 
+            console.log('[MAP_SCRIPT V11.2] Mode desktop détecté pour handleMapClick.');
             if (mobilePopupElement && mobilePopupElement.classList.contains('visible')) {
                 mobilePopupElement.classList.remove('visible');
                  setTimeout(() => {
@@ -399,7 +464,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (map.getLayer(LAYER_ID_PINS) && map.getSource(SOURCE_ID_ANNONCES)) {
                              map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
                         }
-                    } catch (error) { console.warn("Error unsetting feature state on popup close:", error); }
+                    } catch (error) { console.warn("[MAP_SCRIPT V11.2] Erreur désélection feature state (fermeture popup desktop):", error.message); }
                     selectedPinId = null;
                 }
                 mapLibrePopup = null;
@@ -419,32 +484,34 @@ document.addEventListener('DOMContentLoaded', function() {
         }, obj);
     }
     
-    // Mobile toggle button setup
-    if (mobileToggleButton) { // Check if button exists
+    if (mobileToggleButton) {
         mobileToggleButton.addEventListener('click', () => {
-            if (!isMobile) return; // Action only on mobile
+            console.log('[MAP_SCRIPT V11.2] Clic sur le bouton de bascule mobile.');
+            if (!isMobile) return; 
 
             document.body.classList.toggle('map-is-active');
+            console.log(`[MAP_SCRIPT V11.2] Classe 'map-is-active' sur body: ${document.body.classList.contains('map-is-active')}`);
             
             if (document.body.classList.contains('map-is-active')) {
-                // Switched to Map View
                 if (map) map.resize();
             } else {
-                // Switched to List View
                 if (listContainer) listContainer.scrollTo(0, 0);
             }
-            updateMobileButtonAndViewState(); // Update button text and manage view
+            updateMobileButtonAndViewState(); 
         });
+    } else {
+        console.warn("[MAP_SCRIPT V11.2] Bouton de bascule mobile non trouvé. La fonctionnalité de bascule ne sera pas active.");
     }
 
 
     window.addEventListener('resize', () => {
+        // console.log('[MAP_SCRIPT V11.2] Événement de redimensionnement de la fenêtre.');
         const previouslyMobile = isMobile;
         isMobile = window.innerWidth < 768;
 
         if (previouslyMobile !== isMobile) {
-            console.log(`[MAP_SCRIPT V11.1] Mode changé: ${previouslyMobile ? 'Mobile -> Desktop' : 'Desktop -> Mobile'}`);
-            if (selectedPinId !== null) {
+            console.log(`[MAP_SCRIPT V11.2] Changement de mode d'affichage: ${previouslyMobile ? 'Mobile -> Desktop' : 'Desktop -> Mobile'}`);
+            if (selectedPinId !== null) { // Si un pin était sélectionné, fermer les popups pour éviter un affichage incorrect
                 if (mapLibrePopup) {
                     mapLibrePopup.remove();
                     mapLibrePopup = null;
@@ -458,27 +525,28 @@ document.addEventListener('DOMContentLoaded', function() {
                     }, 300);
                 }
             }
-            if (map) {
+            if (map) { // Adapter le pitch et le bearing de la carte
                 map.setPitch(isMobile ? 0 : 50);
                 map.setBearing(isMobile ? 0 : -15);
             }
         }
-        updateMobileButtonAndViewState(); // Always update button/view state on resize
+        updateMobileButtonAndViewState(); 
     });
 
     function scrollListItemIntoView(propertyIdStr) {
         if (!listContainer || !propertyIdStr) return;
-        if (isMobile && document.body.classList.contains('map-is-active')) return;
+        if (isMobile && document.body.classList.contains('map-is-active')) return; // Ne pas scroller si la carte est en plein écran
 
         const itemInList = listContainer.querySelector(`[data-property-id="${propertyIdStr}"]`);
         if (itemInList) {
             const scrollTarget = itemInList.closest('a, div[data-property-id]'); 
             if (scrollTarget) {
+                // console.log(`[MAP_SCRIPT V11.2] Défilement de l'élément de liste ID ${propertyIdStr} en vue.`);
                 scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
         }
     }
 
-    // Initial UI setup based on screen size
+    console.log('[MAP_SCRIPT V11.2] Configuration initiale de l\'état UI mobile/desktop.');
     updateMobileButtonAndViewState();
 });
