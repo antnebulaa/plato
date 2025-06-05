@@ -119,6 +119,7 @@ document.addEventListener('DOMContentLoaded', function() {
             style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`,
             pitch: 50,
             bearing: -15,
+            navigationControl: false,
             renderWorldCopies: false
         });
         
