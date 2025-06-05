@@ -177,12 +177,20 @@ document.addEventListener('DOMContentLoaded', function() {
         return `<div class="map-custom-popup"><img src="${coverPhoto}" alt="${title}" class="popup-image" onerror="this.src='${placeholderImage}'"><div class="popup-info"><h4 class="popup-title">${title}</h4><p class="popup-price">${priceText}</p><a href="${detailLink}" class="popup-link" target="_blank">Voir détails</a></div></div>`;
     }
     
-    function openMobileBottomSheet(properties) { // Reste inchangé
-        if (!mobileBottomSheet || !mobileBottomSheetContent) return;
-        const contentHTML = createPopupHTML(properties);
-        mobileBottomSheetContent.innerHTML = contentHTML;
-        mobileBottomSheet.classList.add('visible');
+    function openMobileBottomSheet(properties) {
+    console.log('[DEBUG_MODAL] openMobileBottomSheet called with properties:', properties); // NOUVEAU LOG
+    console.log('[DEBUG_MODAL] mobileBottomSheet element:', mobileBottomSheet); // NOUVEAU LOG
+    console.log('[DEBUG_MODAL] mobileBottomSheetContent element:', mobileBottomSheetContent); // NOUVEAU LOG
+
+    if (!mobileBottomSheet || !mobileBottomSheetContent) {
+        console.error('[DEBUG_MODAL] ERROR: Bottom sheet elements not found!'); // NOUVEAU LOG
+        return;
     }
+    const contentHTML = createPopupHTML(properties);
+    mobileBottomSheetContent.innerHTML = contentHTML;
+    mobileBottomSheet.classList.add('visible');
+    console.log('[DEBUG_MODAL] "visible" class added to mobileBottomSheet.'); // NOUVEAU LOG
+}
     
     function closeMobileBottomSheet() { // Reste inchangé
         if (!mobileBottomSheet) return;
@@ -196,12 +204,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    function handleMapClick(e) { // Reste inchangé
-        if (e.features && e.features.length > 0) {
-            const feature = e.features[0];
-            const coordinates = feature.geometry.coordinates.slice(); 
-            const properties = feature.properties;
-            const clickedPinId = feature.id;
+    function handleMapClick(e) {
+    console.log('[DEBUG_MODAL] handleMapClick triggered!'); // NOUVEAU LOG
+    console.log('[DEBUG_MODAL] isMobile:', isMobile); // NOUVEAU LOG
+
+    if (e.features && e.features.length > 0) {
+        const feature = e.features[0];
+        const coordinates = feature.geometry.coordinates.slice();
+        const properties = feature.properties;
+        const clickedPinId = feature.id;
+
+        console.log('[DEBUG_MODAL] Clicked Pin ID:', clickedPinId, 'Properties:', properties); // NOUVEAU LOG
 
             if (selectedPinId !== null && selectedPinId !== clickedPinId) {
                 map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
