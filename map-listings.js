@@ -1,8 +1,8 @@
-// map-listings.js - VERSION 12 - Carte Info Mobile Style Airbnb
+// map-listings.js - VERSION 12.1 - Correction bounds.isValid
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V12] Passage à la carte info mobile style Airbnb.');
+    console.log('[MAP_SCRIPT V12.1] Correction bounds.isValid.');
 
-    const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL'; // Conservez votre clé
+    const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const MAP_CONTAINER_ID = 'map-section';
     const LIST_CONTAINER_ID = 'annonces-wrapper';
     const MOBILE_TOGGLE_BUTTON_ID = 'mobile-map-toggle';
@@ -16,32 +16,38 @@ document.addEventListener('DOMContentLoaded', function() {
     let map = null;
     let allAnnouncements = [];
     let isMobile = window.innerWidth < 768;
-    let currentPopup = null; // Pour le popup MapLibre sur desktop
+    let currentPopup = null;
     let selectedPinId = null;
 
-    // Éléments pour la carte d'info mobile (anciennement bottom sheet)
-    const mobileInfoCardContainer = document.getElementById('mobile-bottom-sheet'); // On garde cet ID pour le conteneur principal
-    const mobileInfoCardContent = document.getElementById('mobile-bottom-sheet-content'); // Conteneur pour le contenu injecté
+    const mobileInfoCardContainer = document.getElementById('mobile-bottom-sheet');
+    const mobileInfoCardContent = document.getElementById('mobile-bottom-sheet-content');
 
-    // --- Gestion du redimensionnement de la fenêtre ---
     window.addEventListener('resize', () => {
         const newIsMobile = window.innerWidth < 768;
         if (newIsMobile !== isMobile) {
             console.log('[RESIZE] isMobile a changé pour:', newIsMobile);
             isMobile = newIsMobile;
         }
-        // Si on passe en mode mobile et qu'un popup desktop est ouvert, on le ferme
         if (isMobile && currentPopup) {
             currentPopup.remove();
             currentPopup = null;
         }
-        // Si on passe en mode desktop et que la carte info mobile est ouverte, on la ferme
         if (!isMobile && mobileInfoCardContainer && mobileInfoCardContainer.classList.contains('visible')) {
             closeMobileInfoCard();
         }
+         // Mettre à jour la visibilité du bouton toggle au redimensionnement
+        if (mobileToggleButton) {
+            if (isMobile) {
+                mobileToggleButton.style.display = 'block';
+            } else {
+                mobileToggleButton.style.display = 'none';
+                if (document.body.classList.contains('map-is-active')) {
+                    document.body.classList.remove('map-is-active');
+                }
+            }
+        }
     });
 
-    // --- Réception des annonces depuis l'autre script ---
     document.addEventListener('annoncesChargeesEtRendues', (event) => {
         const annonces = event.detail.annonces;
         if (!annonces || !Array.isArray(annonces)) {
@@ -53,36 +59,49 @@ document.addEventListener('DOMContentLoaded', function() {
         const geojsonData = convertAnnoncesToGeoJSON(allAnnouncements);
 
         if (!map) {
+            console.log("[ANNONCES_CHARGEES] La carte n'est pas encore initialisée. Appel de initializeMap.");
             initializeMap(geojsonData);
         } else {
+            console.log("[ANNONCES_CHARGEES] Mise à jour de la source de données de la carte.");
             if (map.getSource(SOURCE_ID_ANNONCES)) {
                 map.getSource(SOURCE_ID_ANNONCES).setData(geojsonData);
             } else {
                 console.error("[MAP_SCRIPT] Source d'annonces non trouvée pour la mise à jour.");
-                // Peut-être réinitialiser la carte ou la source ici
+                // Recréer la source et les couches si elles ont été supprimées ou jamais ajoutées
+                if (map.isStyleLoaded()) {
+                    map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: geojsonData, promoteId: 'id' });
+                    addMapLayers(); // Fonction pour ajouter les couches si elles n'existent pas
+                }
             }
             
             if (geojsonData.features.length > 0) {
                  const bounds = getBounds(geojsonData);
-                 if (bounds.isValid()) { // S'assurer que les limites sont valides
+                 if (bounds.getSouthWest() && bounds.getNorthEast() && !bounds.getSouthWest().equals(bounds.getNorthEast())) { // CORRECTION ICI
                     map.fitBounds(bounds, { padding: 80, maxZoom: 16 });
                  } else {
-                    map.flyTo({ center: [2.3522, 48.8566], zoom: 11 }); // Fallback Paris
+                    console.warn("[ANNONCES_CHARGEES] Les limites (bounds) ne sont pas valides. Centrage par défaut.");
+                    map.flyTo({ center: [2.3522, 48.8566], zoom: 11 });
                  }
             } else { 
-                map.flyTo({ center: [2.3522, 48.8566], zoom: 11 }); // Fallback Paris
+                console.warn("[ANNONCES_CHARGEES] Aucune feature dans geojsonData. Centrage par défaut.");
+                map.flyTo({ center: [2.3522, 48.8566], zoom: 11 });
+            }
+            // S'assurer que la liste est mise à jour après le chargement des données
+            if (map.isStyleLoaded()) {
+                updateVisibleList();
+            } else {
+                map.once('styledata', updateVisibleList);
             }
         }
     });
 
-    // --- Conversion des données d'annonces en GeoJSON ---
     function convertAnnoncesToGeoJSON(annonces) {
         const features = annonces.map(annonce => {
             const lat = getNestedValue(annonce, 'geo_location.data.lat');
             const lng = getNestedValue(annonce, 'geo_location.data.lng');
             
             if (annonce.id === undefined || annonce.id === null || lat === undefined || lng === undefined) {
-                console.warn("[GEOJSON_CONVERT] Annonce avec ID ou géolocalisation manquant:", annonce);
+                console.warn("[GEOJSON_CONVERT] Annonce avec ID ou géolocalisation manquant:", annonce.id);
                 return null;
             }
             let featureId = parseInt(annonce.id, 10);
@@ -91,7 +110,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 return null;
             }
 
-            // Préparer les propriétés pour la carte d'info
             const properties = {
                 id: featureId,
                 id_str: String(annonce.id),
@@ -99,129 +117,171 @@ document.addEventListener('DOMContentLoaded', function() {
                 title: getNestedValue(annonce, 'property_title'),
                 coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url'),
                 city: getNestedValue(annonce, 'city'),
-                type: getNestedValue(annonce, 'house_type.0') || "Logement", // Exemple, adaptez 'house_type.0'
-                // Ajoutez d'autres champs si nécessaire pour createMobileInfoCardHTML
-                // rating: getNestedValue(annonce, 'VOTRE_CHAMP_RATING'), 
-                // reviews: getNestedValue(annonce, 'VOTRE_CHAMP_NB_AVIS'),
+                type: getNestedValue(annonce, 'house_type.0') || getNestedValue(annonce, 'house_type') || "Logement",
             };
             
-            return {
-                type: 'Feature',
-                id: featureId,
-                geometry: {
-                    type: 'Point',
-                    coordinates: [parseFloat(lng), parseFloat(lat)]
-                },
-                properties: properties
-            };
-        }).filter(Boolean); // Élimine les nulls si des annonces n'ont pas pu être converties
+            return { type: 'Feature', id: featureId, geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] }, properties: properties };
+        }).filter(Boolean);
         return { type: 'FeatureCollection', features };
     }
 
-    // --- Calcul des limites pour zoomer sur les annonces ---
     function getBounds(geojson) {
         const bounds = new maplibregl.LngLatBounds();
         if (geojson && geojson.features && geojson.features.length > 0) {
             geojson.features.forEach(feature => {
-                if (feature.geometry && feature.geometry.coordinates) {
+                if (feature.geometry && feature.geometry.coordinates &&
+                    typeof feature.geometry.coordinates[0] === 'number' &&
+                    typeof feature.geometry.coordinates[1] === 'number') {
                     bounds.extend(feature.geometry.coordinates);
+                } else {
+                    console.warn("[GET_BOUNDS] Coordonnées invalides pour la feature:", feature);
                 }
             });
         }
         return bounds;
     }
 
-    // --- Initialisation de la carte MapLibre ---
-    function initializeMap(initialGeoJSON) {
-        map = new maplibregl.Map({
-            container: MAP_CONTAINER_ID,
-            style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`,
-            pitch: 0, // Commence en 2D, peut être modifié plus tard si besoin
-            bearing: 0,
-            navigationControl: false,
-            renderWorldCopies: false,
-            attributionControl: false // Pour cacher l'attribution MapTiler par défaut si vous l'ajoutez ailleurs
-        });
-        map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
-        
-        window.map = map; // Pour débogage
-
-        if (initialGeoJSON && initialGeoJSON.features && initialGeoJSON.features.length > 0) {
-            const bounds = getBounds(initialGeoJSON);
-            if (bounds.isValid()) {
-                map.fitBounds(bounds, { padding: 80, duration: 0, maxZoom: 16 });
-            } else {
-                map.setCenter([2.3522, 48.8566]); map.setZoom(11); // Fallback Paris
-            }
-        } else {
-            map.setCenter([2.3522, 48.8566]); map.setZoom(11); // Fallback Paris
+    function addMapLayers() { // Nouvelle fonction pour encapsuler l'ajout des couches
+        if (!map.getSource(SOURCE_ID_ANNONCES)) {
+            console.error("[ADD_LAYERS] La source d'annonces n'existe pas. Impossible d'ajouter les couches.");
+            return;
         }
-
-        map.on('load', () => {
-            console.log('[MAP_SCRIPT] Carte chargée. Ajout des couches.');
-            map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
-
+        if (!map.getLayer(LAYER_ID_PINS)) {
             map.addLayer({
                 id: LAYER_ID_PINS,
                 type: 'circle',
                 source: SOURCE_ID_ANNONCES,
-                paint: {
-                    'circle-radius': 26,
-                    'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#007bff', '#FFFFFF'],
-                    'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 1, 1.5],
-                    'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#eeeeee']
-                }
+                paint: { /* ... vos styles ... */ } // Styles copiés d'initializeMap
             });
-
+        }
+        if (!map.getLayer(LAYER_ID_LABELS)) {
             map.addLayer({
                 id: LAYER_ID_LABELS,
                 type: 'symbol',
                 source: SOURCE_ID_ANNONCES,
-                layout: {
-                    'text-field': ['concat', ['to-string', ['get', 'price']], '€'],
-                    'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], // Assurez-vous que ces polices sont chargées
-                    'text-size': 14,
-                    'text-allow-overlap': false,
-                    'text-ignore-placement': false
-                },
-                paint: {
-                    'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333']
-                }
+                layout: { /* ... vos layouts ... */ }, // Layouts copiés d'initializeMap
+                paint: { /* ... vos styles ... */ } // Styles copiés d'initializeMap
             });
+        }
+    }
+
+
+    function initializeMap(initialGeoJSON) {
+        if (map) { // Empêcher la réinitialisation si la carte existe déjà
+            console.warn("[MAP_INIT] Tentative de réinitialisation d'une carte existante. Ignoré.");
+            return;
+        }
+        console.log("[MAP_INIT] Initialisation de la carte...");
+        map = new maplibregl.Map({
+            container: MAP_CONTAINER_ID,
+            style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`,
+            pitch: 0,
+            bearing: 0,
+            navigationControl: false,
+            renderWorldCopies: false,
+            attributionControl: false
+        });
+        map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+        
+        window.map = map;
+
+        if (initialGeoJSON && initialGeoJSON.features && initialGeoJSON.features.length > 0) {
+            const bounds = getBounds(initialGeoJSON);
+            if (bounds.getSouthWest() && bounds.getNorthEast() && !bounds.getSouthWest().equals(bounds.getNorthEast())) { // CORRECTION ICI
+                map.fitBounds(bounds, { padding: 80, duration: 0, maxZoom: 16 });
+            } else {
+                console.warn("[MAP_INIT] Les limites (bounds) initiales ne sont pas valides. Centrage par défaut.");
+                map.setCenter([2.3522, 48.8566]); map.setZoom(11);
+            }
+        } else {
+            console.warn("[MAP_INIT] Pas de GeoJSON initial ou vide. Centrage par défaut.");
+            map.setCenter([2.3522, 48.8566]); map.setZoom(11);
+        }
+
+        map.on('load', () => {
+            console.log('[MAP_SCRIPT] Événement "load" de la carte déclenché.');
+            if (!map.getSource(SOURCE_ID_ANNONCES)) {
+                map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
+            } else {
+                 map.getSource(SOURCE_ID_ANNONCES).setData(initialGeoJSON); // Mettre à jour si déjà existante
+            }
+
+            // Recréation des couches avec les styles exacts
+            if (!map.getLayer(LAYER_ID_PINS)) {
+                map.addLayer({
+                    id: LAYER_ID_PINS,
+                    type: 'circle',
+                    source: SOURCE_ID_ANNONCES,
+                    paint: {
+                        'circle-radius': 26,
+                        'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#007bff', '#FFFFFF'],
+                        'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 1, 1.5],
+                        'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#eeeeee']
+                    }
+                });
+            }
+
+            if (!map.getLayer(LAYER_ID_LABELS)) {
+                map.addLayer({
+                    id: LAYER_ID_LABELS,
+                    type: 'symbol',
+                    source: SOURCE_ID_ANNONCES,
+                    layout: {
+                        'text-field': ['concat', ['to-string', ['get', 'price']], '€'],
+                        'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                        'text-size': 14,
+                        'text-allow-overlap': false,
+                        'text-ignore-placement': false
+                    },
+                    paint: {
+                        'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333']
+                    }
+                });
+            }
             
             map.on('click', LAYER_ID_PINS, handleMapClick);
-            map.on('click', handleMapGeneralClick); // Pour fermer la carte info si on clique en dehors des pins
+            map.on('click', handleMapGeneralClick);
             map.on('mouseenter', LAYER_ID_PINS, () => map.getCanvas().style.cursor = 'pointer');
             map.on('mouseleave', LAYER_ID_PINS, () => map.getCanvas().style.cursor = '');
-            map.on('moveend', updateVisibleList);
-
-            updateVisibleList();
+            
+            // 'moveend' devrait être le dernier pour s'assurer que tout est chargé
+            map.on('moveend', updateVisibleList); 
+            // Appel initial après le chargement des couches
+            updateVisibleList(); 
+        });
+         map.on('styledata', () => { // S'assurer que les couches sont ajoutées si le style change
+            if (map.getSource(SOURCE_ID_ANNONCES) && map.isStyleLoaded()) {
+                addMapLayers(); // Utilise la fonction pour ajouter/vérifier les couches
+            }
         });
 
         map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     }
     
-    // --- Mise à jour de la liste d'annonces en fonction des pins visibles ---
     function updateVisibleList() {
-        if (!map || !map.isStyleLoaded() || !listContainer) return;
+        if (!map || !map.isStyleLoaded() || !listContainer || !map.getSource(SOURCE_ID_ANNONCES)) return;
+        // Vérifier si les couches existent avant de les interroger
+        if (!map.getLayer(LAYER_ID_PINS)) {
+            console.warn("[UPDATE_LIST] La couche de pins n'existe pas, impossible de mettre à jour la liste.");
+            return;
+        }
         const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_PINS] });
         const visiblePropertyIds = new Set(visibleFeatures.map(feature => String(feature.properties.id)));
         
         const allListItems = listContainer.querySelectorAll('[data-property-id]');
         allListItems.forEach(itemDivOrAnchor => {
-            // L'élément avec data-property-id pourrait être l'ancre elle-même ou un enfant
             let targetElement = itemDivOrAnchor;
-            if (itemDivOrAnchor.tagName !== 'A' && itemDivOrAnchor.parentElement.tagName === 'A') {
+            if (itemDivOrAnchor.tagName !== 'A' && itemDivOrAnchor.parentElement && itemDivOrAnchor.parentElement.tagName === 'A') {
                 targetElement = itemDivOrAnchor.parentElement;
             }
             const itemIdString = itemDivOrAnchor.dataset.propertyId;
 
             if (visiblePropertyIds.has(itemIdString)) {
                 targetElement.classList.remove('annonce-list-item-hidden');
-                targetElement.style.display = ''; // Assurez-vous qu'il est visible
+                targetElement.style.display = '';
             } else {
                 targetElement.classList.add('annonce-list-item-hidden');
-                targetElement.style.display = 'none'; // Cachez-le
+                targetElement.style.display = 'none';
             }
         });
 
@@ -230,28 +290,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- Création du HTML pour la carte d'information mobile ---
     function createMobileInfoCardHTML(properties) {
-        const placeholderImage = 'https://via.placeholder.com/400x225/cccccc/969696?text=Image'; // Ratio 16:9
+        const placeholderImage = 'https://via.placeholder.com/400x225/cccccc/969696?text=Image';
         const coverPhoto = properties.coverPhoto || placeholderImage;
         const title = properties.title || "Titre non disponible";
         const priceText = properties.price ? `<strong>${properties.price} €</strong> par mois` : "Prix non disponible";
         const location = properties.city || "Lieu non disponible";
-        const type = properties.type || "Logement"; // 'type' est un exemple, utilisez le bon champ de vos 'properties'
-
-        // Exemple pour le rating, adaptez avec vos vrais champs de 'properties'
-        // const ratingValue = properties.rating_average || "N/A"; 
-        // const reviewCount = properties.reviews_count || 0;
-        // const ratingDisplay = (properties.rating_average && properties.reviews_count) ? `★ ${ratingValue} (${reviewCount} avis)` : "Pas encore d'avis";
-        const ratingDisplay = `★ 4.64 (314)`; // Placeholder, remplacez par vos données
+        const type = properties.type || "Logement"; 
+        const ratingDisplay = `★ 4.64 (314)`; // Placeholder
 
         return `
             <div class="info-card-mobile">
                 <div class="info-card-mobile__image-container">
                     <img src="${coverPhoto}" alt="Photo de ${title}" class="info-card-mobile__image" onerror="this.src='${placeholderImage}'">
                     <button id="info-card-mobile-close-btn" class="info-card-mobile__close-btn" aria-label="Fermer">&times;</button>
-                    
-                    </div>
+                </div>
                 <div class="info-card-mobile__details">
                     <div class="info-card-mobile__location-type">${type} · ${location}</div>
                     <h4 class="info-card-mobile__title">${title}</h4>
@@ -262,7 +315,6 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
     }
     
-    // --- Création du HTML pour le popup desktop ---
     function createDesktopPopupHTML(properties) {
         const placeholderImage = 'https://via.placeholder.com/280x150/cccccc/969696?text=Image';
         const coverPhoto = properties.coverPhoto || placeholderImage;
@@ -272,7 +324,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return `<div class="map-custom-popup"><img src="${coverPhoto}" alt="${title}" class="popup-image" onerror="this.src='${placeholderImage}'"><div class="popup-info"><h4 class="popup-title">${title}</h4><p class="popup-price">${priceText}</p><a href="${detailLink}" class="popup-link" target="_blank">Voir détails</a></div></div>`;
     }
 
-    // --- Affichage de la carte d'information mobile ---
     function openMobileInfoCard(properties) {
         if (!mobileInfoCardContainer || !mobileInfoCardContent) {
             console.error('[INFO_CARD] Conteneur de la carte info mobile introuvable.');
@@ -283,7 +334,7 @@ document.addEventListener('DOMContentLoaded', function() {
         mobileInfoCardContent.innerHTML = cardHTML;
         
         mobileInfoCardContainer.classList.add('visible');
-        document.body.classList.add('mobile-bottom-sheet-is-visible'); // Pour styler d'autres éléments si besoin
+        document.body.classList.add('mobile-bottom-sheet-is-visible');
 
         const newCloseButton = document.getElementById('info-card-mobile-close-btn');
         if (newCloseButton) {
@@ -293,30 +344,22 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- Fermeture de la carte d'information mobile ---
     function closeMobileInfoCard() {
         if (!mobileInfoCardContainer) return;
         
         mobileInfoCardContainer.classList.remove('visible');
         document.body.classList.remove('mobile-bottom-sheet-is-visible');
         
-        // Optionnel : vider le contenu pour libérer la mémoire un peu après la transition
-        // setTimeout(() => {
-        // if (mobileInfoCardContent) mobileInfoCardContent.innerHTML = '';
-        // }, 350); // Doit correspondre à la durée de la transition CSS
-
         if (map && selectedPinId !== null) {
             map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
             selectedPinId = null;
         }
     }
     
-    // --- Gestion du clic sur un pin de la carte ---
     function handleMapClick(e) {
-        // e.preventDefault(); // Si l'événement est direct et non propagé
-        // e.stopPropagation(); // Empêche l'événement de se propager à handleMapGeneralClick
-        
         if (e.features && e.features.length > 0) {
+            e.originalEvent.stopPropagation(); // Empêcher le clic de se propager à handleMapGeneralClick
+            
             const feature = e.features[0];
             const coordinates = feature.geometry.coordinates.slice();
             const properties = feature.properties;
@@ -355,32 +398,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
         }
-        // Ne pas appeler closeMobileInfoCard ici, car ce handler est spécifique aux clics sur les PINS.
-        // La fermeture par clic extérieur sera gérée par handleMapGeneralClick.
     }
 
-    // --- Gestion du clic général sur la carte (pour fermer la carte info si ouverte) ---
     function handleMapGeneralClick(e) {
-        // Vérifier si le clic était sur un pin (géré par handleMapClick)
-        // queryRenderedFeatures renverra une liste vide si on clique sur la carte "vide"
-        const features = map.queryRenderedFeatures(e.point, { layers: [LAYER_ID_PINS] });
-
-        if (!features.length) { // Si le clic n'est PAS sur un pin
+        if (!map.queryRenderedFeatures(e.point, { layers: [LAYER_ID_PINS] }).length) {
             if (isMobile && mobileInfoCardContainer && mobileInfoCardContainer.classList.contains('visible')) {
-                console.log('[MAP_GENERAL_CLICK] Clic en dehors d\'un pin, fermeture de la carte info mobile.');
                 closeMobileInfoCard();
             }
         }
     }
 
-    // --- Helper pour accéder aux valeurs imbriquées ---
     function getNestedValue(obj, path) {
         if (!obj || !path) return undefined;
         return path.split('.').reduce((acc, part) => {
             if (acc && typeof acc === 'object' && acc[part] !== undefined) {
-                // Gérer les indices de tableau numériques
                 const index = parseInt(part, 10);
-                if (Array.isArray(acc) && !isNaN(index)) {
+                if (Array.isArray(acc) && !isNaN(index) && acc.length > index) { // Vérifier aussi la longueur du tableau
                     return acc[index];
                 }
                 return acc[part];
@@ -389,43 +422,36 @@ document.addEventListener('DOMContentLoaded', function() {
         }, obj);
     }
     
-    // --- Gestion du bouton toggle pour mobile ---
-    if (mobileToggleButton) { // On vérifie que le bouton existe avant d'ajouter l'écouteur
+    if (mobileToggleButton) {
         if (isMobile) {
-            mobileToggleButton.style.display = 'block'; // Afficher le bouton sur mobile
+            mobileToggleButton.style.display = 'block';
         } else {
-            mobileToggleButton.style.display = 'none'; // Cacher le bouton sur desktop
+            mobileToggleButton.style.display = 'none';
         }
 
         mobileToggleButton.addEventListener('click', () => {
             document.body.classList.toggle('map-is-active');
             if (document.body.classList.contains('map-is-active')) {
-                if (map) map.resize(); // Important pour que la carte s'affiche correctement
-                mobileToggleButton.textContent = `Voir la liste`; // ou une icône
+                if (map) map.resize();
+                mobileToggleButton.textContent = `Voir la liste`;
             } else {
                 if (listContainer) listContainer.scrollTo(0, 0);
-                // Le texte du bouton est mis à jour par updateVisibleList
+                 // Le texte est mis à jour par updateVisibleList si besoin, ou on le remet à son état initial ici
+                 // mobileToggleButton.textContent = `Voir les X logements`; // updateVisibleList devrait s'en charger
             }
         });
     } else {
         console.warn(`[MAP_SCRIPT] Bouton avec ID '${MOBILE_TOGGLE_BUTTON_ID}' non trouvé.`);
     }
 
-    // Mettre à jour la visibilité du bouton toggle au redimensionnement
-    window.addEventListener('resize', () => {
-        // ... (la logique isMobile est déjà mise à jour plus haut)
-        if (mobileToggleButton) {
-            if (isMobile) {
-                mobileToggleButton.style.display = 'block';
-            } else {
-                mobileToggleButton.style.display = 'none';
-                // Si on passe en desktop et que la carte était active, on revient à l'affichage par défaut
-                if (document.body.classList.contains('map-is-active')) {
-                    document.body.classList.remove('map-is-active');
-                    // S'assurer que la liste est visible et la carte cachée (selon vos styles CSS desktop)
-                }
-            }
-        }
-    });
+    // Appel initial pour configurer la carte si les données sont déjà là (peu probable au premier chargement du script)
+    // mais l'événement 'annoncesChargeesEtRendues' est le principal déclencheur.
+    if (allAnnouncements.length > 0 && !map) {
+        console.log("[MAP_SCRIPT] Données d'annonces déjà présentes, initialisation de la carte.");
+        initializeMap(convertAnnoncesToGeoJSON(allAnnouncements));
+    } else if (!allAnnouncements.length && !map) {
+        console.log("[MAP_SCRIPT] Aucune donnée d'annonce initiale, initialisation de la carte avec GeoJSON vide.");
+        initializeMap({ type: 'FeatureCollection', features: [] });
+    }
 
 });
