@@ -267,7 +267,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const mobileToggleButton = document.getElementById(MOBILE_TOGGLE_BUTTON_ID);
         if (mobileToggleButton) mobileToggleButton.style.display = isMobile ? 'block' : 'none';
         
-        // Gérer le basculement entre les popups/cartes lors du redimensionnement
         if (isMobile && currentPopup) {
             currentPopup.remove();
             currentPopup = null;
@@ -281,7 +280,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('annoncesChargeesEtRendues', (event) => {
         const annonces = event.detail.annonces || [];
         console.log(`[EVENT] ${annonces.length} annonces reçues.`);
-        const geojsonData = convertAnnoncesToGeoJSON(annonces); // APPEL SÛR ICI
+        const geojsonData = convertAnnoncesToGeoJSON(annonces);
 
         if (!map) {
             initializeMap(geojsonData);
@@ -309,5 +308,4 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-
 });
