@@ -183,7 +183,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (properties.rooms) details.push(`${properties.rooms} pièces`);
         if (properties.bedrooms) details.push(`${properties.bedrooms} chambres`);
         if (properties.area) details.push(`${properties.area}m²`);
-        const descriptionHTML = details.length > 0 ? `<p class="popup-description">${details.join(' • ')}</p>` : '';
+        const descriptionHTML = details.length > 0 ? `<p class="popup-description">${details.join(' · ')}</p>` : '';
 
         // 3. Construire le prix avec le texte "par mois CC" stylisable
         const priceHTML = `<p class="popup-price">${properties.price || '?'}€ <span class="popup-price-period">par mois CC</span></p>`;
