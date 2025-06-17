@@ -1,51 +1,60 @@
-// map-listings.js - VERSION MODIFIÉE SANS BUILDINGS-3D
+// map-listings.js - VERSION MODIFIÉE AVEC BOTTOM SHEET MOBILE
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V11] Suppression de buildings-3d-layer.'); // Versionning
+    console.log('[MAP_SCRIPT V12] Intégration de la bottom sheet mobile.'); // Versionning
 
-    const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL'; // Reste inchangé
-    const MAP_CONTAINER_ID = 'map-section'; // Reste inchangé
-    const LIST_CONTAINER_ID = 'annonces-wrapper'; // Reste inchangé
-    const MOBILE_TOGGLE_BUTTON_ID = 'mobile-map-toggle'; // Reste inchangé
-    const SOURCE_ID_ANNONCES = 'annonces-source'; // Reste inchangé
-    const LAYER_ID_PINS = 'annonces-pins-layer'; // Reste inchangé
-    const LAYER_ID_LABELS = 'annonces-labels-layer'; // Reste inchangé
+    const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL'; 
+    const MAP_CONTAINER_ID = 'map-section'; 
+    const LIST_CONTAINER_ID = 'annonces-wrapper'; 
+    const MOBILE_TOGGLE_BUTTON_ID = 'mobile-map-toggle'; 
+    const SOURCE_ID_ANNONCES = 'annonces-source'; 
+    const LAYER_ID_PINS = 'annonces-pins-layer'; 
+    const LAYER_ID_LABELS = 'annonces-labels-layer'; 
 
-    // SUPPRESSION DES CONSTANTES LIÉES AUX BÂTIMENTS 3D
-    // const SOURCE_NAME_BUILDINGS = 'maptiler_planet';
-    // const SOURCE_LAYER_NAME_BUILDINGS = 'building';
-    // const LAYER_ID_BUILDINGS_3D = 'buildings-3d-layer';
+    const listContainer = document.getElementById(LIST_CONTAINER_ID); 
+    const mobileToggleButton = document.getElementById(MOBILE_TOGGLE_BUTTON_ID); 
 
-    const listContainer = document.getElementById(LIST_CONTAINER_ID); // Reste inchangé
-    const mobileToggleButton = document.getElementById(MOBILE_TOGGLE_BUTTON_ID); // Reste inchangé
+    let map = null; 
+    let allAnnouncements = []; 
+    let isMobile = window.innerWidth < 768; 
+    let currentPopup = null; 
+    let selectedPinId = null; 
 
-    let map = null; // Reste inchangé
-    let allAnnouncements = []; // Reste inchangé
-    let isMobile = window.innerWidth < 768; // Reste inchangé
-    let currentPopup = null; // Reste inchangé
-    let selectedPinId = null; // Reste inchangé
-    // SUPPRESSION DE LA VARIABLE LIÉE AUX BÂTIMENTS 3D
-    // let currentHighlightedBuildingIds = new Set();
+    // NOUVEAU : Références aux éléments de la Bottom Sheet
+    const mobileBottomSheet = document.getElementById('mobile-bottom-sheet'); 
+    const mobileBottomSheetContent = document.getElementById('mobile-bottom-sheet-content'); 
+    const bottomSheetCloseButton = document.getElementById('bottom-sheet-close-button'); 
 
-    const mobileBottomSheet = document.getElementById('mobile-bottom-sheet'); // Reste inchangé
-    const mobileBottomSheetContent = document.getElementById('mobile-bottom-sheet-content'); // Reste inchangé
-    const bottomSheetCloseButton = document.getElementById('bottom-sheet-close-button'); // Reste inchangé
-
-    window.addEventListener('resize', () => { // Reste inchangé
+    // MODIFIÉ : Le listener de redimensionnement gère maintenant aussi la bottom sheet
+    window.addEventListener('resize', () => { 
         isMobile = window.innerWidth < 768;
+        // Si on passe en mobile et qu'un popup desktop est ouvert, on le ferme
         if (isMobile && currentPopup) {
             currentPopup.remove();
             currentPopup = null;
         }
+        // Si on passe en desktop et que la bottom sheet mobile est ouverte, on la ferme
         if (!isMobile && mobileBottomSheet && mobileBottomSheet.classList.contains('visible')) {
             closeMobileBottomSheet();
         }
     });
 
-    if (bottomSheetCloseButton) { // Reste inchangé
+    // NOUVEAU : Écouteur pour le bouton de fermeture de la bottom sheet
+    if (bottomSheetCloseButton) { 
         bottomSheetCloseButton.addEventListener('click', closeMobileBottomSheet);
     }
+    
+    // NOUVEAU : Fermer la bottom sheet si on clique sur la carte en dehors d'un pin
+    function onMapBackgroundClick(e) {
+        // Cette condition vérifie si le clic a eu lieu sur la carte mais pas sur un pin
+        if (e.defaultPrevented === false) { // `handleMapClick` met `defaultPrevented` à true
+             if (isMobile && mobileBottomSheet && mobileBottomSheet.classList.contains('visible')) {
+                closeMobileBottomSheet();
+            }
+        }
+    }
 
-    document.addEventListener('annoncesChargeesEtRendues', (event) => { // Reste inchangé
+
+    document.addEventListener('annoncesChargeesEtRendues', (event) => { 
         const annonces = event.detail.annonces;
         if (!annonces || !Array.isArray(annonces)) return;
         
@@ -56,10 +65,6 @@ document.addEventListener('DOMContentLoaded', function() {
             initializeMap(geojsonData);
         } else {
             map.getSource(SOURCE_ID_ANNONCES).setData(geojsonData);
-            // SUPPRESSION DE L'APPEL A mettreAJourBatimentsSelectionnes
-            // if (map.isStyleLoaded()) {
-            //      mettreAJourBatimentsSelectionnes(allAnnouncements);
-            // }
             if (geojsonData.features.length > 0) {
                  const bounds = getBounds(geojsonData);
                  map.fitBounds(bounds, { padding: 80, maxZoom: 16 });
@@ -69,7 +74,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    function convertAnnoncesToGeoJSON(annonces) { // Reste inchangé
+    function convertAnnoncesToGeoJSON(annonces) { 
         const features = annonces.map(annonce => {
             const lat = getNestedValue(annonce, 'geo_location.data.lat');
             const lng = getNestedValue(annonce, 'geo_location.data.lng');
@@ -81,14 +86,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return { type: 'FeatureCollection', features };
     }
 
-    // SUPPRESSION DE LA FONCTION mettreAJourBatimentsSelectionnes
-    /*
-    async function mettreAJourBatimentsSelectionnes(annonces) {
-        // ... tout le contenu de la fonction est supprimé ...
-    }
-    */
-
-    function getBounds(geojson) { // Reste inchangé
+    function getBounds(geojson) { 
         const bounds = new maplibregl.LngLatBounds();
         geojson.features.forEach(feature => {
             bounds.extend(feature.geometry.coordinates);
@@ -96,12 +94,12 @@ document.addEventListener('DOMContentLoaded', function() {
         return bounds;
     }
 
-    function initializeMap(initialGeoJSON) { // Modifié
+    function initializeMap(initialGeoJSON) { 
         map = new maplibregl.Map({
             container: MAP_CONTAINER_ID,
             style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`,
-            pitch: 50, // Vous pouvez réduire à 0 si vous n'utilisez plus la 3D
-            bearing: -15, // Vous pouvez réduire à 0 si vous n'utilisez plus la 3D
+            pitch: 50, 
+            bearing: -15, 
             navigationControl: false,
             renderWorldCopies: false
         });
@@ -115,21 +113,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         map.on('load', () => {
-            console.log('[MAP_SCRIPT V11] Carte chargée. Ajout des couches (sans bâtiments 3D).');
+            console.log('[MAP_SCRIPT V12] Carte chargée.');
             map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
-
-            // SUPPRESSION DE L'AJOUT DE LA COUCHE LAYER_ID_BUILDINGS_3D
-            /*
-            const heightExpression = ['coalesce', ['get', 'height'], 20]; 
-            const minHeightExpression = ['coalesce', ['get', 'min_height'], 0];
-
-            map.addLayer({
-                'id': LAYER_ID_BUILDINGS_3D,
-                // ...
-            }, LAYER_ID_PINS); // Cette ligne causait l'erreur
-            */
             
-            // Ajout des couches Pins et Labels directement
             map.addLayer({
                 id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID_ANNONCES,
                 paint: { 'circle-radius': 26, 'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#007bff', '#FFFFFF'], 'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 1, 1.5], 'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#eeeeee'] }
@@ -141,19 +127,18 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             map.on('click', LAYER_ID_PINS, handleMapClick);
+            map.on('click', onMapBackgroundClick); // NOUVEAU : Listener de clic sur le fond de la carte
             map.on('mouseenter', LAYER_ID_PINS, () => map.getCanvas().style.cursor = 'pointer');
             map.on('mouseleave', LAYER_ID_PINS, () => map.getCanvas().style.cursor = '');
             map.on('moveend', updateVisibleList);
 
             updateVisibleList();
-            // SUPPRESSION DE L'APPEL A mettreAJourBatimentsSelectionnes
-            // mettreAJourBatimentsSelectionnes(allAnnouncements); 
         });
 
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
     
-    function updateVisibleList() { // Reste inchangé
+    function updateVisibleList() { 
         if (!map || !map.isStyleLoaded() || !listContainer) return;
         const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_PINS] });
         const visiblePropertyIds = new Set(visibleFeatures.map(feature => String(feature.properties.id)));
@@ -168,65 +153,90 @@ document.addEventListener('DOMContentLoaded', function() {
         if (isMobile && mobileToggleButton) { mobileToggleButton.textContent = `Voir les ${visiblePropertyIds.size} logements`; }
     }
 
-    function createPopupHTML(properties) { // Reste inchangé
+    function createPopupHTML(properties) {
+        // MODIFIÉ : Légère simplification pour fonctionner dans les deux contextes
         const placeholderImage = 'https://via.placeholder.com/280x150/cccccc/969696?text=Image';
         const coverPhoto = properties.coverPhoto || placeholderImage;
         const title = properties.title || "Titre non disponible";
         const priceText = `${properties.price || '?'} € / mois`;
         const detailLink = `annonce?id=${properties.id_str}`;
-        return `<div class="map-custom-popup"><img src="${coverPhoto}" alt="${title}" class="popup-image" onerror="this.src='${placeholderImage}'"><div class="popup-info"><h4 class="popup-title">${title}</h4><p class="popup-price">${priceText}</p><a href="${detailLink}" class="popup-link" target="_blank">Voir détails</a></div></div>`;
+        // La div englobante 'map-custom-popup' est ajoutée ici
+        return `<div class="map-custom-popup">
+                    <img src="${coverPhoto}" alt="${title}" class="popup-image" onerror="this.src='${placeholderImage}'">
+                    <div class="popup-info">
+                        <h4 class="popup-title">${title}</h4>
+                        <p class="popup-price">${priceText}</p>
+                        <a href="${detailLink}" class="popup-link" target="_blank">Voir détails</a>
+                    </div>
+                </div>`;
     }
     
-    function openMobileBottomSheet(properties) { // Reste inchangé
+    // NOUVEAU : Fonction pour ouvrir la bottom sheet sur mobile
+    function openMobileBottomSheet(properties) { 
         if (!mobileBottomSheet || !mobileBottomSheetContent) return;
         const contentHTML = createPopupHTML(properties);
         mobileBottomSheetContent.innerHTML = contentHTML;
         mobileBottomSheet.classList.add('visible');
     }
     
-    function closeMobileBottomSheet() { // Reste inchangé
+    // NOUVEAU : Fonction pour fermer la bottom sheet
+    function closeMobileBottomSheet() { 
         if (!mobileBottomSheet) return;
         mobileBottomSheet.classList.remove('visible');
+        // Vider le contenu après la fin de l'animation de fermeture
         setTimeout(() => {
             if (mobileBottomSheetContent) mobileBottomSheetContent.innerHTML = '';
-        }, 300); 
+        }, 300); // 300ms correspond à la durée de la transition CSS
+        
+        // Déselectionner le pin sur la carte
         if (map && selectedPinId !== null) {
             map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
             selectedPinId = null; 
         }
     }
     
-    function handleMapClick(e) { // Reste inchangé
+    // MODIFIÉ : La fonction de clic sur la carte gère maintenant les deux cas (desktop/mobile)
+    function handleMapClick(e) { 
+        e.preventDefault(); // Empêche le listener `onMapBackgroundClick` de se déclencher
         if (e.features && e.features.length > 0) {
             const feature = e.features[0];
             const coordinates = feature.geometry.coordinates.slice(); 
             const properties = feature.properties;
             const clickedPinId = feature.id;
 
+            // Gérer la déselection de l'ancien pin
             if (selectedPinId !== null && selectedPinId !== clickedPinId) {
                 map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
             }
+            // Sélectionner le nouveau pin
             map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: clickedPinId }, { selected: true });
             selectedPinId = clickedPinId; 
 
+            // LOGIQUE CONDITIONNELLE : MOBILE vs DESKTOP
             if (isMobile) {
+                // Sur mobile, on ferme le popup desktop s'il existe par hasard
                 if (currentPopup) {
                     currentPopup.remove();
                     currentPopup = null;
                 }
+                // Et on ouvre notre nouvelle bottom sheet
                 openMobileBottomSheet(properties);
+
             } else {
+                // Sur desktop, on ferme la bottom sheet si elle est ouverte
                 if (mobileBottomSheet && mobileBottomSheet.classList.contains('visible')) {
                     closeMobileBottomSheet(); 
                 }
+                // Et on utilise le popup classique
                 if (currentPopup) currentPopup.remove(); 
 
                 const popupHTML = createPopupHTML(properties);
-                currentPopup = new maplibregl.Popup({ offset: 10, closeButton: true, className: 'airbnb-style-popup' })
+                currentPopup = new maplibregl.Popup({ offset: 25, closeButton: true, className: 'airbnb-style-popup' })
                     .setLngLat(coordinates)
                     .setHTML(popupHTML)
                     .addTo(map);
 
+                // Gérer la fermeture du popup desktop
                 currentPopup.on('close', () => {
                     if (selectedPinId === clickedPinId) { 
                         map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
@@ -238,12 +248,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function getNestedValue(obj, path) { // Reste inchangé
+    function getNestedValue(obj, path) { 
         if (!path) return undefined;
         return path.split('.').reduce((acc, part) => (acc && acc[part] !== undefined) ? (isNaN(parseInt(part, 10)) ? acc[part] : acc[parseInt(part, 10)]) : undefined, obj);
     }
     
-    if (isMobile && mobileToggleButton) { // Reste inchangé
+    if (isMobile && mobileToggleButton) { 
         mobileToggleButton.addEventListener('click', () => {
             document.body.classList.toggle('map-is-active');
             if (document.body.classList.contains('map-is-active')) {
