@@ -1,25 +1,28 @@
 // map-listings.js - VERSION MODIFIÉE V16 (Gestion intelligente des pins)
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V16] Gestion intelligente des pins pour éviter la confusion.');
+    console.log('[MAP_SCRIPT V17.1] Correction des constantes de couches.');
 
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const MAP_CONTAINER_ID = 'map-section';
     const LIST_CONTAINER_ID = 'annonces-wrapper';
     const MOBILE_TOGGLE_BUTTON_ID = 'mobile-map-toggle';
     const SOURCE_ID_ANNONCES = 'annonces-source';
-    const LAYER_ID_PINS = 'annonces-pins-layer';
-    const LAYER_ID_LABELS = 'annonces-labels-layer';
-
-
+    
+    // =================================================================
+    // == CORRECTION : Déclaration des bonnes constantes pour les couches ==
+    // =================================================================
+    const LAYER_ID_DOTS = 'annonces-dots-layer';
+    const LAYER_ID_PRICES = 'annonces-prices-layer';
+    
     const listContainer = document.getElementById(LIST_CONTAINER_ID);
     const mobileToggleButton = document.getElementById(MOBILE_TOGGLE_BUTTON_ID);
 
-   let map = null;
+    let map = null;
     let allAnnouncements = [];
     let isMobile = window.innerWidth < 768;
     let currentPopup = null;
     let selectedPinId = null;
-    let hoverPopup = null; // NOUVEAU : Pour gérer le popup de survol
+    let hoverPopup = null;
 
     const mobileBottomSheet = document.getElementById('mobile-bottom-sheet');
     const mobileBottomSheetContent = document.getElementById('mobile-bottom-sheet-content');
@@ -54,12 +57,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // =================================================================================
-    // == SECTION ENTIÈREMENT NOUVELLE ET REFACTORISÉE POUR L'AFFICHAGE DE LA CARTE ==
-    // =================================================================================
-    
-    // NOUVEAU : Helper pour créer une icône de cercle pour MapLibre
-    // Cela nous permet de ne pas dépendre d'une image externe.
     const createCircleSdf = (size) => {
         const canvas = document.createElement('canvas');
         canvas.width = size;
@@ -72,7 +69,6 @@ document.addEventListener('DOMContentLoaded', function() {
         context.fill();
         return context.getImageData(0, 0, size, size);
     };
-
 
     function initializeMap(initialGeoJSON) {
         map = new maplibregl.Map({
@@ -89,13 +85,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         map.on('load', () => {
-            // NOUVEAU : On ajoute notre icône de cercle générée au style de la carte
             map.addImage('circle-background', createCircleSdf(64), { sdf: true });
-
             map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
             
-            // COUCHE 1 : LES PETITS POINTS (toujours visibles)
-            // Cette couche affiche un petit point pour CHAQUE annonce.
             map.addLayer({
                 id: LAYER_ID_DOTS,
                 type: 'circle',
@@ -108,21 +100,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
 
-            // COUCHE 2 : LES BULLES DE PRIX (atomiques)
-            // Cette couche tente d'afficher une icône de cercle ET un prix par-dessus la couche de points.
-            // Si elle ne peut pas (collision), elle ne s'affiche pas, laissant le point de la couche 1 visible.
             map.addLayer({
                 id: LAYER_ID_PRICES,
                 type: 'symbol',
                 source: SOURCE_ID_ANNONCES,
                 layout: {
-                    'icon-image': 'circle-background', // Utilise notre icône
+                    'icon-image': 'circle-background',
                     'icon-size': 0.9,
                     'text-field': ['concat', ['to-string', ['get', 'price']], '€'],
                     'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
                     'text-size': 14,
-                    'icon-allow-overlap': false, // Ne pas afficher l'icône si elle chevauche
-                    'text-allow-overlap': false, // Ne pas afficher le texte s'il chevauche
+                    'icon-allow-overlap': false,
+                    'text-allow-overlap': false,
                     'icon-anchor': 'center',
                     'text-anchor': 'center'
                 },
@@ -132,19 +121,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
 
-            // GESTION DU SURVOL (HOVER) SUR LES PETITS POINTS
             map.on('mouseenter', LAYER_ID_DOTS, (e) => {
                 if (e.features.length > 0) {
                     map.getCanvas().style.cursor = 'pointer';
                     const properties = e.features[0].properties;
                     const coordinates = e.features[0].geometry.coordinates.slice();
-
-                    // On crée un popup qui ressemble à nos bulles de prix
                     hoverPopup = new maplibregl.Popup({
-                        closeButton: false,
-                        offset: 10,
-                        anchor: 'bottom',
-                        className: 'hover-popup'
+                        closeButton: false, offset: 10, anchor: 'bottom', className: 'hover-popup'
                     })
                     .setLngLat(coordinates)
                     .setHTML(`<div class="hover-popup-content">${properties.price}€</div>`)
@@ -160,10 +143,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             
-            // GESTION DU CLIC (identique mais sur les deux couches)
             map.on('click', [LAYER_ID_DOTS, LAYER_ID_PRICES], handleMapClick);
 
-            // NOUVEAU : On attend que la carte soit "idle" pour la première synchro de la liste
             map.on('idle', () => {
                 updateVisibleList();
             });
@@ -175,10 +156,9 @@ document.addEventListener('DOMContentLoaded', function() {
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
 
-    // Le reste du fichier est quasi identique, j'ai juste retiré les fonctions devenues inutiles.
     function updateVisibleList() {
         if (!map || !map.isStyleLoaded() || !listContainer) return;
-        const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_DOTS] }); // On se base sur les points
+        const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_DOTS] });
         const visiblePropertyIds = new Set(visibleFeatures.map(feature => String(feature.properties.id)));
         const allListItems = listContainer.querySelectorAll('[data-property-id]');
         allListItems.forEach(itemDiv => {
@@ -198,7 +178,7 @@ document.addEventListener('DOMContentLoaded', function() {
             mobileToggleButton.textContent = `Voir les ${visiblePropertyIds.size} logements`;
         }
     }
-
+    
     function getBounds(geojson) {
         const bounds = new maplibregl.LngLatBounds();
         geojson.features.forEach(feature => {
