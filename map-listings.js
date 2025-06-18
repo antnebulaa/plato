@@ -1,6 +1,6 @@
-// map-listings.js - VERSION MODIFIÉE V13 (Easing + Contenu riche)
+// map-listings.js - VERSION MODIFIÉE V14 (Lien popup corrigé + Clic global)
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V13] Easing et contenu riche.');
+    console.log('[MAP_SCRIPT V14] Correction du lien de détail et popup cliquable.');
 
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const MAP_CONTAINER_ID = 'map-section';
@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const mobileToggleButton = document.getElementById(MOBILE_TOGGLE_BUTTON_ID);
 
     let map = null;
-    let allAnnouncements = [];
+    let allAnnouncements = []; // Cette variable est la clé pour notre solution
     let isMobile = window.innerWidth < 768;
     let currentPopup = null;
     let selectedPinId = null;
@@ -35,7 +35,10 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     if (bottomSheetCloseButton) {
-        bottomSheetCloseButton.addEventListener('click', closeMobileBottomSheet);
+        bottomSheetCloseButton.addEventListener('click', (e) => {
+            e.stopPropagation(); // Empêche le clic de se propager au lien derrière
+            closeMobileBottomSheet();
+        });
     }
     
     function onMapBackgroundClick(e) {
@@ -45,7 +48,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     }
-
 
     document.addEventListener('annoncesChargeesEtRendues', (event) => {
         const annonces = event.detail.annonces;
@@ -67,9 +69,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // ==================================================================
-    // == MODIFICATION 1 : AJOUT DE PLUS DE PROPRIÉTÉS POUR LE POPUP ==
-    // ==================================================================
     function convertAnnoncesToGeoJSON(annonces) {
         const features = annonces.map(annonce => {
             const lat = getNestedValue(annonce, 'geo_location.data.lat');
@@ -87,7 +86,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     id_str: String(annonce.id),
                     price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?',
                     coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url'),
-                    // NOUVEAUX CHAMPS AJOUTÉS
                     house_type: getNestedValue(annonce, 'house_type'),
                     city: getNestedValue(annonce, 'city'),
                     rooms: getNestedValue(annonce, 'rooms'),
@@ -127,23 +125,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         map.on('load', () => {
             map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
-            
-            map.addLayer({
-                id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID_ANNONCES,
-                paint: { 'circle-radius': 26, 'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#007bff', '#FFFFFF'], 'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 1, 1.5], 'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#eeeeee'] }
-            });
-            map.addLayer({
-                id: LAYER_ID_LABELS, type: 'symbol', source: SOURCE_ID_ANNONCES,
-                layout: { 'text-field': ['concat', ['to-string', ['get', 'price']], '€'],'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14, 'text-allow-overlap': false },
-                paint: { 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] }
-            });
-            
+            map.addLayer({ id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID_ANNONCES, paint: { 'circle-radius': 26, 'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#007bff', '#FFFFFF'], 'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 1, 1.5], 'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#eeeeee'] } });
+            map.addLayer({ id: LAYER_ID_LABELS, type: 'symbol', source: SOURCE_ID_ANNONCES, layout: { 'text-field': ['concat', ['to-string', ['get', 'price']], '€'],'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14, 'text-allow-overlap': false }, paint: { 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] } });
             map.on('click', LAYER_ID_PINS, handleMapClick);
             map.on('click', onMapBackgroundClick);
             map.on('mouseenter', LAYER_ID_PINS, () => map.getCanvas().style.cursor = 'pointer');
             map.on('mouseleave', LAYER_ID_PINS, () => map.getCanvas().style.cursor = '');
             map.on('moveend', updateVisibleList);
-
             updateVisibleList();
         });
 
@@ -166,41 +154,34 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ================================================================
-    // == MODIFICATION 2 : GÉNÉRATION DU NOUVEAU CONTENU DYNAMIQUE ==
+    // == MODIFICATION 1 : LA CARTE EST MAINTENANT UN LIEN GLOBAL ==
     // ================================================================
     function createPopupHTML(properties) {
         const placeholderImage = 'https://via.placeholder.com/280x150/cccccc/969696?text=Image';
         const coverPhoto = properties.coverPhoto || placeholderImage;
-
-        // 1. Construire le titre dynamique
         const houseTypeRaw = properties.house_type || 'Logement';
         const houseType = houseTypeRaw.charAt(0).toUpperCase() + houseTypeRaw.slice(1);
         const city = properties.city || 'localité non précisée';
         const title = `${houseType} à ${city}`;
-
-        // 2. Construire la description dynamique (uniquement avec les données disponibles)
         const details = [];
         if (properties.rooms) details.push(`${properties.rooms} pièces`);
         if (properties.bedrooms) details.push(`${properties.bedrooms} chambres`);
         if (properties.area) details.push(`${properties.area}m²`);
         const descriptionHTML = details.length > 0 ? `<p class="popup-description">${details.join(' · ')}</p>` : '';
-
-        // 3. Construire le prix avec le texte "par mois CC" stylisable
         const priceHTML = `<p class="popup-price">${properties.price || '?'}€ <span class="popup-price-period">par mois CC</span></p>`;
-        
-        // 4. Lien vers la page de détails
         const detailLink = `annonce?id=${properties.id_str}`;
 
-        // 5. Assembler le HTML final
-        return `<div class="map-custom-popup">
-                    <img src="${coverPhoto}" alt="${title}" class="popup-image" onerror="this.src='${placeholderImage}'">
-                    <div class="popup-info">
-                        <h4 class="popup-title">${title}</h4>
-                        ${descriptionHTML}
-                        ${priceHTML}
-                        <a href="${detailLink}" class="popup-link" target="_blank">Voir détails</a>
+        // On enveloppe tout dans une balise <a> et on supprime le lien "Voir détails"
+        return `<a href="${detailLink}" class="popup-container-link">
+                    <div class="map-custom-popup">
+                        <img src="${coverPhoto}" alt="${title}" class="popup-image" onerror="this.src='${placeholderImage}'">
+                        <div class="popup-info">
+                            <h4 class="popup-title">${title}</h4>
+                            ${descriptionHTML}
+                            ${priceHTML}
+                        </div>
                     </div>
-                </div>`;
+                </a>`;
     }
     
     function openMobileBottomSheet(properties) {
@@ -213,16 +194,16 @@ document.addEventListener('DOMContentLoaded', function() {
     function closeMobileBottomSheet() {
         if (!mobileBottomSheet) return;
         mobileBottomSheet.classList.remove('visible');
-        setTimeout(() => {
-            if (mobileBottomSheetContent) mobileBottomSheetContent.innerHTML = '';
-        }, 350); // Doit correspondre à la durée de la transition CSS
-        
+        setTimeout(() => { if (mobileBottomSheetContent) mobileBottomSheetContent.innerHTML = ''; }, 200);
         if (map && selectedPinId !== null) {
             map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
             selectedPinId = null; 
         }
     }
     
+    // ======================================================================================
+    // == MODIFICATION 2 : ON STOCKE LES DONNÉES DE L'ANNONCE AVANT D'AFFICHER LE POPUP ==
+    // ======================================================================================
     function handleMapClick(e) {
         e.preventDefault();
         if (e.features && e.features.length > 0) {
@@ -230,6 +211,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const coordinates = feature.geometry.coordinates.slice(); 
             const properties = feature.properties;
             const clickedPinId = feature.id;
+
+            // --- C'EST LA CORRECTION MAGIQUE ---
+            // On retrouve l'annonce complète dans notre tableau `allAnnouncements`
+            const fullAnnonceData = allAnnouncements.find(annonce => annonce.id === clickedPinId);
+            if (fullAnnonceData) {
+                // On la stocke dans le sessionStorage, comme le fait sûrement votre liste de gauche
+                sessionStorage.setItem('selected_property_details', JSON.stringify(fullAnnonceData));
+                console.log(`[MAP_SCRIPT V14] Données de l'annonce ${clickedPinId} stockées dans sessionStorage.`);
+            }
+            // --- FIN DE LA CORRECTION ---
 
             if (selectedPinId !== null && selectedPinId !== clickedPinId) {
                 map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
