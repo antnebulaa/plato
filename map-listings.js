@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 properties: {
                     id: featureId,
                     id_str: String(annonce.id),
-                    price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?',
+                    price: getNestedValue(annonce, '_property_lease_of_property.0.loyer_cc') || '?',
                     coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url'),
                     house_type: getNestedValue(annonce, 'house_type'),
                     city: getNestedValue(annonce, 'city'),
