@@ -1,6 +1,6 @@
-// map-listings.js - VERSION 19 (Correction finale du clic)
+// map-listings.js - VERSION 20 (Retour à la logique de clic fiable de la v13)
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V19] Correction du clic et simplification de la logique.');
+    console.log('[MAP_SCRIPT V20] Retour à la logique de clic fiable avec popup sur desktop.');
 
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const MAP_CONTAINER_ID = 'map-section';
@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let map = null;
     let allAnnouncements = [];
     let isMobile = window.innerWidth < 768;
+    let currentPopup = null; // Réintroduction de la variable pour le popup desktop
     let selectedPinId = null;
     let hoverPopup = null;
 
@@ -25,6 +26,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.addEventListener('resize', () => {
         isMobile = window.innerWidth < 768;
+        if (isMobile && currentPopup) { currentPopup.remove(); currentPopup = null; }
+        if (!isMobile && mobileBottomSheet && mobileBottomSheet.classList.contains('visible')) { closeMobileBottomSheet(); }
     });
 
     if (bottomSheetCloseButton) {
@@ -88,10 +91,11 @@ document.addEventListener('DOMContentLoaded', function() {
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
 
-    // =================================================================================
-    // == CORRECTION MAJEURE : Simplification et fiabilisation du clic ==
-    // =================================================================================
+    // =================================================================
+    // == CORRECTION : RESTAURATION DE LA LOGIQUE DE CLIC DE LA V13 ==
+    // =================================================================
     function handleMapClick(e) {
+        // On ne met PAS e.preventDefault() ici pour ne pas bloquer les clics sur les liens
         if (hoverPopup) {
             hoverPopup.remove();
             hoverPopup = null;
@@ -102,29 +106,38 @@ document.addEventListener('DOMContentLoaded', function() {
             const properties = feature.properties;
             const clickedPinId = feature.id;
 
-            // On s'assure que les données sont prêtes pour la page de détail
             const fullAnnonceData = allAnnouncements.find(annonce => annonce.id === clickedPinId);
             if (fullAnnonceData) {
                 sessionStorage.setItem('selected_property_details', JSON.stringify(fullAnnonceData));
             }
 
-            // On met le pin en noir pour le feedback visuel
-            if (selectedPinId !== null) {
+            if (selectedPinId !== null && selectedPinId !== clickedPinId) {
                 map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
             }
             map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: clickedPinId }, { selected: true });
             selectedPinId = clickedPinId;
 
-            // SI ON EST SUR MOBILE : on affiche la bottom sheet
             if (isMobile) {
                 openMobileBottomSheet(properties);
-            } 
-            // SI ON EST SUR DESKTOP : on navigue directement
-            else {
-                // On attend un instant pour que l'utilisateur voie le pin devenir noir
-                setTimeout(() => {
-                    window.location.href = `annonce?id=${properties.id_str}`;
-                }, 100); // 100ms de délai
+            } else {
+                // RETOUR À LA LOGIQUE QUI FONCTIONNE : CRÉER UN POPUP
+                if (currentPopup) {
+                    currentPopup.remove();
+                }
+                const popupHTML = createPopupHTML(properties);
+                currentPopup = new maplibregl.Popup({ offset: 25, closeButton: true, className: 'airbnb-style-popup' })
+                    .setLngLat(feature.geometry.coordinates.slice())
+                    .setHTML(popupHTML)
+                    .addTo(map);
+
+                // Gérer la déselection quand on ferme le popup avec la croix
+                currentPopup.on('close', () => {
+                    if (selectedPinId === clickedPinId) {
+                        map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
+                        selectedPinId = null;
+                    }
+                    currentPopup = null;
+                });
             }
         }
     }
