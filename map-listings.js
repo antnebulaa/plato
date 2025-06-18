@@ -1,6 +1,6 @@
-// map-listings.js - VERSION MODIFIÉE V14 (Lien popup corrigé + Clic global)
+// map-listings.js - VERSION MODIFIÉE V15 (Correction de la source des coordonnées)
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V14] Correction du lien de détail et popup cliquable.');
+    console.log('[MAP_SCRIPT V15] Correction de la source des coordonnées géographiques.');
 
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const MAP_CONTAINER_ID = 'map-section';
@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const mobileToggleButton = document.getElementById(MOBILE_TOGGLE_BUTTON_ID);
 
     let map = null;
-    let allAnnouncements = []; // Cette variable est la clé pour notre solution
+    let allAnnouncements = [];
     let isMobile = window.innerWidth < 768;
     let currentPopup = null;
     let selectedPinId = null;
@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (bottomSheetCloseButton) {
         bottomSheetCloseButton.addEventListener('click', (e) => {
-            e.stopPropagation(); // Empêche le clic de se propager au lien derrière
+            e.stopPropagation();
             closeMobileBottomSheet();
         });
     }
@@ -69,10 +69,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // ======================================================================================
+    // == CORRECTION : On utilise `latitude` et `longitude` comme dans home-form-display-v4.js ==
+    // ======================================================================================
     function convertAnnoncesToGeoJSON(annonces) {
         const features = annonces.map(annonce => {
-            const lat = getNestedValue(annonce, 'geo_location.data.lat');
-            const lng = getNestedValue(annonce, 'geo_location.data.lng');
+            // On utilise maintenant le bon chemin pour les coordonnées
+            const lat = getNestedValue(annonce, 'latitude');
+            const lng = getNestedValue(annonce, 'longitude');
+            
             if (annonce.id === undefined || annonce.id === null || lat === undefined || lng === undefined) return null;
             let featureId = parseInt(annonce.id, 10);
             if (isNaN(featureId)) return null;
@@ -134,7 +139,6 @@ document.addEventListener('DOMContentLoaded', function() {
             map.on('moveend', updateVisibleList);
             updateVisibleList();
         });
-
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
     
@@ -153,9 +157,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (isMobile && mobileToggleButton) { mobileToggleButton.textContent = `Voir les ${visiblePropertyIds.size} logements`; }
     }
 
-    // ================================================================
-    // == MODIFICATION 1 : LA CARTE EST MAINTENANT UN LIEN GLOBAL ==
-    // ================================================================
     function createPopupHTML(properties) {
         const placeholderImage = 'https://via.placeholder.com/280x150/cccccc/969696?text=Image';
         const coverPhoto = properties.coverPhoto || placeholderImage;
@@ -167,11 +168,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (properties.rooms) details.push(`${properties.rooms} pièces`);
         if (properties.bedrooms) details.push(`${properties.bedrooms} chambres`);
         if (properties.area) details.push(`${properties.area}m²`);
-        const descriptionHTML = details.length > 0 ? `<p class="popup-description">${details.join(' · ')}</p>` : '';
+        const descriptionHTML = details.length > 0 ? `<p class="popup-description">${details.join(' • ')}</p>` : '';
         const priceHTML = `<p class="popup-price">${properties.price || '?'}€ <span class="popup-price-period">par mois CC</span></p>`;
         const detailLink = `annonce?id=${properties.id_str}`;
 
-        // On enveloppe tout dans une balise <a> et on supprime le lien "Voir détails"
         return `<a href="${detailLink}" class="popup-container-link">
                     <div class="map-custom-popup">
                         <img src="${coverPhoto}" alt="${title}" class="popup-image" onerror="this.src='${placeholderImage}'">
@@ -194,16 +194,13 @@ document.addEventListener('DOMContentLoaded', function() {
     function closeMobileBottomSheet() {
         if (!mobileBottomSheet) return;
         mobileBottomSheet.classList.remove('visible');
-        setTimeout(() => { if (mobileBottomSheetContent) mobileBottomSheetContent.innerHTML = ''; }, 200);
+        setTimeout(() => { if (mobileBottomSheetContent) mobileBottomSheetContent.innerHTML = ''; }, 350);
         if (map && selectedPinId !== null) {
             map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
             selectedPinId = null; 
         }
     }
     
-    // ======================================================================================
-    // == MODIFICATION 2 : ON STOCKE LES DONNÉES DE L'ANNONCE AVANT D'AFFICHER LE POPUP ==
-    // ======================================================================================
     function handleMapClick(e) {
         e.preventDefault();
         if (e.features && e.features.length > 0) {
@@ -212,16 +209,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const properties = feature.properties;
             const clickedPinId = feature.id;
 
-            // --- C'EST LA CORRECTION MAGIQUE ---
-            // On retrouve l'annonce complète dans notre tableau `allAnnouncements`
-            const fullAnnonceData = allAnnouncements.find(annonce => annonce.id === clickedPinId);
-            if (fullAnnonceData) {
-                // On la stocke dans le sessionStorage, comme le fait sûrement votre liste de gauche
-                sessionStorage.setItem('selected_property_details', JSON.stringify(fullAnnonceData));
-                console.log(`[MAP_SCRIPT V14] Données de l'annonce ${clickedPinId} stockées dans sessionStorage.`);
-            }
-            // --- FIN DE LA CORRECTION ---
-
+            // La logique de stockage que j'avais mise est retirée car non pertinente
+            
             if (selectedPinId !== null && selectedPinId !== clickedPinId) {
                 map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
             }
@@ -234,13 +223,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     currentPopup = null;
                 }
                 openMobileBottomSheet(properties);
-
             } else {
                 if (mobileBottomSheet && mobileBottomSheet.classList.contains('visible')) {
                     closeMobileBottomSheet(); 
                 }
                 if (currentPopup) currentPopup.remove(); 
-
                 const popupHTML = createPopupHTML(properties);
                 currentPopup = new maplibregl.Popup({ offset: 25, closeButton: true, className: 'airbnb-style-popup' })
                     .setLngLat(coordinates)
