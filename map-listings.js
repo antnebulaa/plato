@@ -14,11 +14,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const listContainer = document.getElementById(LIST_CONTAINER_ID);
     const mobileToggleButton = document.getElementById(MOBILE_TOGGLE_BUTTON_ID);
 
-    let map = null;
+   let map = null;
     let allAnnouncements = [];
     let isMobile = window.innerWidth < 768;
     let currentPopup = null;
     let selectedPinId = null;
+    let hoverPopup = null; // NOUVEAU : Pour gérer le popup de survol
 
     const mobileBottomSheet = document.getElementById('mobile-bottom-sheet');
     const mobileBottomSheetContent = document.getElementById('mobile-bottom-sheet-content');
@@ -26,34 +27,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.addEventListener('resize', () => {
         isMobile = window.innerWidth < 768;
-        if (isMobile && currentPopup) {
-            currentPopup.remove();
-            currentPopup = null;
-        }
-        if (!isMobile && mobileBottomSheet && mobileBottomSheet.classList.contains('visible')) {
-            closeMobileBottomSheet();
-        }
+        if (isMobile && currentPopup) { currentPopup.remove(); currentPopup = null; }
+        if (!isMobile && mobileBottomSheet && mobileBottomSheet.classList.contains('visible')) { closeMobileBottomSheet(); }
     });
 
     if (bottomSheetCloseButton) {
-        bottomSheetCloseButton.addEventListener('click', (e) => {
-            e.stopPropagation();
-            closeMobileBottomSheet();
-        });
+        bottomSheetCloseButton.addEventListener('click', (e) => { e.stopPropagation(); closeMobileBottomSheet(); });
     }
     
-    function onMapBackgroundClick(e) {
-        if (e.defaultPrevented === false) {
-             if (isMobile && mobileBottomSheet && mobileBottomSheet.classList.contains('visible')) {
-                closeMobileBottomSheet();
-            }
-        }
-    }
-
     document.addEventListener('annoncesChargeesEtRendues', (event) => {
         const annonces = event.detail.annonces;
         if (!annonces || !Array.isArray(annonces)) return;
-        
         allAnnouncements = annonces;
         const geojsonData = convertAnnoncesToGeoJSON(allAnnouncements);
 
@@ -61,7 +45,6 @@ document.addEventListener('DOMContentLoaded', function() {
             initializeMap(geojsonData);
         } else {
             map.getSource(SOURCE_ID_ANNONCES).setData(geojsonData);
-            if (map.isStyleLoaded()) updatePinStyles();
             if (geojsonData.features.length > 0) {
                  const bounds = getBounds(geojsonData);
                  map.fitBounds(bounds, { padding: 80, maxZoom: 16 });
@@ -70,38 +53,26 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+    
+    // =================================================================================
+    // == SECTION ENTIÈREMENT NOUVELLE ET REFACTORISÉE POUR L'AFFICHAGE DE LA CARTE ==
+    // =================================================================================
+    
+    // NOUVEAU : Helper pour créer une icône de cercle pour MapLibre
+    // Cela nous permet de ne pas dépendre d'une image externe.
+    const createCircleSdf = (size) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const context = canvas.getContext('2d');
+        const radius = size / 2;
+        context.beginPath();
+        context.arc(radius, radius, radius - 2, 0, 2 * Math.PI, false);
+        context.fillStyle = 'white';
+        context.fill();
+        return context.getImageData(0, 0, size, size);
+    };
 
-    function convertAnnoncesToGeoJSON(annonces) {
-        const features = annonces.map(annonce => {
-            const lat = getNestedValue(annonce, 'latitude');
-            const lng = getNestedValue(annonce, 'longitude');
-            
-            if (annonce.id === undefined || annonce.id === null || lat === undefined || lng === undefined) return null;
-            let featureId = parseInt(annonce.id, 10);
-            if (isNaN(featureId)) return null;
-            
-            return {
-                type: 'Feature', id: featureId, geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] },
-                properties: { id: featureId, id_str: String(annonce.id), price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?', coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url'), house_type: getNestedValue(annonce, 'house_type'), city: getNestedValue(annonce, 'city'), rooms: getNestedValue(annonce, 'rooms'), bedrooms: getNestedValue(annonce, 'bedrooms'), area: getNestedValue(annonce, 'area') }
-            };
-        }).filter(Boolean);
-        return { type: 'FeatureCollection', features };
-    }
-
-    function updatePinStyles() {
-        if (!map || !map.isStyleLoaded()) return;
-        const allFeatures = map.querySourceFeatures(SOURCE_ID_ANNONCES);
-        const allFeatureIds = new Set(allFeatures.map(f => f.id));
-        const visibleLabelFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_LABELS] });
-        const visibleLabelIds = new Set(visibleLabelFeatures.map(feature => feature.id));
-        allFeatureIds.forEach(id => {
-            if (visibleLabelIds.has(id)) {
-                map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: id }, { 'has-label': true });
-            } else {
-                map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: id }, { 'has-label': false });
-            }
-        });
-    }
 
     function initializeMap(initialGeoJSON) {
         map = new maplibregl.Map({
@@ -118,44 +89,96 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         map.on('load', () => {
+            // NOUVEAU : On ajoute notre icône de cercle générée au style de la carte
+            map.addImage('circle-background', createCircleSdf(64), { sdf: true });
+
             map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
             
+            // COUCHE 1 : LES PETITS POINTS (toujours visibles)
+            // Cette couche affiche un petit point pour CHAQUE annonce.
             map.addLayer({
-                id: LAYER_ID_PINS, type: 'circle', source: SOURCE_ID_ANNONCES,
+                id: LAYER_ID_DOTS,
+                type: 'circle',
+                source: SOURCE_ID_ANNONCES,
                 paint: {
-                    'circle-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'],
-                    'circle-stroke-width': 1.5,
-                    'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'],
-                    'circle-radius': ['case', ['boolean', ['feature-state', 'has-label'], false], 26, ['boolean', ['feature-state', 'selected'], false], 26, 8],
+                    'circle-radius': 5,
+                    'circle-color': '#FFFFFF',
+                    'circle-stroke-width': 1,
+                    'circle-stroke-color': '#B4B4B4'
                 }
             });
 
+            // COUCHE 2 : LES BULLES DE PRIX (atomiques)
+            // Cette couche tente d'afficher une icône de cercle ET un prix par-dessus la couche de points.
+            // Si elle ne peut pas (collision), elle ne s'affiche pas, laissant le point de la couche 1 visible.
             map.addLayer({
-                id: LAYER_ID_LABELS, type: 'symbol', source: SOURCE_ID_ANNONCES,
-                layout: { 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14, 'text-allow-overlap': false, 'text-optional': true },
-                paint: { 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] }
-            });
-            
-            map.on('click', LAYER_ID_PINS, handleMapClick);
-            map.on('click', onMapBackgroundClick);
-            map.on('mouseenter', LAYER_ID_PINS, () => map.getCanvas().style.cursor = 'pointer');
-            map.on('mouseleave', LAYER_ID_PINS, () => map.getCanvas().style.cursor = '');
-            
-            map.on('moveend', () => {
-                updateVisibleList();
-                updatePinStyles();
+                id: LAYER_ID_PRICES,
+                type: 'symbol',
+                source: SOURCE_ID_ANNONCES,
+                layout: {
+                    'icon-image': 'circle-background', // Utilise notre icône
+                    'icon-size': 0.9,
+                    'text-field': ['concat', ['to-string', ['get', 'price']], '€'],
+                    'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                    'text-size': 14,
+                    'icon-allow-overlap': false, // Ne pas afficher l'icône si elle chevauche
+                    'text-allow-overlap': false, // Ne pas afficher le texte s'il chevauche
+                    'icon-anchor': 'center',
+                    'text-anchor': 'center'
+                },
+                paint: {
+                    'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'],
+                    'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333']
+                }
             });
 
-            updateVisibleList();
-            updatePinStyles();
+            // GESTION DU SURVOL (HOVER) SUR LES PETITS POINTS
+            map.on('mouseenter', LAYER_ID_DOTS, (e) => {
+                if (e.features.length > 0) {
+                    map.getCanvas().style.cursor = 'pointer';
+                    const properties = e.features[0].properties;
+                    const coordinates = e.features[0].geometry.coordinates.slice();
+
+                    // On crée un popup qui ressemble à nos bulles de prix
+                    hoverPopup = new maplibregl.Popup({
+                        closeButton: false,
+                        offset: 10,
+                        anchor: 'bottom',
+                        className: 'hover-popup'
+                    })
+                    .setLngLat(coordinates)
+                    .setHTML(`<div class="hover-popup-content">${properties.price}€</div>`)
+                    .addTo(map);
+                }
+            });
+
+            map.on('mouseleave', LAYER_ID_DOTS, () => {
+                map.getCanvas().style.cursor = '';
+                if(hoverPopup) {
+                    hoverPopup.remove();
+                    hoverPopup = null;
+                }
+            });
+            
+            // GESTION DU CLIC (identique mais sur les deux couches)
+            map.on('click', [LAYER_ID_DOTS, LAYER_ID_PRICES], handleMapClick);
+
+            // NOUVEAU : On attend que la carte soit "idle" pour la première synchro de la liste
+            map.on('idle', () => {
+                updateVisibleList();
+            });
+
+            map.on('moveend', () => {
+                updateVisibleList();
+            });
         });
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
 
-    // -- LA FONCTION QUI MANQUAIT DANS MA PRÉCÉDENTE RÉPONSE --
+    // Le reste du fichier est quasi identique, j'ai juste retiré les fonctions devenues inutiles.
     function updateVisibleList() {
         if (!map || !map.isStyleLoaded() || !listContainer) return;
-        const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_PINS] });
+        const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_DOTS] }); // On se base sur les points
         const visiblePropertyIds = new Set(visibleFeatures.map(feature => String(feature.properties.id)));
         const allListItems = listContainer.querySelectorAll('[data-property-id]');
         allListItems.forEach(itemDiv => {
@@ -175,7 +198,6 @@ document.addEventListener('DOMContentLoaded', function() {
             mobileToggleButton.textContent = `Voir les ${visiblePropertyIds.size} logements`;
         }
     }
-    // -- FIN DE LA FONCTION --
 
     function getBounds(geojson) {
         const bounds = new maplibregl.LngLatBounds();
