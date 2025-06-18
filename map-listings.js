@@ -1,6 +1,6 @@
-// map-listings.js - VERSION MODIFIÉE V16 (Gestion intelligente des pins)
+// map-listings.js - VERSION MODIFIÉE V17.2 (Correction finale : réintégration de la fonction manquante)
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V17.1] Correction des constantes de couches.');
+    console.log('[MAP_SCRIPT V17.2] Réintégration de convertAnnoncesToGeoJSON.');
 
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const MAP_CONTAINER_ID = 'map-section';
@@ -8,9 +8,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const MOBILE_TOGGLE_BUTTON_ID = 'mobile-map-toggle';
     const SOURCE_ID_ANNONCES = 'annonces-source';
     
-    // =================================================================
-    // == CORRECTION : Déclaration des bonnes constantes pour les couches ==
-    // =================================================================
     const LAYER_ID_DOTS = 'annonces-dots-layer';
     const LAYER_ID_PRICES = 'annonces-prices-layer';
     
@@ -70,6 +67,27 @@ document.addEventListener('DOMContentLoaded', function() {
         return context.getImageData(0, 0, size, size);
     };
 
+    // ================================================================
+    // == RÉINTÉGRATION DE LA FONCTION ESSENTIELLE QUI MANQUAIT ==
+    // ================================================================
+    function convertAnnoncesToGeoJSON(annonces) {
+        const features = annonces.map(annonce => {
+            const lat = getNestedValue(annonce, 'latitude');
+            const lng = getNestedValue(annonce, 'longitude');
+            
+            if (annonce.id === undefined || annonce.id === null || lat === undefined || lng === undefined) return null;
+            let featureId = parseInt(annonce.id, 10);
+            if (isNaN(featureId)) return null;
+            
+            return {
+                type: 'Feature', id: featureId, geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] },
+                properties: { id: featureId, id_str: String(annonce.id), price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?', coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url'), house_type: getNestedValue(annonce, 'house_type'), city: getNestedValue(annonce, 'city'), rooms: getNestedValue(annonce, 'rooms'), bedrooms: getNestedValue(annonce, 'bedrooms'), area: getNestedValue(annonce, 'area') }
+            };
+        }).filter(Boolean);
+        return { type: 'FeatureCollection', features };
+    }
+
+
     function initializeMap(initialGeoJSON) {
         map = new maplibregl.Map({
             container: MAP_CONTAINER_ID, style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`,
@@ -92,33 +110,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 id: LAYER_ID_DOTS,
                 type: 'circle',
                 source: SOURCE_ID_ANNONCES,
-                paint: {
-                    'circle-radius': 5,
-                    'circle-color': '#FFFFFF',
-                    'circle-stroke-width': 1,
-                    'circle-stroke-color': '#B4B4B4'
-                }
+                paint: { 'circle-radius': 5, 'circle-color': '#FFFFFF', 'circle-stroke-width': 1, 'circle-stroke-color': '#B4B4B4' }
             });
 
             map.addLayer({
                 id: LAYER_ID_PRICES,
                 type: 'symbol',
                 source: SOURCE_ID_ANNONCES,
-                layout: {
-                    'icon-image': 'circle-background',
-                    'icon-size': 0.9,
-                    'text-field': ['concat', ['to-string', ['get', 'price']], '€'],
-                    'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-                    'text-size': 14,
-                    'icon-allow-overlap': false,
-                    'text-allow-overlap': false,
-                    'icon-anchor': 'center',
-                    'text-anchor': 'center'
-                },
-                paint: {
-                    'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'],
-                    'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333']
-                }
+                layout: { 'icon-image': 'circle-background', 'icon-size': 0.9, 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14, 'icon-allow-overlap': false, 'text-allow-overlap': false, 'icon-anchor': 'center', 'text-anchor': 'center' },
+                paint: { 'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'], 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] }
             });
 
             map.on('mouseenter', LAYER_ID_DOTS, (e) => {
@@ -126,9 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     map.getCanvas().style.cursor = 'pointer';
                     const properties = e.features[0].properties;
                     const coordinates = e.features[0].geometry.coordinates.slice();
-                    hoverPopup = new maplibregl.Popup({
-                        closeButton: false, offset: 10, anchor: 'bottom', className: 'hover-popup'
-                    })
+                    hoverPopup = new maplibregl.Popup({ closeButton: false, offset: 10, anchor: 'bottom', className: 'hover-popup' })
                     .setLngLat(coordinates)
                     .setHTML(`<div class="hover-popup-content">${properties.price}€</div>`)
                     .addTo(map);
@@ -145,13 +143,8 @@ document.addEventListener('DOMContentLoaded', function() {
             
             map.on('click', [LAYER_ID_DOTS, LAYER_ID_PRICES], handleMapClick);
 
-            map.on('idle', () => {
-                updateVisibleList();
-            });
-
-            map.on('moveend', () => {
-                updateVisibleList();
-            });
+            map.on('idle', () => { updateVisibleList(); });
+            map.on('moveend', () => { updateVisibleList(); });
         });
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
@@ -178,100 +171,12 @@ document.addEventListener('DOMContentLoaded', function() {
             mobileToggleButton.textContent = `Voir les ${visiblePropertyIds.size} logements`;
         }
     }
-    
-    function getBounds(geojson) {
-        const bounds = new maplibregl.LngLatBounds();
-        geojson.features.forEach(feature => {
-            bounds.extend(feature.geometry.coordinates);
-        });
-        return bounds;
-    }
 
-    function createPopupHTML(properties) {
-        const placeholderImage = 'https://via.placeholder.com/280x150/cccccc/969696?text=Image';
-        const coverPhoto = properties.coverPhoto || placeholderImage;
-        const houseTypeRaw = properties.house_type || 'Logement';
-        const houseType = houseTypeRaw.charAt(0).toUpperCase() + houseTypeRaw.slice(1);
-        const city = properties.city || 'localité non précisée';
-        const title = `${houseType} à ${city}`;
-        const details = [];
-        if (properties.rooms) details.push(`${properties.rooms} pièces`);
-        if (properties.bedrooms) details.push(`${properties.bedrooms} chambres`);
-        if (properties.area) details.push(`${properties.area}m²`);
-        const descriptionHTML = details.length > 0 ? `<p class="popup-description">${details.join(' • ')}</p>` : '';
-        const priceHTML = `<p class="popup-price">${properties.price || '?'}€ <span class="popup-price-period">par mois CC</span></p>`;
-        const detailLink = `annonce?id=${properties.id_str}`;
-        return `<a href="${detailLink}" class="popup-container-link"><div class="map-custom-popup"><img src="${coverPhoto}" alt="${title}" class="popup-image" onerror="this.src='${placeholderImage}'"><div class="popup-info"><h4 class="popup-title">${title}</h4>${descriptionHTML}${priceHTML}</div></div></a>`;
-    }
-
-    function openMobileBottomSheet(properties) {
-        if (!mobileBottomSheet || !mobileBottomSheetContent) return;
-        const contentHTML = createPopupHTML(properties);
-        mobileBottomSheetContent.innerHTML = contentHTML;
-        mobileBottomSheet.classList.add('visible');
-    }
-
-    function closeMobileBottomSheet() {
-        if (!mobileBottomSheet) return;
-        mobileBottomSheet.classList.remove('visible');
-        setTimeout(() => { if (mobileBottomSheetContent) mobileBottomSheetContent.innerHTML = ''; }, 350);
-        if (map && selectedPinId !== null) {
-            map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
-            selectedPinId = null;
-        }
-    }
-
-    function handleMapClick(e) {
-        e.preventDefault();
-        if (e.features && e.features.length > 0) {
-            const feature = e.features[0];
-            const coordinates = feature.geometry.coordinates.slice();
-            const properties = feature.properties;
-            const clickedPinId = feature.id;
-            if (selectedPinId !== null && selectedPinId !== clickedPinId) {
-                map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
-            }
-            map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: clickedPinId }, { selected: true });
-            selectedPinId = clickedPinId;
-            if (isMobile) {
-                if (currentPopup) {
-                    currentPopup.remove();
-                    currentPopup = null;
-                }
-                openMobileBottomSheet(properties);
-            } else {
-                if (mobileBottomSheet && mobileBottomSheet.classList.contains('visible')) {
-                    closeMobileBottomSheet();
-                }
-                if (currentPopup) currentPopup.remove();
-                const popupHTML = createPopupHTML(properties);
-                currentPopup = new maplibregl.Popup({ offset: 25, closeButton: true, className: 'airbnb-style-popup' }).setLngLat(coordinates).setHTML(popupHTML).addTo(map);
-                currentPopup.on('close', () => {
-                    if (selectedPinId === clickedPinId) {
-                        map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
-                        selectedPinId = null;
-                    }
-                    currentPopup = null;
-                });
-            }
-        }
-    }
-
-    function getNestedValue(obj, path) {
-        if (!path) return undefined;
-        return path.split('.').reduce((acc, part) => (acc && acc[part] !== undefined) ? (isNaN(parseInt(part, 10)) ? acc[part] : acc[parseInt(part, 10)]) : undefined, obj);
-    }
-
-    if (isMobile && mobileToggleButton) {
-        mobileToggleButton.addEventListener('click', () => {
-            document.body.classList.toggle('map-is-active');
-            if (document.body.classList.contains('map-is-active')) {
-                if (map) map.resize();
-                mobileToggleButton.textContent = `Voir la liste`;
-            } else {
-                if (listContainer) listContainer.scrollTo(0, 0);
-                mobileToggleButton.textContent = `Afficher la carte`;
-            }
-        });
-    }
+    function getBounds(geojson) { const bounds = new maplibregl.LngLatBounds(); geojson.features.forEach(feature => { bounds.extend(feature.geometry.coordinates); }); return bounds; }
+    function createPopupHTML(properties) { const placeholderImage = 'https://via.placeholder.com/280x150/cccccc/969696?text=Image'; const coverPhoto = properties.coverPhoto || placeholderImage; const houseTypeRaw = properties.house_type || 'Logement'; const houseType = houseTypeRaw.charAt(0).toUpperCase() + houseTypeRaw.slice(1); const city = properties.city || 'localité non précisée'; const title = `${houseType} à ${city}`; const details = []; if (properties.rooms) details.push(`${properties.rooms} pièces`); if (properties.bedrooms) details.push(`${properties.bedrooms} chambres`); if (properties.area) details.push(`${properties.area}m²`); const descriptionHTML = details.length > 0 ? `<p class="popup-description">${details.join(' • ')}</p>` : ''; const priceHTML = `<p class="popup-price">${properties.price || '?'}€ <span class="popup-price-period">par mois CC</span></p>`; const detailLink = `annonce?id=${properties.id_str}`; return `<a href="${detailLink}" class="popup-container-link"><div class="map-custom-popup"><img src="${coverPhoto}" alt="${title}" class="popup-image" onerror="this.src='${placeholderImage}'"><div class="popup-info"><h4 class="popup-title">${title}</h4>${descriptionHTML}${priceHTML}</div></div></a>`; }
+    function openMobileBottomSheet(properties) { if (!mobileBottomSheet || !mobileBottomSheetContent) return; const contentHTML = createPopupHTML(properties); mobileBottomSheetContent.innerHTML = contentHTML; mobileBottomSheet.classList.add('visible'); }
+    function closeMobileBottomSheet() { if (!mobileBottomSheet) return; mobileBottomSheet.classList.remove('visible'); setTimeout(() => { if (mobileBottomSheetContent) mobileBottomSheetContent.innerHTML = ''; }, 350); if (map && selectedPinId !== null) { map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false }); selectedPinId = null; } }
+    function handleMapClick(e) { e.preventDefault(); if (e.features && e.features.length > 0) { const feature = e.features[0]; const coordinates = feature.geometry.coordinates.slice(); const properties = feature.properties; const clickedPinId = feature.id; if (selectedPinId !== null && selectedPinId !== clickedPinId) { map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false }); } map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: clickedPinId }, { selected: true }); selectedPinId = clickedPinId; if (isMobile) { if (currentPopup) { currentPopup.remove(); currentPopup = null; } openMobileBottomSheet(properties); } else { if (mobileBottomSheet && mobileBottomSheet.classList.contains('visible')) { closeMobileBottomSheet(); } if (currentPopup) currentPopup.remove(); const popupHTML = createPopupHTML(properties); currentPopup = new maplibregl.Popup({ offset: 25, closeButton: true, className: 'airbnb-style-popup' }).setLngLat(coordinates).setHTML(popupHTML).addTo(map); currentPopup.on('close', () => { if (selectedPinId === clickedPinId) { map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false }); selectedPinId = null; } currentPopup = null; }); } } }
+    function getNestedValue(obj, path) { if (!path) return undefined; return path.split('.').reduce((acc, part) => (acc && acc[part] !== undefined) ? (isNaN(parseInt(part, 10)) ? acc[part] : acc[parseInt(part, 10)]) : undefined, obj); }
+    if (isMobile && mobileToggleButton) { mobileToggleButton.addEventListener('click', () => { document.body.classList.toggle('map-is-active'); if (document.body.classList.contains('map-is-active')) { if (map) map.resize(); mobileToggleButton.textContent = `Voir la liste`; } else { if (listContainer) listContainer.scrollTo(0, 0); mobileToggleButton.textContent = `Afficher la carte`; } }); }
 });
