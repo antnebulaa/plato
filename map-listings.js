@@ -1,6 +1,6 @@
-// map-listings.js - VERSION 18 (Correction des conflits hover/clic et de la transmission de données)
+// map-listings.js - VERSION 19 (Correction finale du clic)
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V18] Correction des conflits et de la transmission de données.');
+    console.log('[MAP_SCRIPT V19] Correction du clic et simplification de la logique.');
 
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const MAP_CONTAINER_ID = 'map-section';
@@ -16,7 +16,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let map = null;
     let allAnnouncements = [];
     let isMobile = window.innerWidth < 768;
-    let currentPopup = null;
     let selectedPinId = null;
     let hoverPopup = null;
 
@@ -26,8 +25,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.addEventListener('resize', () => {
         isMobile = window.innerWidth < 768;
-        if (isMobile && currentPopup) { currentPopup.remove(); currentPopup = null; }
-        if (!isMobile && mobileBottomSheet && mobileBottomSheet.classList.contains('visible')) { closeMobileBottomSheet(); }
     });
 
     if (bottomSheetCloseButton) {
@@ -64,15 +61,12 @@ document.addEventListener('DOMContentLoaded', function() {
         map.on('load', () => {
             map.addImage('circle-background', createCircleSdf(64), { sdf: true });
             map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
-            map.addLayer({ id: LAYER_ID_DOTS, type: 'circle', source: SOURCE_ID_ANNONCES, paint: { 'circle-radius': 5, 'circle-color': '#FFFFFF', 'circle-stroke-width': 2, 'circle-stroke-color': '#B4B4B4' } });
+            map.addLayer({ id: LAYER_ID_DOTS, type: 'circle', source: SOURCE_ID_ANNONCES, paint: { 'circle-radius': 5, 'circle-color': '#FFFFFF', 'circle-stroke-width': 1, 'circle-stroke-color': '#B4B4B4' } });
             map.addLayer({ id: LAYER_ID_PRICES, type: 'symbol', source: SOURCE_ID_ANNONCES, layout: { 'icon-image': 'circle-background', 'icon-size': 0.9, 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14, 'icon-allow-overlap': false, 'text-allow-overlap': false, 'icon-anchor': 'center', 'text-anchor': 'center' }, paint: { 'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'], 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] } });
 
-            // CORRECTION 1 : Le survol est maintenant plus intelligent
             map.on('mouseenter', LAYER_ID_DOTS, (e) => {
                 const priceFeatures = map.queryRenderedFeatures(e.point, { layers: [LAYER_ID_PRICES] });
-                if (priceFeatures.length > 0) {
-                    return; 
-                }
+                if (priceFeatures.length > 0) { return; }
                 if (e.features.length > 0) {
                     map.getCanvas().style.cursor = 'pointer';
                     const properties = e.features[0].properties;
@@ -94,10 +88,10 @@ document.addEventListener('DOMContentLoaded', function() {
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
 
+    // =================================================================================
+    // == CORRECTION MAJEURE : Simplification et fiabilisation du clic ==
+    // =================================================================================
     function handleMapClick(e) {
-        e.preventDefault();
-
-        // CORRECTION 2 : On retire le popup de survol dès qu'un clic est enregistré
         if (hoverPopup) {
             hoverPopup.remove();
             hoverPopup = null;
@@ -108,32 +102,29 @@ document.addEventListener('DOMContentLoaded', function() {
             const properties = feature.properties;
             const clickedPinId = feature.id;
 
-            // CORRECTION 3 : On réintroduit la sauvegarde des données pour la page de détail
+            // On s'assure que les données sont prêtes pour la page de détail
             const fullAnnonceData = allAnnouncements.find(annonce => annonce.id === clickedPinId);
             if (fullAnnonceData) {
                 sessionStorage.setItem('selected_property_details', JSON.stringify(fullAnnonceData));
-                console.log(`[MAP_SCRIPT V18] Données de l'annonce ${clickedPinId} stockées dans sessionStorage.`);
             }
 
-            if (selectedPinId !== null && selectedPinId !== clickedPinId) {
+            // On met le pin en noir pour le feedback visuel
+            if (selectedPinId !== null) {
                 map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
             }
             map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: clickedPinId }, { selected: true });
             selectedPinId = clickedPinId;
 
+            // SI ON EST SUR MOBILE : on affiche la bottom sheet
             if (isMobile) {
-                if (currentPopup) { currentPopup.remove(); currentPopup = null; }
                 openMobileBottomSheet(properties);
-            } else {
-                if (mobileBottomSheet && mobileBottomSheet.classList.contains('visible')) { closeMobileBottomSheet(); }
-                if (currentPopup) currentPopup.remove();
-                const popupHTML = createPopupHTML(properties);
-                currentPopup = new maplibregl.Popup({ offset: 25, closeButton: true, className: 'airbnb-style-popup' })
-                .setLngLat(feature.geometry.coordinates.slice()).setHTML(popupHTML).addTo(map);
-                currentPopup.on('close', () => {
-                    if (selectedPinId === clickedPinId) { map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false }); selectedPinId = null; }
-                    currentPopup = null;
-                });
+            } 
+            // SI ON EST SUR DESKTOP : on navigue directement
+            else {
+                // On attend un instant pour que l'utilisateur voie le pin devenir noir
+                setTimeout(() => {
+                    window.location.href = `annonce?id=${properties.id_str}`;
+                }, 100); // 100ms de délai
             }
         }
     }
