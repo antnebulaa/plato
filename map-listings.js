@@ -41,10 +41,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     document.addEventListener('annoncesChargeesEtRendues', (event) => {
-        const annonces = event.detail.annonces;
+        // La déstructuration garantit que `annonces` et `cities` sont bien extraits de l'objet `event.detail`.
+        const { annonces, cities } = event.detail; 
         if (!annonces || !Array.isArray(annonces)) return;
+
         allAnnouncements = annonces;
         const geojsonData = convertAnnoncesToGeoJSON(allAnnouncements);
+
         if (!map) {
             initializeMap(geojsonData);
         } else {
@@ -52,7 +55,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (geojsonData.features.length > 0) { const bounds = getBounds(geojsonData); map.fitBounds(bounds, { padding: 80, maxZoom: 16 }); }
             else { map.flyTo({ center: [2.3522, 48.8566], zoom: 11 }); }
         }
-        // NOUVEAU : On met à jour les frontières des villes après chaque recherche
+
+        // `cities` est maintenant défini (il sera un tableau, vide si aucune ville n'est spécifiée)
         if (map && cities) {
             updateCityBoundaries(cities);
         }
@@ -68,35 +72,36 @@ document.addEventListener('DOMContentLoaded', function() {
 
         map.on('load', () => {
             map.addImage('circle-background', createCircleSdf(64), { sdf: true });
-            // NOUVEAU : Ajout de la couche des quartiers (aplat de couleur)
+
+            // CORRIGÉ : Utiliser la source "openmaptiles" qui est le nom correct dans le style de MapTiler
             map.addLayer({
                 'id': LAYER_ID_NEIGHBORHOOD_FILL,
                 'type': 'fill',
-                'source': 'maptiler', // La source par défaut des tuiles vectorielles de MapTiler
+                'source': 'openmaptiles', // CORRIGÉ
                 'source-layer': 'place',
-                'filter': ['in', ['get', 'class'], ['literal', ['suburb', 'quarter']]], // On cible les quartiers
+                'filter': ['in', ['get', 'class'], ['literal', ['suburb', 'quarter']]],
                 'paint': {
-                    'fill-color': [ // NOUVEAU : Couleur différente par quartier pour une meilleure lisibilité
+                    'fill-color': [
                         'interpolate',
                         ['linear'],
-                        ['get', 'rank'], // La propriété 'rank' est souvent disponible et varie
-                        1, 'rgba(255, 99, 71, 0.1)',   // Rank bas -> couleur 1
-                        5, 'rgba(60, 179, 113, 0.1)',  // Rank moyen -> couleur 2
-                        10, 'rgba(30, 144, 255, 0.1)'  // Rank élevé -> couleur 3
+                        ['get', 'rank'],
+                        1, 'rgba(255, 99, 71, 0.1)',
+                        5, 'rgba(60, 179, 113, 0.1)',
+                        10, 'rgba(30, 144, 255, 0.1)'
                     ],
                     'fill-opacity': 0.7
                 }
-            }, LAYER_ID_DOTS); // On place cette couche sous les points des annonces
+            }, LAYER_ID_DOTS);
 
-            // NOUVEAU : Ajout des étiquettes de noms de quartiers
+            // CORRIGÉ : Utiliser la source "openmaptiles" ici aussi
             map.addLayer({
                 'id': LAYER_ID_NEIGHBORHOOD_LABELS,
                 'type': 'symbol',
-                'source': 'maptiler',
+                'source': 'openmaptiles', // CORRIGÉ
                 'source-layer': 'place',
                 'filter': ['in', ['get', 'class'], ['literal', ['suburb', 'quarter']]],
                 'layout': {
-                    'text-field': ['get', 'name:fr'], // Affiche le nom en français
+                    'text-field': ['get', 'name:fr'],
                     'text-size': 13,
                     'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
                 },
@@ -106,19 +111,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     'text-halo-width': 1
                 }
             }, LAYER_ID_DOTS);
+
             map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
             map.addLayer({ id: LAYER_ID_DOTS, type: 'circle', source: SOURCE_ID_ANNONCES, paint: { 'circle-radius': 5, 'circle-color': '#FFFFFF', 'circle-stroke-width': 1, 'circle-stroke-color': '#B4B4B4' } });
             map.addLayer({ id: LAYER_ID_PRICES, type: 'symbol', source: SOURCE_ID_ANNONCES, layout: { 'icon-image': 'circle-background', 'icon-size': 0.9, 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14, 'icon-allow-overlap': false, 'text-allow-overlap': false, 'icon-anchor': 'center', 'text-anchor': 'center' }, paint: { 'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'], 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] } });
-
+            
             map.on('mouseenter', LAYER_ID_DOTS, handleDotHoverOrClick);
             map.on('click', LAYER_ID_DOTS, handleDotHoverOrClick);
-            map.on('mouseleave', LAYER_ID_DOTS, () => {
-                map.getCanvas().style.cursor = '';
-                if(hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; }
-            });
-            
+            map.on('mouseleave', LAYER_ID_DOTS, () => { map.getCanvas().style.cursor = ''; if(hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; } });
             map.on('click', LAYER_ID_PRICES, handlePriceBubbleClick);
-
             map.on('idle', () => { updateVisibleList(); });
             map.on('moveend', () => { updateVisibleList(); });
         });
@@ -129,14 +130,12 @@ document.addEventListener('DOMContentLoaded', function() {
     async function updateCityBoundaries(cities = []) {
         console.log('[MAP_SCRIPT] Mise à jour des frontières pour les villes:', cities);
 
-        // Nettoyer les anciennes frontières
         if (map.getLayer(LAYER_ID_CITY_BOUNDARIES)) map.removeLayer(LAYER_ID_CITY_BOUNDARIES);
         if (map.getSource(SOURCE_ID_CITY_BOUNDARIES)) map.removeSource(SOURCE_ID_CITY_BOUNDARIES);
 
         if (cities.length === 0) return;
 
         try {
-            // Créer une liste de promesses pour chaque appel à l'API de géocodage
             const promises = cities.map(city =>
                 fetch(`https://api.maptiler.com/geocoding/${encodeURIComponent(city)}.json?key=${MAPTILER_API_KEY}&language=fr&types=region,place`)
                 .then(response => {
@@ -148,9 +147,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const results = await Promise.all(promises);
             
             const boundaryFeatures = results.map(result => {
-                // On cherche la première feature qui a une géométrie
                 return result.features.find(feature => feature.geometry);
-            }).filter(Boolean); // On filtre les résultats non trouvés
+            }).filter(Boolean);
 
             if (boundaryFeatures.length === 0) {
                 console.warn('[MAP_SCRIPT] Aucune frontière trouvée pour les villes demandées.');
@@ -162,7 +160,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 features: boundaryFeatures
             };
 
-            // Ajouter la source et la couche à la carte
             map.addSource(SOURCE_ID_CITY_BOUNDARIES, { type: 'geojson', data: geojson });
             map.addLayer({
                 id: LAYER_ID_CITY_BOUNDARIES,
@@ -177,7 +174,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     'line-width': 2.5,
                     'line-opacity': 0.8
                 }
-            }, LAYER_ID_NEIGHBORHOOD_FILL); // On place cette couche par-dessus les quartiers mais sous les annonces
+            }, LAYER_ID_NEIGHBORHOOD_FILL);
             
             console.log('[MAP_SCRIPT] Frontières de villes affichées.');
 
@@ -185,6 +182,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('[MAP_SCRIPT] Erreur lors de la récupération des frontières de ville:', error);
         }
     }
+
 
     function handleDotHoverOrClick(e) {
         const priceFeatures = map.queryRenderedFeatures(e.point, { layers: [LAYER_ID_PRICES] });
