@@ -65,7 +65,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const createCircleSdf = (size) => { const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size; const context = canvas.getContext('2d'); const radius = size / 2; context.beginPath(); context.arc(radius, radius, radius - 2, 0, 2 * Math.PI, false); context.fillStyle = 'white'; context.fill(); return context.getImageData(0, 0, size, size); };
     function convertAnnoncesToGeoJSON(annonces) { const features = annonces.map(annonce => { const lat = getNestedValue(annonce, 'geo_location.data.lat'); const lng = getNestedValue(annonce, 'geo_location.data.lng'); if (annonce.id === undefined || annonce.id === null || lat === undefined || lng === undefined) return null; let featureId = parseInt(annonce.id, 10); if (isNaN(featureId)) return null; return { type: 'Feature', id: featureId, geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] }, properties: { id: featureId, id_str: String(annonce.id), price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?', coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url'), house_type: getNestedValue(annonce, 'house_type'), city: getNestedValue(annonce, 'city'), rooms: getNestedValue(annonce, 'rooms'), bedrooms: getNestedValue(annonce, 'bedrooms'), area: getNestedValue(annonce, 'area') } }; }).filter(Boolean); return { type: 'FeatureCollection', features }; }
 
-    function initializeMap(initialGeoJSON) {
+     function initializeMap(initialGeoJSON) {
         map = new maplibregl.Map({ container: MAP_CONTAINER_ID, style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`, pitch: 0, bearing: 0, navigationControl: false, renderWorldCopies: false });
         window.map = map;
         if (initialGeoJSON.features.length > 0) { const bounds = getBounds(initialGeoJSON); map.fitBounds(bounds, { padding: 80, duration: 0, maxZoom: 16 }); } else { map.setCenter([2.3522, 48.8566]); map.setZoom(11); }
@@ -73,44 +73,41 @@ document.addEventListener('DOMContentLoaded', function() {
         map.on('load', () => {
             map.addImage('circle-background', createCircleSdf(64), { sdf: true });
 
-            // CORRIGÉ : Utiliser la source "openmaptiles" qui est le nom correct dans le style de MapTiler
-            map.addLayer({
-                'id': LAYER_ID_NEIGHBORHOOD_FILL,
-                'type': 'fill',
-                'source': 'openmaptiles', // CORRIGÉ
-                'source-layer': 'place',
-                'filter': ['in', ['get', 'class'], ['literal', ['suburb', 'quarter']]],
-                'paint': {
-                    'fill-color': [
-                        'interpolate',
-                        ['linear'],
-                        ['get', 'rank'],
-                        1, 'rgba(255, 99, 71, 0.1)',
-                        5, 'rgba(60, 179, 113, 0.1)',
-                        10, 'rgba(30, 144, 255, 0.1)'
-                    ],
-                    'fill-opacity': 0.7
-                }
-            }, LAYER_ID_DOTS);
+            // ===== NOUVELLE LOGIQUE DÉFINITIVE =====
+            // 1. Trouver dynamiquement le nom de la source de données vectorielles de la carte
+            const sources = map.getStyle().sources;
+            const vectorSourceId = Object.keys(sources).find(id => sources[id].type === 'vector' && sources[id].url?.includes('maptiler'));
 
-            // CORRIGÉ : Utiliser la source "openmaptiles" ici aussi
-            map.addLayer({
-                'id': LAYER_ID_NEIGHBORHOOD_LABELS,
-                'type': 'symbol',
-                'source': 'openmaptiles', // CORRIGÉ
-                'source-layer': 'place',
-                'filter': ['in', ['get', 'class'], ['literal', ['suburb', 'quarter']]],
-                'layout': {
-                    'text-field': ['get', 'name:fr'],
-                    'text-size': 13,
-                    'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
-                },
-                'paint': {
-                    'text-color': '#666',
-                    'text-halo-color': 'white',
-                    'text-halo-width': 1
-                }
-            }, LAYER_ID_DOTS);
+            if (vectorSourceId) {
+                console.log(`[MAP_SCRIPT] Source de tuiles vectorielles détectée : "${vectorSourceId}"`);
+
+                // 2. Ajouter les couches de quartiers en utilisant l'ID de source trouvé
+                map.addLayer({
+                    'id': LAYER_ID_NEIGHBORHOOD_FILL,
+                    'type': 'fill',
+                    'source': vectorSourceId, // On utilise la variable
+                    'source-layer': 'place',
+                    'filter': ['in', ['get', 'class'], ['literal', ['suburb', 'quarter']]],
+                    'paint': {
+                        'fill-color': ['interpolate', ['linear'], ['get', 'rank'], 1, 'rgba(255, 99, 71, 0.1)', 5, 'rgba(60, 179, 113, 0.1)', 10, 'rgba(30, 144, 255, 0.1)'],
+                        'fill-opacity': 0.7
+                    }
+                }, LAYER_ID_DOTS);
+
+                map.addLayer({
+                    'id': LAYER_ID_NEIGHBORHOOD_LABELS,
+                    'type': 'symbol',
+                    'source': vectorSourceId, // On utilise la variable
+                    'source-layer': 'place',
+                    'filter': ['in', ['get', 'class'], ['literal', ['suburb', 'quarter']]],
+                    'layout': { 'text-field': ['get', 'name:fr'], 'text-size': 13, 'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'], },
+                    'paint': { 'text-color': '#666', 'text-halo-color': 'white', 'text-halo-width': 1 }
+                }, LAYER_ID_DOTS);
+            } else {
+                console.warn('[MAP_SCRIPT] AVERTISSEMENT : Impossible de trouver la source de données vectorielles de MapTiler pour afficher les quartiers.');
+            }
+            // ===== FIN DE LA NOUVELLE LOGIQUE =====
+
 
             map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
             map.addLayer({ id: LAYER_ID_DOTS, type: 'circle', source: SOURCE_ID_ANNONCES, paint: { 'circle-radius': 5, 'circle-color': '#FFFFFF', 'circle-stroke-width': 1, 'circle-stroke-color': '#B4B4B4' } });
@@ -138,46 +135,31 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const promises = cities.map(city =>
                 fetch(`https://api.maptiler.com/geocoding/${encodeURIComponent(city)}.json?key=${MAPTILER_API_KEY}&language=fr&types=region,place`)
-                .then(response => {
-                    if (!response.ok) throw new Error(`Geocoding failed for ${city}`);
-                    return response.json();
-                })
+                .then(response => { if (!response.ok) throw new Error(`Geocoding failed for ${city}`); return response.json(); })
             );
-
             const results = await Promise.all(promises);
-            
-            const boundaryFeatures = results.map(result => {
-                return result.features.find(feature => feature.geometry);
-            }).filter(Boolean);
+            const boundaryFeatures = results.map(result => result.features.find(feature => feature.geometry)).filter(Boolean);
 
             if (boundaryFeatures.length === 0) {
                 console.warn('[MAP_SCRIPT] Aucune frontière trouvée pour les villes demandées.');
                 return;
             }
-
-            const geojson = {
-                type: 'FeatureCollection',
-                features: boundaryFeatures
-            };
+            const geojson = { type: 'FeatureCollection', features: boundaryFeatures };
 
             map.addSource(SOURCE_ID_CITY_BOUNDARIES, { type: 'geojson', data: geojson });
+            
+            // LOGIQUE ROBUSTE : On détermine avant quelle couche insérer celle des frontières
+            const beforeLayerId = map.getLayer(LAYER_ID_NEIGHBORHOOD_FILL) ? LAYER_ID_NEIGHBORHOOD_FILL : LAYER_ID_DOTS;
+
             map.addLayer({
                 id: LAYER_ID_CITY_BOUNDARIES,
                 type: 'line',
                 source: SOURCE_ID_CITY_BOUNDARIES,
-                layout: {
-                    'line-join': 'round',
-                    'line-cap': 'round'
-                },
-                paint: {
-                    'line-color': '#007cff',
-                    'line-width': 2.5,
-                    'line-opacity': 0.8
-                }
-            }, LAYER_ID_NEIGHBORHOOD_FILL);
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: { 'line-color': '#007cff', 'line-width': 2.5, 'line-opacity': 0.8 }
+            }, beforeLayerId); // On utilise la variable pour être sûr
             
             console.log('[MAP_SCRIPT] Frontières de villes affichées.');
-
         } catch (error) {
             console.error('[MAP_SCRIPT] Erreur lors de la récupération des frontières de ville:', error);
         }
