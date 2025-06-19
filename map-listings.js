@@ -9,6 +9,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const SOURCE_ID_ANNONCES = 'annonces-source';
     const LAYER_ID_DOTS = 'annonces-dots-layer';
     const LAYER_ID_PRICES = 'annonces-prices-layer';
+
+    // --- NOUVEAU : IDs pour les couches de délimitation ---
+    const SOURCE_ID_CITY_BOUNDARIES = 'city-boundaries-source';
+    const LAYER_ID_CITY_BOUNDARIES = 'city-boundaries-layer';
+    const LAYER_ID_NEIGHBORHOOD_FILL = 'neighborhood-fill-layer';
+    const LAYER_ID_NEIGHBORHOOD_LABELS = 'neighborhood-labels-layer';
     
     const listContainer = document.getElementById(LIST_CONTAINER_ID);
     const mobileToggleButton = document.getElementById(MOBILE_TOGGLE_BUTTON_ID);
@@ -46,6 +52,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (geojsonData.features.length > 0) { const bounds = getBounds(geojsonData); map.fitBounds(bounds, { padding: 80, maxZoom: 16 }); }
             else { map.flyTo({ center: [2.3522, 48.8566], zoom: 11 }); }
         }
+        // NOUVEAU : On met à jour les frontières des villes après chaque recherche
+        if (map && cities) {
+            updateCityBoundaries(cities);
+        }
     });
     
     const createCircleSdf = (size) => { const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size; const context = canvas.getContext('2d'); const radius = size / 2; context.beginPath(); context.arc(radius, radius, radius - 2, 0, 2 * Math.PI, false); context.fillStyle = 'white'; context.fill(); return context.getImageData(0, 0, size, size); };
@@ -58,6 +68,44 @@ document.addEventListener('DOMContentLoaded', function() {
 
         map.on('load', () => {
             map.addImage('circle-background', createCircleSdf(64), { sdf: true });
+            // NOUVEAU : Ajout de la couche des quartiers (aplat de couleur)
+            map.addLayer({
+                'id': LAYER_ID_NEIGHBORHOOD_FILL,
+                'type': 'fill',
+                'source': 'maptiler', // La source par défaut des tuiles vectorielles de MapTiler
+                'source-layer': 'place',
+                'filter': ['in', ['get', 'class'], ['literal', ['suburb', 'quarter']]], // On cible les quartiers
+                'paint': {
+                    'fill-color': [ // NOUVEAU : Couleur différente par quartier pour une meilleure lisibilité
+                        'interpolate',
+                        ['linear'],
+                        ['get', 'rank'], // La propriété 'rank' est souvent disponible et varie
+                        1, 'rgba(255, 99, 71, 0.1)',   // Rank bas -> couleur 1
+                        5, 'rgba(60, 179, 113, 0.1)',  // Rank moyen -> couleur 2
+                        10, 'rgba(30, 144, 255, 0.1)'  // Rank élevé -> couleur 3
+                    ],
+                    'fill-opacity': 0.7
+                }
+            }, LAYER_ID_DOTS); // On place cette couche sous les points des annonces
+
+            // NOUVEAU : Ajout des étiquettes de noms de quartiers
+            map.addLayer({
+                'id': LAYER_ID_NEIGHBORHOOD_LABELS,
+                'type': 'symbol',
+                'source': 'maptiler',
+                'source-layer': 'place',
+                'filter': ['in', ['get', 'class'], ['literal', ['suburb', 'quarter']]],
+                'layout': {
+                    'text-field': ['get', 'name:fr'], // Affiche le nom en français
+                    'text-size': 13,
+                    'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+                },
+                'paint': {
+                    'text-color': '#666',
+                    'text-halo-color': 'white',
+                    'text-halo-width': 1
+                }
+            }, LAYER_ID_DOTS);
             map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
             map.addLayer({ id: LAYER_ID_DOTS, type: 'circle', source: SOURCE_ID_ANNONCES, paint: { 'circle-radius': 5, 'circle-color': '#FFFFFF', 'circle-stroke-width': 1, 'circle-stroke-color': '#B4B4B4' } });
             map.addLayer({ id: LAYER_ID_PRICES, type: 'symbol', source: SOURCE_ID_ANNONCES, layout: { 'icon-image': 'circle-background', 'icon-size': 0.9, 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14, 'icon-allow-overlap': false, 'text-allow-overlap': false, 'icon-anchor': 'center', 'text-anchor': 'center' }, paint: { 'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'], 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] } });
@@ -75,6 +123,67 @@ document.addEventListener('DOMContentLoaded', function() {
             map.on('moveend', () => { updateVisibleList(); });
         });
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
+    }
+
+    // NOUVEAU : Fonction pour récupérer et afficher les frontières des villes
+    async function updateCityBoundaries(cities = []) {
+        console.log('[MAP_SCRIPT] Mise à jour des frontières pour les villes:', cities);
+
+        // Nettoyer les anciennes frontières
+        if (map.getLayer(LAYER_ID_CITY_BOUNDARIES)) map.removeLayer(LAYER_ID_CITY_BOUNDARIES);
+        if (map.getSource(SOURCE_ID_CITY_BOUNDARIES)) map.removeSource(SOURCE_ID_CITY_BOUNDARIES);
+
+        if (cities.length === 0) return;
+
+        try {
+            // Créer une liste de promesses pour chaque appel à l'API de géocodage
+            const promises = cities.map(city =>
+                fetch(`https://api.maptiler.com/geocoding/${encodeURIComponent(city)}.json?key=${MAPTILER_API_KEY}&language=fr&types=region,place`)
+                .then(response => {
+                    if (!response.ok) throw new Error(`Geocoding failed for ${city}`);
+                    return response.json();
+                })
+            );
+
+            const results = await Promise.all(promises);
+            
+            const boundaryFeatures = results.map(result => {
+                // On cherche la première feature qui a une géométrie
+                return result.features.find(feature => feature.geometry);
+            }).filter(Boolean); // On filtre les résultats non trouvés
+
+            if (boundaryFeatures.length === 0) {
+                console.warn('[MAP_SCRIPT] Aucune frontière trouvée pour les villes demandées.');
+                return;
+            }
+
+            const geojson = {
+                type: 'FeatureCollection',
+                features: boundaryFeatures
+            };
+
+            // Ajouter la source et la couche à la carte
+            map.addSource(SOURCE_ID_CITY_BOUNDARIES, { type: 'geojson', data: geojson });
+            map.addLayer({
+                id: LAYER_ID_CITY_BOUNDARIES,
+                type: 'line',
+                source: SOURCE_ID_CITY_BOUNDARIES,
+                layout: {
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                },
+                paint: {
+                    'line-color': '#007cff',
+                    'line-width': 2.5,
+                    'line-opacity': 0.8
+                }
+            }, LAYER_ID_NEIGHBORHOOD_FILL); // On place cette couche par-dessus les quartiers mais sous les annonces
+            
+            console.log('[MAP_SCRIPT] Frontières de villes affichées.');
+
+        } catch (error) {
+            console.error('[MAP_SCRIPT] Erreur lors de la récupération des frontières de ville:', error);
+        }
     }
 
     function handleDotHoverOrClick(e) {
