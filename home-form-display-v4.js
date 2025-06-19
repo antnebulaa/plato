@@ -171,12 +171,13 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
         // --- LOGIQUE D'AFFICHAGE ET MISE À JOUR DU BOUTON (C'EST CETTE PARTIE) ---
         if (itemsArray && Array.isArray(itemsArray)) {
             console.log(`[FETCH_PROCESS] Affichage de ${itemsArray.length} items. Total global rapporté pour bouton: ${totalItemsFromServer}.`);
-            renderAnnouncements(itemsArray, templateElement, itemsContainer, emptyMessage);
-            updateFilterButtonText(totalItemsFromServer); // APPEL CRUCIAL
+            // MODIFICATION ICI: on passe 'params' à renderAnnouncements
+            renderAnnouncements(itemsArray, templateElement, itemsContainer, emptyMessage, params); // <<<<<<<<<<<<<<<< MODIFIÉ
+            updateFilterButtonText(totalItemsFromServer);
         } else {
             console.warn('[FETCH_PROCESS] itemsArray final est null ou non tableau. Pas de rendu. Total rapporté pour bouton:', totalItemsFromServer);
             if (itemsContainer) itemsContainer.innerHTML = `<p style="color:orange;">${emptyMessage}</p>`;
-            updateFilterButtonText(totalItemsFromServer); // Mettre à jour le bouton même si pas d'items (pour afficher "0 trouvés")
+            updateFilterButtonText(totalItemsFromServer); 
         }
         // --- FIN DE LA LOGIQUE D'AFFICHAGE ---
 
@@ -188,7 +189,7 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
 }
 
     // --- Fonction pour afficher les données ---
-    function renderAnnouncements(items, templateNode, container, noDataMessage) {
+    function renderAnnouncements(items, templateNode, container, noDataMessage, params = {}) { // <<<<<<<<<<<<<<<< MODIFIÉ
     console.log(`[NEW_SCRIPT_RENDER] Rendu de ${items.length} items.`);
     container.innerHTML = ''; // Nettoyer le conteneur avant d'ajouter
 
@@ -316,11 +317,13 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
     
     // home-form-display-v4.js -> dans renderAnnouncements
 document.dispatchEvent(new CustomEvent('annoncesChargeesEtRendues', { 
-    detail: { 
-        container: container,
-        annonces: items // <-- AJOUT IMPORTANT : on passe le tableau d'items
-    } 
-}));
+        detail: { 
+            container: container,
+            annonces: items,
+            // AJOUT IMPORTANT : on passe les villes sélectionnées à l'événement
+            cities: params.city || [] // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< AJOUTÉ
+        } 
+    }));
     console.log("[NOM_DE_VOTRE_FONCTION_RENDER] Terminé.");
 }
         
