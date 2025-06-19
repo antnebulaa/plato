@@ -1,6 +1,6 @@
-// map-listings.js - VERSION 25 (Logique de clic et survol distincte et fonctionnelle)
+// map-listings.js - VERSION 26 (Clic final et robuste sur le popup)
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V25] Logique de clic et survol distincte.');
+    console.log('[MAP_SCRIPT V26] Clic final et robuste sur le popup.');
 
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const MAP_CONTAINER_ID = 'map-section';
@@ -62,7 +62,6 @@ document.addEventListener('DOMContentLoaded', function() {
             map.addLayer({ id: LAYER_ID_DOTS, type: 'circle', source: SOURCE_ID_ANNONCES, paint: { 'circle-radius': 5, 'circle-color': '#FFFFFF', 'circle-stroke-width': 1, 'circle-stroke-color': '#B4B4B4' } });
             map.addLayer({ id: LAYER_ID_PRICES, type: 'symbol', source: SOURCE_ID_ANNONCES, layout: { 'icon-image': 'circle-background', 'icon-size': 0.9, 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14, 'icon-allow-overlap': false, 'text-allow-overlap': false, 'icon-anchor': 'center', 'text-anchor': 'center' }, paint: { 'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'], 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] } });
 
-            // ÉCOUTEURS DÉDIÉS
             map.on('mouseenter', LAYER_ID_DOTS, handleDotHoverOrClick);
             map.on('click', LAYER_ID_DOTS, handleDotHoverOrClick);
             map.on('mouseleave', LAYER_ID_DOTS, () => {
@@ -78,27 +77,19 @@ document.addEventListener('DOMContentLoaded', function() {
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
 
-    // =================================================================
-    // == NOUVELLES FONCTIONS DE CLIC DÉDIÉES
-    // =================================================================
-
-    // FONCTION 1 : Pour les PETITS POINTS (au survol ET au clic)
     function handleDotHoverOrClick(e) {
         const priceFeatures = map.queryRenderedFeatures(e.point, { layers: [LAYER_ID_PRICES] });
-        if (priceFeatures.length > 0) { return; } // Si une grosse bulle est là, on ne fait rien
+        if (priceFeatures.length > 0) { return; }
         if (e.features.length > 0) {
             map.getCanvas().style.cursor = 'pointer';
-            if (hoverTooltip) { hoverTooltip.remove(); } // Retire l'ancien tooltip s'il existe
+            if (hoverTooltip) { hoverTooltip.remove(); }
             const properties = e.features[0].properties;
             const coordinates = e.features[0].geometry.coordinates.slice();
             hoverTooltip = new maplibregl.Popup({ closeButton: false, offset: 10, anchor: 'bottom', className: 'hover-popup' })
-                .setLngLat(coordinates)
-                .setHTML(`<div class="hover-popup-content">${properties.price}€</div>`)
-                .addTo(map);
+                .setLngLat(coordinates).setHTML(`<div class="hover-popup-content">${properties.price}€</div>`).addTo(map);
         }
     }
 
-    // FONCTION 2 : Pour les GROSSES BULLES DE PRIX (uniquement au clic)
     function handlePriceBubbleClick(e) {
         if (hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; }
         if (e.features && e.features.length > 0) {
@@ -115,8 +106,6 @@ document.addEventListener('DOMContentLoaded', function() {
             map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: clickedPinId }, { selected: true });
             selectedPinId = clickedPinId;
 
-            const detailLink = `annonce?id=${properties.id_str}`;
-
             if (isMobile) {
                 if (currentPopup) { currentPopup.remove(); }
                 openMobileBottomSheet(properties);
@@ -125,12 +114,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 const popupHTML = createPopupHTML(properties);
                 currentPopup = new maplibregl.Popup({ offset: 25, closeButton: true, className: 'airbnb-style-popup' })
                     .setLngLat(feature.geometry.coordinates.slice()).setHTML(popupHTML).addTo(map);
-                
-                // On rend le popup entièrement cliquable avec son propre écouteur
-                currentPopup.getElement().addEventListener('click', () => {
-                    window.open(detailLink, '_blank'); // Ouvre dans un nouvel onglet
-                });
-
                 currentPopup.on('close', () => {
                     if (selectedPinId === clickedPinId) { map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false }); selectedPinId = null; }
                     currentPopup = null;
@@ -139,7 +122,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Le contenu du popup n'est plus un lien, mais une simple div.
+    // =========================================================================================
+    // == CORRECTION DE LA STRUCTURE HTML DU POPUP POUR UN LIEN GLOBAL FIABLE
+    // =========================================================================================
     function createPopupHTML(properties) {
         const placeholderImage = 'https://via.placeholder.com/280x150/cccccc/969696?text=Image';
         const coverPhoto = properties.coverPhoto || placeholderImage;
@@ -153,22 +138,27 @@ document.addEventListener('DOMContentLoaded', function() {
         if (properties.area) details.push(`${properties.area}m²`);
         const descriptionHTML = details.length > 0 ? `<p class="popup-description">${details.join(' • ')}</p>` : '';
         const priceHTML = `<p class="popup-price">${properties.price || '?'}€ <span class="popup-price-period">par mois CC</span></p>`;
+        const detailLink = `annonce?id=${properties.id_str}`;
         
-        // La div racine a une classe spéciale pour le curseur
-        return `<div class="map-custom-popup clickable-popup">
-                    <img src="${coverPhoto}" alt="${title}" class="popup-image" onerror="this.src='${placeholderImage}'">
-                    <div class="popup-info">
-                        <h4 class="popup-title">${title}</h4>
-                        ${descriptionHTML}
-                        ${priceHTML}
+        // La structure est une DIV qui contient un LIEN, qui contient le contenu visuel.
+        // C'est la méthode la plus compatible.
+        return `<div>
+                  <a href="${detailLink}" class="popup-container-link" target="_blank">
+                    <div class="map-custom-popup">
+                        <img src="${coverPhoto}" alt="${title}" class="popup-image" onerror="this.src='${placeholderImage}'">
+                        <div class="popup-info">
+                            <h4 class="popup-title">${title}</h4>
+                            ${descriptionHTML}
+                            ${priceHTML}
+                        </div>
                     </div>
+                  </a>
                 </div>`;
     }
 
-    // Le reste des fonctions est correct et n'a pas besoin de modification.
     function updateVisibleList() { if (!map || !map.isStyleLoaded() || !listContainer) return; const visibleFeatures = map.queryRenderedFeatures({ layers: [LAYER_ID_DOTS] }); const visiblePropertyIds = new Set(visibleFeatures.map(feature => String(feature.properties.id))); const allListItems = listContainer.querySelectorAll('[data-property-id]'); allListItems.forEach(itemDiv => { const itemIdString = itemDiv.dataset.propertyId; const anchorTag = itemDiv.parentElement; if (!anchorTag || anchorTag.tagName !== 'A') { itemDiv.style.display = visiblePropertyIds.has(itemIdString) ? '' : 'none'; return; } if (visiblePropertyIds.has(itemIdString)) { anchorTag.classList.remove('annonce-list-item-hidden'); } else { anchorTag.classList.add('annonce-list-item-hidden'); } }); if (isMobile && mobileToggleButton) { mobileToggleButton.textContent = `Voir les ${visiblePropertyIds.size} logements`; } }
     function getBounds(geojson) { const bounds = new maplibregl.LngLatBounds(); geojson.features.forEach(feature => { bounds.extend(feature.geometry.coordinates); }); return bounds; }
-    function openMobileBottomSheet(properties) { if (!mobileBottomSheet || !mobileBottomSheetContent) return; const contentHTML = createPopupHTML(properties); mobileBottomSheetContent.innerHTML = contentHTML; mobileBottomSheet.classList.add('visible'); const link = mobileBottomSheet.querySelector('.popup-container-link'); if(link) { link.addEventListener('click', (e) => { e.stopPropagation(); }); } }
+    function openMobileBottomSheet(properties) { if (!mobileBottomSheet || !mobileBottomSheetContent) return; const contentHTML = createPopupHTML(properties); mobileBottomSheetContent.innerHTML = contentHTML; mobileBottomSheet.classList.add('visible');}
     function closeMobileBottomSheet() { if (!mobileBottomSheet) return; mobileBottomSheet.classList.remove('visible'); setTimeout(() => { if (mobileBottomSheetContent) mobileBottomSheetContent.innerHTML = ''; }, 350); if (map && selectedPinId !== null) { map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false }); selectedPinId = null; } }
     function getNestedValue(obj, path) { if (!path) return undefined; return path.split('.').reduce((acc, part) => (acc && acc[part] !== undefined) ? (isNaN(parseInt(part, 10)) ? acc[part] : acc[parseInt(part, 10)]) : undefined, obj); }
     if (isMobile && mobileToggleButton) { mobileToggleButton.addEventListener('click', () => { document.body.classList.toggle('map-is-active'); if (document.body.classList.contains('map-is-active')) { if (map) map.resize(); mobileToggleButton.textContent = `Voir la liste`; } else { if (listContainer) listContainer.scrollTo(0, 0); mobileToggleButton.textContent = `Afficher la carte`; } }); }
