@@ -1,12 +1,14 @@
-// map-listings.js - VERSION 20 (Retour à la logique de clic fiable de la v13)
+// map-listings.js - VERSION 21 (Fusion : Affichage V19 + Clic V13)
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V20] Retour à la logique de clic fiable avec popup sur desktop.');
+    console.log('[MAP_SCRIPT V21] Fusion de la logique de clic V13 et de l\'affichage V19.');
 
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const MAP_CONTAINER_ID = 'map-section';
     const LIST_CONTAINER_ID = 'annonces-wrapper';
     const MOBILE_TOGGLE_BUTTON_ID = 'mobile-map-toggle';
     const SOURCE_ID_ANNONCES = 'annonces-source';
+
+    // On utilise les noms de couches du système visuel moderne
     const LAYER_ID_DOTS = 'annonces-dots-layer';
     const LAYER_ID_PRICES = 'annonces-prices-layer';
     
@@ -16,7 +18,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let map = null;
     let allAnnouncements = [];
     let isMobile = window.innerWidth < 768;
-    let currentPopup = null; // Réintroduction de la variable pour le popup desktop
+    let currentPopup = null; // ESSENTIEL : On réintroduit la variable pour le popup desktop
     let selectedPinId = null;
     let hoverPopup = null;
 
@@ -54,7 +56,24 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     const createCircleSdf = (size) => { const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size; const context = canvas.getContext('2d'); const radius = size / 2; context.beginPath(); context.arc(radius, radius, radius - 2, 0, 2 * Math.PI, false); context.fillStyle = 'white'; context.fill(); return context.getImageData(0, 0, size, size); };
-    function convertAnnoncesToGeoJSON(annonces) { const features = annonces.map(annonce => { const lat = getNestedValue(annonce, 'latitude'); const lng = getNestedValue(annonce, 'longitude'); if (annonce.id === undefined || annonce.id === null || lat === undefined || lng === undefined) return null; let featureId = parseInt(annonce.id, 10); if (isNaN(featureId)) return null; return { type: 'Feature', id: featureId, geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] }, properties: { id: featureId, id_str: String(annonce.id), price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?', coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url'), house_type: getNestedValue(annonce, 'house_type'), city: getNestedValue(annonce, 'city'), rooms: getNestedValue(annonce, 'rooms'), bedrooms: getNestedValue(annonce, 'bedrooms'), area: getNestedValue(annonce, 'area') } }; }).filter(Boolean); return { type: 'FeatureCollection', features }; }
+
+    function convertAnnoncesToGeoJSON(annonces) {
+        const features = annonces.map(annonce => {
+            // CORRECTION : On utilise le bon chemin pour les coordonnées, comme dans les versions récentes
+            const lat = getNestedValue(annonce, 'latitude');
+            const lng = getNestedValue(annonce, 'longitude');
+            
+            if (annonce.id === undefined || annonce.id === null || lat === undefined || lng === undefined) return null;
+            let featureId = parseInt(annonce.id, 10);
+            if (isNaN(featureId)) return null;
+            
+            return {
+                type: 'Feature', id: featureId, geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] },
+                properties: { id: featureId, id_str: String(annonce.id), price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?', coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url'), house_type: getNestedValue(annonce, 'house_type'), city: getNestedValue(annonce, 'city'), rooms: getNestedValue(annonce, 'rooms'), bedrooms: getNestedValue(annonce, 'bedrooms'), area: getNestedValue(annonce, 'area') }
+            };
+        }).filter(Boolean);
+        return { type: 'FeatureCollection', features };
+    }
 
     function initializeMap(initialGeoJSON) {
         map = new maplibregl.Map({ container: MAP_CONTAINER_ID, style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`, pitch: 0, bearing: 0, navigationControl: false, renderWorldCopies: false });
@@ -91,9 +110,6 @@ document.addEventListener('DOMContentLoaded', function() {
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
 
-    // =================================================================
-    // == CORRECTION : RESTAURATION DE LA LOGIQUE DE CLIC DE LA V13 ==
-    // =================================================================
     function handleMapClick(e) {
         // On ne met PAS e.preventDefault() ici pour ne pas bloquer les clics sur les liens
         if (hoverPopup) {
@@ -118,9 +134,12 @@ document.addEventListener('DOMContentLoaded', function() {
             selectedPinId = clickedPinId;
 
             if (isMobile) {
+                if (currentPopup) { currentPopup.remove(); currentPopup = null; }
                 openMobileBottomSheet(properties);
             } else {
-                // RETOUR À LA LOGIQUE QUI FONCTIONNE : CRÉER UN POPUP
+                // =======================================================
+                // == RETOUR À LA LOGIQUE QUI FONCTIONNE (TYPE V13) ======
+                // =======================================================
                 if (currentPopup) {
                     currentPopup.remove();
                 }
@@ -130,7 +149,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     .setHTML(popupHTML)
                     .addTo(map);
 
-                // Gérer la déselection quand on ferme le popup avec la croix
                 currentPopup.on('close', () => {
                     if (selectedPinId === clickedPinId) {
                         map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false });
