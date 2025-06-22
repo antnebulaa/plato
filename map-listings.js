@@ -1,6 +1,6 @@
-// map-listings.js - VERSION 38 (Basé sur V26 + Corrections + Quartiers)
+// map-listings.js - VERSION MISE À JOUR
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT V38] Reprise de la base V26 fonctionnelle + ajout des quartiers.');
+    console.log('[MAP_SCRIPT] Initialisation avec filtre dynamique des quartiers par ville.');
 
     // --- Constantes de base (inchangées) ---
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
@@ -13,9 +13,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // --- NOUVEAU : Constantes pour les couches de quartiers ---
     const QUARTIERS_TILESET_ID = '01978de1-8434-7672-9f69-d320e76122ea';
-    const QUARTIERS_SOURCE_LAYER_NAME = 'quartier_france_simpl';
+    const QUARTIERS_SOURCE_LAYER_NAME = 'quartier_france_simpl'; // Confirmé par votre screenshot
     const SOURCE_ID_QUARTIERS = 'quartiers-source-vector';
-    const LAYER_ID_QUARTIERS_FILL = 'quartiers-fill-layer';
+    // MODIFIÉ : On utilise maintenant un ID pour une couche de LIGNES
+    const LAYER_ID_QUARTIERS_LINES = 'quartiers-lines-layer';
+    // IMPORTANT : Nom du champ dans votre Tileset qui contient le nom de la ville/commune.
+    // 'nom_com' est un standard fréquent, mais vérifiez-le dans votre interface MapTiler (voir instructions plus bas).
+    const QUARTIERS_CITY_FIELD_NAME = 'nom_com';
 
     const listContainer = document.getElementById(LIST_CONTAINER_ID);
     const mobileToggleButton = document.getElementById(MOBILE_TOGGLE_BUTTON_ID);
@@ -41,12 +45,22 @@ document.addEventListener('DOMContentLoaded', function() {
         bottomSheetCloseButton.addEventListener('click', (e) => { e.stopPropagation(); closeMobileBottomSheet(); });
     }
     
-    // La gestion de l'événement 'annoncesChargeesEtRendues' de la V26
+    // MODIFIÉ : Le gestionnaire d'événement récupère maintenant les villes sélectionnées
     document.addEventListener('annoncesChargeesEtRendues', (event) => {
         const annonces = event.detail.annonces;
+        // NOUVEAU : Récupérer les villes depuis l'événement. Le `|| []` est une sécurité.
+        const selectedCities = event.detail.cities || [];
+        
+        console.log('[MAP_SCRIPT] Événement "annoncesChargeesEtRendues" reçu avec :', {
+             annoncesCount: annonces ? annonces.length : 0,
+             cities: selectedCities 
+        });
+
         if (!annonces || !Array.isArray(annonces)) return;
+
         allAnnouncements = annonces;
         const geojsonData = convertAnnoncesToGeoJSON(allAnnouncements);
+        
         if (!map) {
             initializeMap(geojsonData);
         } else {
@@ -54,6 +68,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (geojsonData.features.length > 0) { const bounds = getBounds(geojsonData); map.fitBounds(bounds, { padding: 80, maxZoom: 16 }); }
             else { map.flyTo({ center: [2.3522, 48.8566], zoom: 11 }); }
         }
+
+        // NOUVEAU : On met à jour la couche des quartiers à chaque fois que les annonces changent.
+        updateQuartiersLayer(selectedCities);
     });
     
     const createCircleSdf = (size) => { const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size; const context = canvas.getContext('2d'); const radius = size / 2; context.beginPath(); context.arc(radius, radius, radius - 2, 0, 2 * Math.PI, false); context.fillStyle = 'white'; context.fill(); return context.getImageData(0, 0, size, size); };
@@ -65,61 +82,80 @@ document.addEventListener('DOMContentLoaded', function() {
         if (initialGeoJSON.features.length > 0) { const bounds = getBounds(initialGeoJSON); map.fitBounds(bounds, { padding: 80, duration: 0, maxZoom: 16 }); } else { map.setCenter([2.3522, 48.8566]); map.setZoom(11); }
 
         map.on('load', () => {
-            // ▼▼▼ AJOUT LOGIQUE DES QUARTIERS (CORRIGÉ) ▼▼▼
+            // ▼▼▼ MODIFIÉ : Logique des quartiers ▼▼▼
 
-            // 1. Ajout de la source pour les quartiers avec la bonne URL
+            // 1. Ajout de la source pour les quartiers (inchangé)
             map.addSource(SOURCE_ID_QUARTIERS, {
                 type: 'vector',
                 url: `https://api.maptiler.com/data/${QUARTIERS_TILESET_ID}/tiles.json?key=${MAPTILER_API_KEY}`
             });
 
-            // On trouve la première couche de texte/labels pour insérer les quartiers en dessous
             const firstSymbolLayer = map.getStyle().layers.find(layer => layer.type === 'symbol');
 
-            // 2. Ajout de la couche de remplissage pour les quartiers
+            // 2. Ajout de la couche de LIGNES pour les contours des quartiers
             map.addLayer({
-                id: LAYER_ID_QUARTIERS_FILL,
-                type: 'fill',
+                id: LAYER_ID_QUARTIERS_LINES,
+                type: 'line', // On utilise 'line' au lieu de 'fill'
                 source: SOURCE_ID_QUARTIERS,
                 'source-layer': QUARTIERS_SOURCE_LAYER_NAME,
                 paint: {
-                    'fill-color': 'rgba(8, 153, 153, 0.1)', // Turquoise discret
-                    'fill-outline-color': 'rgba(8, 153, 153, 0.3)'
-                }
+                    'line-color': '#089999', // Couleur principale de la ligne (turquoise)
+                    'line-width': 2,         // Épaisseur de la ligne
+                    'line-opacity': 0.8      // Opacité
+                },
+                // NOUVEAU : Filtre initial qui ne correspond à rien, pour que la couche soit vide au démarrage.
+                filter: ['==', QUARTIERS_CITY_FIELD_NAME, ''] 
             }, firstSymbolLayer ? firstSymbolLayer.id : undefined);
             
-            // ▲▲▲ FIN DE L'AJOUT POUR LES QUARTIERS ▲▲▲
+            // ▲▲▲ FIN DE LA MODIFICATION POUR LES QUARTIERS ▲▲▲
 
 
-            // ▼▼▼ LOGIQUE ORIGINALE DE LA V26 (CONSERVÉE ET FONCTIONNELLE) ▼▼▼
-
-            // Ligne essentielle pour les bulles, qui avait été supprimée. La voici de retour.
+            // ▼▼▼ LOGIQUE ORIGINALE DES ANNONCES (CONSERVÉE ET FONCTIONNELLE) ▼▼▼
             map.addImage('circle-background', createCircleSdf(64), { sdf: true });
-            
             map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
-            
-            // Ajout des couches pour les annonces (par-dessus les quartiers)
             map.addLayer({ id: LAYER_ID_DOTS, type: 'circle', source: SOURCE_ID_ANNONCES, paint: { 'circle-radius': 5, 'circle-color': '#FFFFFF', 'circle-stroke-width': 1, 'circle-stroke-color': '#B4B4B4' } });
             map.addLayer({ id: LAYER_ID_PRICES, type: 'symbol', source: SOURCE_ID_ANNONCES, layout: { 'icon-image': 'circle-background', 'icon-size': 0.9, 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14, 'icon-allow-overlap': false, 'text-allow-overlap': false, 'icon-anchor': 'center', 'text-anchor': 'center' }, paint: { 'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'], 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] } });
-
             map.on('mouseenter', LAYER_ID_DOTS, handleDotHoverOrClick);
             map.on('click', LAYER_ID_DOTS, handleDotHoverOrClick);
-            map.on('mouseleave', LAYER_ID_DOTS, () => {
-                map.getCanvas().style.cursor = '';
-                if(hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; }
-            });
-            
+            map.on('mouseleave', LAYER_ID_DOTS, () => { map.getCanvas().style.cursor = ''; if(hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; } });
             map.on('click', LAYER_ID_PRICES, handlePriceBubbleClick);
-
             map.on('idle', () => { updateVisibleList(); });
             map.on('moveend', () => { updateVisibleList(); });
-
-            // ▲▲▲ FIN DE LA LOGIQUE ORIGINALE V26 ▲▲▲
+            // ▲▲▲ FIN DE LA LOGIQUE ORIGINALE DES ANNONCES ▲▲▲
         });
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
 
-    // --- Toutes les fonctions suivantes sont identiques à votre version V26 ---
+    // NOUVEAU : Fonction dédiée à la mise à jour du filtre de la couche des quartiers
+    function updateQuartiersLayer(selectedCities = []) {
+        // Sécurité : ne fait rien si la carte ou la couche n'est pas encore prête
+        if (!map || !map.isStyleLoaded() || !map.getLayer(LAYER_ID_QUARTIERS_LINES)) {
+            // On peut essayer de relancer après un court délai si la carte est en train de se charger
+            setTimeout(() => updateQuartiersLayer(selectedCities), 200);
+            return;
+        }
+
+        // Si aucune ville n'est sélectionnée (ou que le tableau est vide)
+        if (!selectedCities || selectedCities.length === 0) {
+            console.log("[MAP_SCRIPT] Aucune ville sélectionnée, masquage des contours de quartiers.");
+            // On applique un filtre qui ne correspond à rien pour tout cacher
+            map.setFilter(LAYER_ID_QUARTIERS_LINES, ['==', QUARTIERS_CITY_FIELD_NAME, '']);
+            return;
+        }
+
+        console.log(`[MAP_SCRIPT] Mise à jour du filtre des quartiers pour les villes :`, selectedCities);
+
+        // On construit le filtre MapLibre.
+        // L'expression ['in', field, ...values] est parfaite pour ça.
+        // Elle vérifie si la valeur du champ (ex: 'nom_com') est l'une des valeurs du tableau.
+        const filter = ['in', QUARTIERS_CITY_FIELD_NAME, ...selectedCities];
+
+        // On applique le filtre à la couche des lignes
+        map.setFilter(LAYER_ID_QUARTIERS_LINES, filter);
+    }
+
+
+    // --- Toutes les fonctions suivantes sont identiques à votre version fonctionnelle ---
     function handleDotHoverOrClick(e) {
         const priceFeatures = map.queryRenderedFeatures(e.point, { layers: [LAYER_ID_PRICES] });
         if (priceFeatures.length > 0) { return; }
