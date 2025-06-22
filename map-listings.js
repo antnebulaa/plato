@@ -89,14 +89,17 @@ function initializeMap(initialGeoJSON) {
         // 1. Ajout de la source pour les quartiers avec la bonne URL et le bon ID
         // C'est ici que nous utilisons le nouvel ID que vous avez trouvé.
         map.addSource(SOURCE_ID_QUARTIERS, {
-            type: 'vector',
-            // On ne cherche plus un fichier tiles.json, on construit l'URL des tuiles directement.
-            tiles: [
-                `https://api.maptiler.com/tiles/01978dde-e6c0-7db6-ad88-68aeafdf00dc/{z}/{x}/{y}.pbf?key=${MAPTILER_API_KEY}`
-            ],
-            minzoom: 0,
-            maxzoom: 14
-        });
+    type: 'vector',
+    tiles: [
+        `https://api.maptiler.com/tiles/01978dde-e6c0-7db6-ad88-68aeafdf00dc/{z}/{x}/{y}.pbf?key=${MAPTILER_API_KEY}`
+    ],
+    minzoom: 0, // Laissez à 0 ou ajustez si nécessaire
+    
+    // ▼▼▼ MODIFICATION IMPORTANTE ▼▼▼
+    // Remplacez 14 par le niveau de zoom MAXIMUM indiqué sur MapTiler pour votre tileset.
+    // Si c'est 11, par exemple, mettez 11.
+    maxzoom: 11 // <--- VÉRIFIEZ ET AJUSTEZ CETTE VALEUR
+});
 
         // On trouve la première couche de texte/labels pour insérer les quartiers en dessous
         const firstSymbolLayer = map.getStyle().layers.find(layer => layer.type === 'symbol');
