@@ -22,6 +22,31 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let map = null;
     let allAnnouncements = [];
+    // --- NOUVEAU : Logique simplifiée pour afficher/masquer les contours des quartiers ---
+
+// Écouteur pour la sélection d'une ville (doit être déclenché par votre script d'autocomplete)
+document.addEventListener('city:selected', (event) => {
+    if (!map || !map.isStyleLoaded()) return;
+
+    const { cityData } = event.detail;
+
+    // 1. Zoom sur la ville sélectionnée
+    map.fitBounds(cityData.bounds, { padding: 80, duration: 800 });
+
+    // 2. On rend la couche des contours visible
+    map.setLayoutProperty('quartiers-lines-layer', 'visibility', 'visible');
+});
+
+// Écouteur pour la suppression d'une ville
+document.addEventListener('city:removed', (event) => {
+    if (!map || !map.isStyleLoaded()) return;
+
+    // Vérifie si c'était la dernière ville à être supprimée
+    if (typeof selectedCities !== 'undefined' && selectedCities.length === 0) {
+        // S'il n'y a plus de villes, on cache les contours
+        map.setLayoutProperty('quartiers-lines-layer', 'visibility', 'none');
+    }
+});
     let isMobile = window.innerWidth < 768;
     let currentPopup = null;
     let selectedPinId = null;
@@ -73,20 +98,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 url: `https://api.maptiler.com/data/${QUARTIERS_TILESET_ID}/tiles.json?key=${MAPTILER_API_KEY}`
             });
 
-            // On trouve la première couche de texte/labels pour insérer les quartiers en dessous
-            const firstSymbolLayer = map.getStyle().layers.find(layer => layer.type === 'symbol');
+           // 2. Ajout des couches pour les quartiers (invisibles par défaut)
+const firstSymbolLayer = map.getStyle().layers.find(layer => layer.type === 'symbol');
 
-            // 2. Ajout de la couche de remplissage pour les quartiers
-            map.addLayer({
-                id: LAYER_ID_QUARTIERS_FILL,
-                type: 'fill',
-                source: SOURCE_ID_QUARTIERS,
-                'source-layer': QUARTIERS_SOURCE_LAYER_NAME,
-                paint: {
-                    'fill-color': 'rgba(8, 153, 153, 0.1)', // Turquoise discret
-                    'fill-outline-color': 'rgba(8, 153, 153, 0.3)'
-                }
-            }, firstSymbolLayer ? firstSymbolLayer.id : undefined);
+// Couche pour les CONTOURS (celle que nous allons afficher)
+map.addLayer({
+    id: 'quartiers-lines-layer', // ID pour les contours
+    type: 'line',
+    source: SOURCE_ID_QUARTIERS, // Utilise la même source que vous aviez déjà
+    'source-layer': QUARTIERS_SOURCE_LAYER_NAME,
+    paint: {
+        'line-color': '#089999', // Couleur des contours
+        'line-width': 1.5,
+        'line-opacity': 0.8
+    },
+    layout: {
+        'visibility': 'none' // Invisible par défaut
+    }
+}, firstSymbolLayer ? firstSymbolLayer.id : undefined);
             
             // ▲▲▲ FIN DE L'AJOUT POUR LES QUARTIERS ▲▲▲
 
