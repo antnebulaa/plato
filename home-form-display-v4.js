@@ -639,7 +639,7 @@ function collectFilterValues(formElement) {
    // Ajout des villes sélectionnées (si `selectedCities` est accessible)
     if (typeof selectedCities !== 'undefined' && selectedCities.length > 0) {
         // On envoie une copie du tableau pour éviter les modifications par référence
-        params['city'] = [...selectedCities];
+       params['city'] = selectedCities.map(c => c.name); 
         console.log(`[FILTRES_COLLECT] Villes sélectionnées ajoutées:`, JSON.stringify(params['city']));
     } else {
         console.log("[FILTRES_COLLECT] Aucune ville sélectionnée via les tags.");
