@@ -60,39 +60,18 @@ async function fetchAnnouncements(params = {}) { // <<<< ACCEPTE params ICI, ave
     let paramsForURL = { ...params }; // Copier les params pour ne pas modifier l'original si besoin ailleurs
 
         // --- MODIFICATION IMPORTANTE POUR LES FILTRES DE TYPE TABLEAU (comme house_type) ---
-// Gestion de house_type
-if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
-    if (paramsForURL.house_type.length > 0) {
-        if (paramsForURL.house_type.length === 1) {
-            // Si un seul élément, envoyer comme une chaîne simple
-            paramsForURL.house_type = paramsForURL.house_type[0];
-            console.log(`[NEW_SCRIPT_FETCH_DEBUG] house_type (valeur unique) transformé en string: "${paramsForURL.house_type}"`);
+// MODIFIÉ : Traitement générique pour les filtres de type tableau
+['house_type', 'city', 'quartier'].forEach(key => {
+    if (paramsForURL[key] && Array.isArray(paramsForURL[key])) {
+        if (paramsForURL[key].length > 0) {
+            paramsForURL[key] = paramsForURL[key].join(',');
+            console.log(`[NEW_SCRIPT_FETCH_DEBUG] Paramètre '<span class="math-inline">\{key\}' transformé en CSV\: "</span>{paramsForURL[key]}"`);
         } else {
-            // Si plusieurs éléments, envoyer comme une chaîne CSV (séparée par des virgules)
-            paramsForURL.house_type = paramsForURL.house_type.join(','); // <--- REVENIR A JOIN(',')
-            console.log(`[NEW_SCRIPT_FETCH_DEBUG] house_type (valeurs multiples) transformé en CSV string: "${paramsForURL.house_type}"`);
-        }
-    } else {
-        // Si le tableau est vide, supprimer le paramètre
-        delete paramsForURL.house_type;
-        console.log("[NEW_SCRIPT_FETCH_DEBUG] house_type était un tableau vide, supprimé des paramètres URL.");
-    }
-}
-        // Répétez ce bloc if ci-dessus pour d'autres filtres qui seraient des tableaux et que Xano attend en CSV
-
-    // NOUVEAU : Gestion de city (similaire à house_type)
-    if (paramsForURL.city && Array.isArray(paramsForURL.city)) {
-        if (paramsForURL.city.length > 0) {
-            if (paramsForURL.city.length === 1) {
-                paramsForURL.city = paramsForURL.city[0]; // Une seule ville -> chaîne simple
-            } else {
-                paramsForURL.city = paramsForURL.city.join(','); // Plusieurs villes -> chaîne CSV
-            }
-            console.log(`[NEW_SCRIPT_FETCH_DEBUG] city transformé en: "${paramsForURL.city}"`);
-        } else {
-            delete paramsForURL.city; // Tableau de villes vide, on supprime le paramètre
+            delete paramsForURL[key]; // Supprimer si le tableau est vide
+            console.log(`[NEW_SCRIPT_FETCH_DEBUG] Paramètre '${key}' était un tableau vide, supprimé.`);
         }
     }
+});
     // Construction de l'URL (s'assurer que paramsForURL est bien utilisé pour cleanParamsForURL)
     if (Object.keys(paramsForURL).length > 0) {
         const cleanParamsForURL = {};
@@ -316,14 +295,14 @@ if (paramsForURL.house_type && Array.isArray(paramsForURL.house_type)) {
     }
     
     // home-form-display-v4.js -> dans renderAnnouncements
-document.dispatchEvent(new CustomEvent('annoncesChargeesEtRendues', { 
-        detail: { 
-            container: container,
-            annonces: items,
-            // AJOUT IMPORTANT : on passe les villes sélectionnées à l'événement
-            cities: params.city || [] // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< AJOUTÉ
-        } 
-    }));
+// MODIFIÉ : On envoie les 'quartiers' sélectionnés à la carte
+document.dispatchEvent(new CustomEvent('annoncesChargeesEtRendues', {
+    detail: {
+        container: container,
+        annonces: items,
+        quartiers: params.quartier || [] // 'quartier' vient des paramètres de recherche
+    }
+}));
     console.log("[NOM_DE_VOTRE_FONCTION_RENDER] Terminé.");
 }
         
@@ -665,6 +644,15 @@ function collectFilterValues(formElement) {
     } else {
         console.log("[FILTRES_COLLECT] Aucune ville sélectionnée via les tags.");
     }
+
+    // NOUVEAU: Ajout des quartiers sélectionnés
+if (typeof getSelectedNeighborhoods === 'function') {
+    const neighborhoods = getSelectedNeighborhoods();
+    if (neighborhoods.length > 0) {
+        params['quartier'] = neighborhoods;
+        console.log(`[FILTRES_COLLECT] Quartiers sélectionnés ajoutés:`, JSON.stringify(params['quartier']));
+    }
+}
 
     console.log("[FILTRES_COLLECT] Paramètres collectés finaux (avant envoi API):", JSON.stringify(params));
     return params;
