@@ -11,15 +11,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const LAYER_ID_DOTS = 'annonces-dots-layer';
     const LAYER_ID_PRICES = 'annonces-prices-layer';
     
-    // --- NOUVEAU : Constantes pour les couches de quartiers ---
-    const QUARTIERS_TILESET_ID = '01978de1-8434-7672-9f69-d320e76122ea';
-    const QUARTIERS_SOURCE_LAYER_NAME = 'quartier_france_simpl'; // Confirmé par votre screenshot
-    const SOURCE_ID_QUARTIERS = 'quartiers-source-vector';
-    // MODIFIÉ : On utilise maintenant un ID pour une couche de LIGNES
-    const LAYER_ID_QUARTIERS_LINES = 'quartiers-lines-layer';
-    // IMPORTANT : Nom du champ dans votre Tileset qui contient le nom de la ville/commune.
-    // 'nom_com' est un standard fréquent, mais vérifiez-le dans votre interface MapTiler (voir instructions plus bas).
-    const QUARTIERS_CITY_FIELD_NAME = 'nom_commune';
+    // ▼▼▼ REMPLACEZ TOUT CE BLOC DANS VOTRE FICHIER ▼▼▼
+
+// --- NOUVEAU : Constantes pour les couches de quartiers ---
+const QUARTIERS_TILESET_ID = 'quartier_france_simpl'; // <-- L'ID CORRECT DU TILESET
+const QUARTIERS_SOURCE_LAYER_NAME = 'quartier_france_simpl';
+const SOURCE_ID_QUARTIERS = 'quartiers-source-vector';
+const LAYER_ID_QUARTIERS_LINES = 'quartiers-lines-layer';
+const QUARTIERS_CITY_FIELD_NAME = 'nom_commune'; // <-- Le nom correct du champ pour la ville
+
+// ▲▲▲ FIN DU BLOC À REMPLACER ▲▲▲
 
     const listContainer = document.getElementById(LIST_CONTAINER_ID);
     const mobileToggleButton = document.getElementById(MOBILE_TOGGLE_BUTTON_ID);
