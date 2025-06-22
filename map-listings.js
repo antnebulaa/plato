@@ -66,20 +66,32 @@ document.addEventListener('city:removed', (event) => {
         bottomSheetCloseButton.addEventListener('click', (e) => { e.stopPropagation(); closeMobileBottomSheet(); });
     }
     
-    // La gestion de l'événement 'annoncesChargeesEtRendues' de la V26
-    document.addEventListener('annoncesChargeesEtRendues', (event) => {
-        const annonces = event.detail.annonces;
-        if (!annonces || !Array.isArray(annonces)) return;
-        allAnnouncements = annonces;
-        const geojsonData = convertAnnoncesToGeoJSON(allAnnouncements);
-        if (!map) {
-            initializeMap(geojsonData);
-        } else {
-            map.getSource(SOURCE_ID_ANNONCES).setData(geojsonData);
-            if (geojsonData.features.length > 0) { const bounds = getBounds(geojsonData); map.fitBounds(bounds, { padding: 80, maxZoom: 16 }); }
-            else { map.flyTo({ center: [2.3522, 48.8566], zoom: 11 }); }
-        }
-    });
+    // Dans map-listings.js
+document.addEventListener('annoncesChargeesEtRendues', (event) => {
+    const { annonces, quartiers } = event.detail;
+    if (!annonces || !Array.isArray(annonces)) return;
+
+    // On utilise bien les nouvelles annonces reçues
+    const geojsonData = convertAnnoncesToGeoJSON(annonces);
+
+    if (!map) {
+        // Si la carte n'existe pas du tout, on l'initialise
+        initializeMap(geojsonData);
+    } else if (map.isStyleLoaded() && map.getSource('annonces-source')) {
+        // CORRIGÉ : On met à jour seulement si la carte ET la source sont prêtes
+        console.log('[MAP] Carte prête, mise à jour de la source des annonces.');
+        map.getSource('annonces-source').setData(geojsonData);
+        updateNeighborhoodHighlight(quartiers || []);
+    } else {
+        // Si la carte n'est pas prête, on attend qu'elle le soit pour faire la mise à jour
+        console.warn('[MAP] Événement reçu, mais carte non prête. Mise à jour en attente.');
+        map.once('load', () => {
+            console.log('[MAP] Carte enfin prête, mise à jour différée effectuée.');
+            map.getSource('annonces-source').setData(geojsonData);
+            updateNeighborhoodHighlight(quartiers || []);
+        });
+    }
+});
     
     const createCircleSdf = (size) => { const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size; const context = canvas.getContext('2d'); const radius = size / 2; context.beginPath(); context.arc(radius, radius, radius - 2, 0, 2 * Math.PI, false); context.fillStyle = 'white'; context.fill(); return context.getImageData(0, 0, size, size); };
     function convertAnnoncesToGeoJSON(annonces) { const features = annonces.map(annonce => { const lat = getNestedValue(annonce, 'geo_location.data.lat'); const lng = getNestedValue(annonce, 'geo_location.data.lng'); if (annonce.id === undefined || annonce.id === null || lat === undefined || lng === undefined) return null; let featureId = parseInt(annonce.id, 10); if (isNaN(featureId)) return null; return { type: 'Feature', id: featureId, geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] }, properties: { id: featureId, id_str: String(annonce.id), price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?', coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url'), house_type: getNestedValue(annonce, 'house_type'), city: getNestedValue(annonce, 'city'), rooms: getNestedValue(annonce, 'rooms'), bedrooms: getNestedValue(annonce, 'bedrooms'), area: getNestedValue(annonce, 'area') } }; }).filter(Boolean); return { type: 'FeatureCollection', features }; }
