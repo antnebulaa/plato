@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const LAYER_ID_QUARTIERS_LINES = 'quartiers-lines-layer';
     // IMPORTANT : Nom du champ dans votre Tileset qui contient le nom de la ville/commune.
     // 'nom_com' est un standard fréquent, mais vérifiez-le dans votre interface MapTiler (voir instructions plus bas).
-    const QUARTIERS_CITY_FIELD_NAME = 'nom_com';
+    const QUARTIERS_CITY_FIELD_NAME = 'nom_commune';
 
     const listContainer = document.getElementById(LIST_CONTAINER_ID);
     const mobileToggleButton = document.getElementById(MOBILE_TOGGLE_BUTTON_ID);
