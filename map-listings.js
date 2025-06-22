@@ -77,56 +77,63 @@ const QUARTIERS_CITY_FIELD_NAME = 'nom_commune'; // <-- Le nom correct du champ 
     const createCircleSdf = (size) => { const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size; const context = canvas.getContext('2d'); const radius = size / 2; context.beginPath(); context.arc(radius, radius, radius - 2, 0, 2 * Math.PI, false); context.fillStyle = 'white'; context.fill(); return context.getImageData(0, 0, size, size); };
     function convertAnnoncesToGeoJSON(annonces) { const features = annonces.map(annonce => { const lat = getNestedValue(annonce, 'geo_location.data.lat'); const lng = getNestedValue(annonce, 'geo_location.data.lng'); if (annonce.id === undefined || annonce.id === null || lat === undefined || lng === undefined) return null; let featureId = parseInt(annonce.id, 10); if (isNaN(featureId)) return null; return { type: 'Feature', id: featureId, geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] }, properties: { id: featureId, id_str: String(annonce.id), price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?', coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url'), house_type: getNestedValue(annonce, 'house_type'), city: getNestedValue(annonce, 'city'), rooms: getNestedValue(annonce, 'rooms'), bedrooms: getNestedValue(annonce, 'bedrooms'), area: getNestedValue(annonce, 'area') } }; }).filter(Boolean); return { type: 'FeatureCollection', features }; }
 
-    function initializeMap(initialGeoJSON) {
-        map = new maplibregl.Map({ container: MAP_CONTAINER_ID, style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`, pitch: 0, bearing: 0, navigationControl: false, renderWorldCopies: false });
-        window.map = map;
-        if (initialGeoJSON.features.length > 0) { const bounds = getBounds(initialGeoJSON); map.fitBounds(bounds, { padding: 80, duration: 0, maxZoom: 16 }); } else { map.setCenter([2.3522, 48.8566]); map.setZoom(11); }
+    // REMPLACEZ VOTRE FONCTION initializeMap PAR CELLE-CI
+function initializeMap(initialGeoJSON) {
+    map = new maplibregl.Map({ container: MAP_CONTAINER_ID, style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`, pitch: 0, bearing: 0, navigationControl: false, renderWorldCopies: false });
+    window.map = map;
+    if (initialGeoJSON.features.length > 0) { const bounds = getBounds(initialGeoJSON); map.fitBounds(bounds, { padding: 80, duration: 0, maxZoom: 16 }); } else { map.setCenter([2.3522, 48.8566]); map.setZoom(11); }
 
-        map.on('load', () => {
-            // ▼▼▼ MODIFIÉ : Logique des quartiers ▼▼▼
+    map.on('load', () => {
+        // ▼▼▼ DÉBUT DE LA SECTION CORRIGÉE POUR LES QUARTIERS ▼▼▼
 
-            // 1. Ajout de la source pour les quartiers (inchangé)
-            map.addSource(SOURCE_ID_QUARTIERS, {
-                type: 'vector',
-                url: `https://api.maptiler.com/data/${QUARTIERS_TILESET_ID}/tiles.json?key=${MAPTILER_API_KEY}`
-            });
-
-            const firstSymbolLayer = map.getStyle().layers.find(layer => layer.type === 'symbol');
-
-            // 2. Ajout de la couche de LIGNES pour les contours des quartiers
-            map.addLayer({
-                id: LAYER_ID_QUARTIERS_LINES,
-                type: 'line', // On utilise 'line' au lieu de 'fill'
-                source: SOURCE_ID_QUARTIERS,
-                'source-layer': QUARTIERS_SOURCE_LAYER_NAME,
-                paint: {
-                    'line-color': '#089999', // Couleur principale de la ligne (turquoise)
-                    'line-width': 2,         // Épaisseur de la ligne
-                    'line-opacity': 0.8      // Opacité
-                },
-                // NOUVEAU : Filtre initial qui ne correspond à rien, pour que la couche soit vide au démarrage.
-                filter: ['==', QUARTIERS_CITY_FIELD_NAME, ''] 
-            }, firstSymbolLayer ? firstSymbolLayer.id : undefined);
-            
-            // ▲▲▲ FIN DE LA MODIFICATION POUR LES QUARTIERS ▲▲▲
-
-
-            // ▼▼▼ LOGIQUE ORIGINALE DES ANNONCES (CONSERVÉE ET FONCTIONNELLE) ▼▼▼
-            map.addImage('circle-background', createCircleSdf(64), { sdf: true });
-            map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
-            map.addLayer({ id: LAYER_ID_DOTS, type: 'circle', source: SOURCE_ID_ANNONCES, paint: { 'circle-radius': 5, 'circle-color': '#FFFFFF', 'circle-stroke-width': 1, 'circle-stroke-color': '#B4B4B4' } });
-            map.addLayer({ id: LAYER_ID_PRICES, type: 'symbol', source: SOURCE_ID_ANNONCES, layout: { 'icon-image': 'circle-background', 'icon-size': 0.9, 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14, 'icon-allow-overlap': false, 'text-allow-overlap': false, 'icon-anchor': 'center', 'text-anchor': 'center' }, paint: { 'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'], 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] } });
-            map.on('mouseenter', LAYER_ID_DOTS, handleDotHoverOrClick);
-            map.on('click', LAYER_ID_DOTS, handleDotHoverOrClick);
-            map.on('mouseleave', LAYER_ID_DOTS, () => { map.getCanvas().style.cursor = ''; if(hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; } });
-            map.on('click', LAYER_ID_PRICES, handlePriceBubbleClick);
-            map.on('idle', () => { updateVisibleList(); });
-            map.on('moveend', () => { updateVisibleList(); });
-            // ▲▲▲ FIN DE LA LOGIQUE ORIGINALE DES ANNONCES ▲▲▲
+        // 1. Ajout de la source pour les quartiers avec la bonne URL et le bon ID
+        // C'est ici que nous utilisons le nouvel ID que vous avez trouvé.
+        map.addSource(SOURCE_ID_QUARTIERS, {
+            type: 'vector',
+            // On ne cherche plus un fichier tiles.json, on construit l'URL des tuiles directement.
+            tiles: [
+                `https://api.maptiler.com/tiles/01978dde-e6c0-7db6-ad88-68aeafdf00dc/{z}/{x}/{y}.pbf?key=${MAPTILER_API_KEY}`
+            ],
+            minzoom: 0,
+            maxzoom: 14
         });
-        map.addControl(new maplibregl.NavigationControl(), 'top-right');
-    }
 
+        // On trouve la première couche de texte/labels pour insérer les quartiers en dessous
+        const firstSymbolLayer = map.getStyle().layers.find(layer => layer.type === 'symbol');
+
+        // 2. Ajout de la couche de LIGNES pour les contours (ceci ne change pas)
+        // Le nom de la couche à l'intérieur du tileset reste 'quartier_france_simpl' comme vu dans votre screenshot.
+        map.addLayer({
+            id: LAYER_ID_QUARTIERS_LINES,
+            type: 'line',
+            source: SOURCE_ID_QUARTIERS,
+            'source-layer': 'quartier_france_simpl', // Nom de la couche DANS le tileset
+            paint: {
+                'line-color': '#089999',
+                'line-width': 2,
+                'line-opacity': 0.8
+            },
+            filter: ['==', QUARTIERS_CITY_FIELD_NAME, ''] 
+        }, firstSymbolLayer ? firstSymbolLayer.id : undefined);
+        
+        // ▲▲▲ FIN DE LA SECTION CORRIGÉE ▲▲▲
+
+
+        // ▼▼▼ LOGIQUE ORIGINALE DES ANNONCES (CONSERVÉE ET FONCTIONNELLE) ▼▼▼
+        map.addImage('circle-background', createCircleSdf(64), { sdf: true });
+        map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
+        map.addLayer({ id: LAYER_ID_DOTS, type: 'circle', source: SOURCE_ID_ANNONCES, paint: { 'circle-radius': 5, 'circle-color': '#FFFFFF', 'circle-stroke-width': 1, 'circle-stroke-color': '#B4B4B4' } });
+        map.addLayer({ id: LAYER_ID_PRICES, type: 'symbol', source: SOURCE_ID_ANNONCES, layout: { 'icon-image': 'circle-background', 'icon-size': 0.9, 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14, 'icon-allow-overlap': false, 'text-allow-overlap': false, 'icon-anchor': 'center', 'text-anchor': 'center' }, paint: { 'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'], 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] } });
+        map.on('mouseenter', LAYER_ID_DOTS, handleDotHoverOrClick);
+        map.on('click', LAYER_ID_DOTS, handleDotHoverOrClick);
+        map.on('mouseleave', LAYER_ID_DOTS, () => { map.getCanvas().style.cursor = ''; if(hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; } });
+        map.on('click', LAYER_ID_PRICES, handlePriceBubbleClick);
+        map.on('idle', () => { updateVisibleList(); });
+        map.on('moveend', () => { updateVisibleList(); });
+        // ▲▲▲ FIN DE LA LOGIQUE ORIGINALE DES ANNONCES ▲▲▲
+    });
+    map.addControl(new maplibregl.NavigationControl(), 'top-right');
+}
     // NOUVEAU : Fonction dédiée à la mise à jour du filtre de la couche des quartiers
     function updateQuartiersLayer(selectedCities = []) {
         // Sécurité : ne fait rien si la carte ou la couche n'est pas encore prête
