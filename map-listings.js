@@ -22,31 +22,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let map = null;
     let allAnnouncements = [];
-    // --- NOUVEAU : Logique simplifiée pour afficher/masquer les contours des quartiers ---
-
-// Écouteur pour la sélection d'une ville (doit être déclenché par votre script d'autocomplete)
-document.addEventListener('city:selected', (event) => {
-    if (!map || !map.isStyleLoaded()) return;
-
-    const { cityData } = event.detail;
-
-    // 1. Zoom sur la ville sélectionnée
-    map.fitBounds(cityData.bounds, { padding: 80, duration: 800 });
-
-    // 2. On rend la couche des contours visible
-    map.setLayoutProperty('quartiers-lines-layer', 'visibility', 'visible');
-});
-
-// Écouteur pour la suppression d'une ville
-document.addEventListener('city:removed', (event) => {
-    if (!map || !map.isStyleLoaded()) return;
-
-    // Vérifie si c'était la dernière ville à être supprimée
-    if (typeof selectedCities !== 'undefined' && selectedCities.length === 0) {
-        // S'il n'y a plus de villes, on cache les contours
-        map.setLayoutProperty('quartiers-lines-layer', 'visibility', 'none');
-    }
-});
     let isMobile = window.innerWidth < 768;
     let currentPopup = null;
     let selectedPinId = null;
@@ -66,125 +41,83 @@ document.addEventListener('city:removed', (event) => {
         bottomSheetCloseButton.addEventListener('click', (e) => { e.stopPropagation(); closeMobileBottomSheet(); });
     }
     
-    // Dans map-listings.js
-document.addEventListener('annoncesChargeesEtRendues', (event) => {
-    const { annonces, quartiers } = event.detail;
-    if (!annonces || !Array.isArray(annonces)) return;
-
-    // On utilise bien les nouvelles annonces reçues
-    const geojsonData = convertAnnoncesToGeoJSON(annonces);
-
-    if (!map) {
-        // Si la carte n'existe pas du tout, on l'initialise
-        initializeMap(geojsonData);
-    } else if (map.isStyleLoaded() && map.getSource('annonces-source')) {
-        // CORRIGÉ : On met à jour seulement si la carte ET la source sont prêtes
-        console.log('[MAP] Carte prête, mise à jour de la source des annonces.');
-        map.getSource('annonces-source').setData(geojsonData);
-        updateNeighborhoodHighlight(quartiers || []);
-    } else {
-        // Si la carte n'est pas prête, on attend qu'elle le soit pour faire la mise à jour
-        console.warn('[MAP] Événement reçu, mais carte non prête. Mise à jour en attente.');
-        map.once('load', () => {
-            console.log('[MAP] Carte enfin prête, mise à jour différée effectuée.');
-            map.getSource('annonces-source').setData(geojsonData);
-            updateNeighborhoodHighlight(quartiers || []);
-        });
-    }
-});
+    // La gestion de l'événement 'annoncesChargeesEtRendues' de la V26
+    document.addEventListener('annoncesChargeesEtRendues', (event) => {
+        const annonces = event.detail.annonces;
+        if (!annonces || !Array.isArray(annonces)) return;
+        allAnnouncements = annonces;
+        const geojsonData = convertAnnoncesToGeoJSON(allAnnouncements);
+        if (!map) {
+            initializeMap(geojsonData);
+        } else {
+            map.getSource(SOURCE_ID_ANNONCES).setData(geojsonData);
+            if (geojsonData.features.length > 0) { const bounds = getBounds(geojsonData); map.fitBounds(bounds, { padding: 80, maxZoom: 16 }); }
+            else { map.flyTo({ center: [2.3522, 48.8566], zoom: 11 }); }
+        }
+    });
     
     const createCircleSdf = (size) => { const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size; const context = canvas.getContext('2d'); const radius = size / 2; context.beginPath(); context.arc(radius, radius, radius - 2, 0, 2 * Math.PI, false); context.fillStyle = 'white'; context.fill(); return context.getImageData(0, 0, size, size); };
     function convertAnnoncesToGeoJSON(annonces) { const features = annonces.map(annonce => { const lat = getNestedValue(annonce, 'geo_location.data.lat'); const lng = getNestedValue(annonce, 'geo_location.data.lng'); if (annonce.id === undefined || annonce.id === null || lat === undefined || lng === undefined) return null; let featureId = parseInt(annonce.id, 10); if (isNaN(featureId)) return null; return { type: 'Feature', id: featureId, geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] }, properties: { id: featureId, id_str: String(annonce.id), price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?', coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url'), house_type: getNestedValue(annonce, 'house_type'), city: getNestedValue(annonce, 'city'), rooms: getNestedValue(annonce, 'rooms'), bedrooms: getNestedValue(annonce, 'bedrooms'), area: getNestedValue(annonce, 'area') } }; }).filter(Boolean); return { type: 'FeatureCollection', features }; }
 
-   
- /**
- * Initialise la carte MapTiler en utilisant VOTRE style personnalisé.
- * @param {object} initialGeoJSON - Le GeoJSON des annonces à afficher au départ.
- */
+    function initializeMap(initialGeoJSON) {
+        map = new maplibregl.Map({ container: MAP_CONTAINER_ID, style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_API_KEY}`, pitch: 0, bearing: 0, navigationControl: false, renderWorldCopies: false });
+        window.map = map;
+        if (initialGeoJSON.features.length > 0) { const bounds = getBounds(initialGeoJSON); map.fitBounds(bounds, { padding: 80, duration: 0, maxZoom: 16 }); } else { map.setCenter([2.3522, 48.8566]); map.setZoom(11); }
 
-function initializeMap(initialGeoJSON) {
-    
-    // --- CORRECTION CLÉ : Utilisation de VOTRE style de carte personnalisé ---
-    // L'URL est construite à partir de l'ID que vous avez fourni.
-    const CUSTOM_MAP_STYLE_URL = 'https://api.maptiler.com/maps/01978de1-8434-7672-9f69-d320e76122ea/style.json?key=UsgTlLJiePXeSnyh57aL';
+        map.on('load', () => {
+            // ▼▼▼ AJOUT LOGIQUE DES QUARTIERS (CORRIGÉ) ▼▼▼
 
-    // Le nom EXACT de votre couche de contours, d'après votre screenshot.
-    const QUARTIERS_LINES_LAYER_ID = 'quartier_france_simpl_line'; 
+            // 1. Ajout de la source pour les quartiers avec la bonne URL
+            map.addSource(SOURCE_ID_QUARTIERS, {
+                type: 'vector',
+                url: `https://api.maptiler.com/data/${QUARTIERS_TILESET_ID}/tiles.json?key=${MAPTILER_API_KEY}`
+            });
 
-    // Vos constantes pour les annonces (inchangées)
-    const SOURCE_ID_ANNONCES = 'annonces-source';
-    const LAYER_ID_DOTS = 'annonces-dots-layer';
-    const LAYER_ID_PRICES = 'annonces-prices-layer';
-    
-    // Initialisation de la carte avec VOTRE style
-    map = new maplibregl.Map({
-        container: 'map-section', // Assurez-vous que l'ID est correct
-        style: CUSTOM_MAP_STYLE_URL, // <-- CORRECTION: On charge votre style ici
-        center: [2.3522, 48.8566],   // Centre par défaut (Paris)
-        zoom: 11
-    });
-    window.map = map;
+            // On trouve la première couche de texte/labels pour insérer les quartiers en dessous
+            const firstSymbolLayer = map.getStyle().layers.find(layer => layer.type === 'symbol');
 
-    map.on('load', () => {
-        console.log(`[MAP] Style personnalisé chargé avec succès.`);
-
-        // --- CORRECTION : On ne tente plus d'AJOUTER la source des quartiers. Elle est déjà dans le style. ---
-        // On vérifie juste si la couche existe et on la masque par défaut.
-        try {
-             if (map.getLayer(QUARTIERS_LINES_LAYER_ID)) {
-                map.setLayoutProperty(QUARTIERS_LINES_LAYER_ID, 'visibility', 'none');
-                console.log(`[MAP] La couche de quartiers "${QUARTIERS_LINES_LAYER_ID}" est prête et masquée.`);
-            } else {
-                // Erreur si la couche n'est pas trouvée dans votre style.
-                console.error(`[MAP] ERREUR CRITIQUE: La couche nommée "${QUARTIERS_LINES_LAYER_ID}" est introuvable dans votre style MapTiler. Veuillez vérifier le nom de la couche dans l'éditeur de carte MapTiler.`);
-            }
-        } catch(e) {
-             console.error(`[MAP] Erreur technique lors de la manipulation de la couche "${QUARTIERS_LINES_LAYER_ID}".`, e);
-        }
-       
-        // --- Le reste de votre logique (qui était correcte) reste inchangé ---
-        
-        // Ajout de la source et des couches pour les ANNONCES (par-dessus votre fond de carte)
-        map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
-        
-        map.addImage('circle-background', createCircleSdf(64), { sdf: true });
+            // 2. Ajout de la couche de remplissage pour les quartiers
+            map.addLayer({
+                id: LAYER_ID_QUARTIERS_FILL,
+                type: 'fill',
+                source: SOURCE_ID_QUARTIERS,
+                'source-layer': QUARTIERS_SOURCE_LAYER_NAME,
+                paint: {
+                    'fill-color': 'rgba(8, 153, 153, 0.1)', // Turquoise discret
+                    'fill-outline-color': 'rgba(8, 153, 153, 0.3)'
+                }
+            }, firstSymbolLayer ? firstSymbolLayer.id : undefined);
             
-        map.addLayer({
-            id: LAYER_ID_DOTS,
-            type: 'circle',
-            source: SOURCE_ID_ANNONCES,
-            paint: { 'circle-radius': 5, 'circle-color': '#FFFFFF', 'circle-stroke-width': 1, 'circle-stroke-color': '#B4B4B4' }
+            // ▲▲▲ FIN DE L'AJOUT POUR LES QUARTIERS ▲▲▲
+
+
+            // ▼▼▼ LOGIQUE ORIGINALE DE LA V26 (CONSERVÉE ET FONCTIONNELLE) ▼▼▼
+
+            // Ligne essentielle pour les bulles, qui avait été supprimée. La voici de retour.
+            map.addImage('circle-background', createCircleSdf(64), { sdf: true });
+            
+            map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
+            
+            // Ajout des couches pour les annonces (par-dessus les quartiers)
+            map.addLayer({ id: LAYER_ID_DOTS, type: 'circle', source: SOURCE_ID_ANNONCES, paint: { 'circle-radius': 5, 'circle-color': '#FFFFFF', 'circle-stroke-width': 1, 'circle-stroke-color': '#B4B4B4' } });
+            map.addLayer({ id: LAYER_ID_PRICES, type: 'symbol', source: SOURCE_ID_ANNONCES, layout: { 'icon-image': 'circle-background', 'icon-size': 0.9, 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14, 'icon-allow-overlap': false, 'text-allow-overlap': false, 'icon-anchor': 'center', 'text-anchor': 'center' }, paint: { 'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'], 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] } });
+
+            map.on('mouseenter', LAYER_ID_DOTS, handleDotHoverOrClick);
+            map.on('click', LAYER_ID_DOTS, handleDotHoverOrClick);
+            map.on('mouseleave', LAYER_ID_DOTS, () => {
+                map.getCanvas().style.cursor = '';
+                if(hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; }
+            });
+            
+            map.on('click', LAYER_ID_PRICES, handlePriceBubbleClick);
+
+            map.on('idle', () => { updateVisibleList(); });
+            map.on('moveend', () => { updateVisibleList(); });
+
+            // ▲▲▲ FIN DE LA LOGIQUE ORIGINALE V26 ▲▲▲
         });
-
-        map.addLayer({
-            id: LAYER_ID_PRICES,
-            type: 'symbol',
-            source: SOURCE_ID_ANNONCES,
-            layout: { 'icon-image': 'circle-background', 'icon-size': 0.9, 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14, 'icon-allow-overlap': false, 'text-allow-overlap': false, 'icon-anchor': 'center', 'text-anchor': 'center' },
-            paint: { 'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'], 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] }
-        });
-
-        // Vos écouteurs d'événements restent les mêmes
-        map.on('mouseenter', LAYER_ID_DOTS, handleDotHoverOrClick);
-        map.on('click', LAYER_ID_DOTS, handleDotHoverOrClick);
-        map.on('mouseleave', LAYER_ID_DOTS, () => {
-            map.getCanvas().style.cursor = '';
-            if(hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; }
-        });
-        map.on('click', LAYER_ID_PRICES, handlePriceBubbleClick);
-        map.on('idle', () => updateVisibleList());
-        map.on('moveend', () => updateVisibleList());
-
-        // Centrage initial sur les annonces
-        if (initialGeoJSON && initialGeoJSON.features.length > 0) {
-            const bounds = getBounds(initialGeoJSON);
-            if(bounds) map.fitBounds(bounds, { padding: 80, duration: 0, maxZoom: 16 });
-        }
-    });
-
-    map.addControl(new maplibregl.NavigationControl(), 'top-right');
-}
-
+        map.addControl(new maplibregl.NavigationControl(), 'top-right');
+    }
 
     // --- Toutes les fonctions suivantes sont identiques à votre version V26 ---
     function handleDotHoverOrClick(e) {
