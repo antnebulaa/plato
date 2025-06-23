@@ -1,23 +1,24 @@
-// map-listings.js - VERSION DÉFINITIVE (auto-suffisante)
+// map-listings.js - VERSION FINALE SIMPLIFIÉE (Coloration des villes sélectionnées)
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT] Initialisation du script final auto-suffisant.');
+    console.log('[MAP_SCRIPT] Initialisation avec coloration des villes sélectionnées.');
 
     // --- Configuration ---
     const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
     const MAP_ID = '019799fa-e40f-7af6-81a6-b6d1de969567';
     const MAP_CONTAINER_ID = 'map-section';
     
+    // Annonces
     const SOURCE_ID_ANNONCES = 'annonces-source';
     const LAYER_ID_DOTS = 'annonces-dots-layer';
     const LAYER_ID_PRICES = 'annonces-prices-layer';
     
-    // Noms des sources et couches que NOUS allons créer ou utiliser
-    const BOUNDARIES_SOURCE_ID = 'boundaries-source'; // Nouveau nom pour la source que nous ajoutons
-    const BOUNDARY_SOURCE_LAYER = 'administrative';   // Nom de la couche DANS la source Boundaries
-    const CITY_OUTLINE_LAYER_ID = 'city-outline-layer';
-    const MASK_LAYER_ID = 'mask-layer';
+    // Couche de mise en avant des villes
+    const CITY_HIGHLIGHT_LAYER_ID = 'city-highlight-layer';
+    const BOUNDARIES_SOURCE = 'Countries';
+    const BOUNDARIES_SOURCE_LAYER = 'administrative';
     const CITY_NAME_FIELD = 'name';
-
+    
+    // Bouton 3D
     const BUTTON_3D_ID = 'toggle-3d-button';
 
     // --- Variables globales ---
@@ -41,7 +42,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 map.fitBounds(bounds, { padding: 80, maxZoom: 16 });
             }
         }
-        updateCityBoundaryLayer(selectedCities);
+        updateCityHighlight(selectedCities);
     });
 
     // --- INITIALISATION DE LA CARTE ---
@@ -51,9 +52,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (initialGeoJSON.features.length > 0) { const bounds = getBounds(initialGeoJSON); map.fitBounds(bounds, { padding: 80, duration: 0, maxZoom: 16 }); }
 
         map.on('load', () => {
-            console.log('[MAP_SCRIPT] Carte chargée. Ajout des sources et couches.');
+            console.log('[MAP_SCRIPT] Carte chargée.');
             
-            // --- Annonces (inchangé) ---
+            // --- Annonces ---
             map.addImage('circle-background', createCircleSdf(64), { sdf: true });
             map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
             map.addLayer({ id: LAYER_ID_DOTS, type: 'circle', source: SOURCE_ID_ANNONCES, paint: { 'circle-radius': 5, 'circle-color': '#FFFFFF', 'circle-stroke-width': 1, 'circle-stroke-color': '#B4B4B4' } });
@@ -61,37 +62,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const firstSymbolLayer = map.getStyle().layers.find(layer => layer.type === 'symbol');
 
-            // --- NOUVELLE LOGIQUE : ON AJOUTE NOUS-MÊME LA SOURCE DES FRONTIÈRES ---
-            console.log('[MAP_SCRIPT] Ajout de la source de données pour les frontières...');
-            map.addSource(BOUNDARIES_SOURCE_ID, {
-                type: 'vector',
-                url: `https://api.maptiler.com/tiles/boundaries/tiles.json?key=${MAPTILER_API_KEY}`
-            });
-
-            // On ajoute les couches de style qui dépendent de cette nouvelle source
-            console.log('[MAP_SCRIPT] Ajout des couches de style pour le masque et les contours...');
-            
-            // 1. Masque gris qui couvre toutes les communes
+            // --- NOUVELLE LOGIQUE (SIMPLE) ---
+            // On ajoute une unique couche de coloration, invisible par défaut
             map.addLayer({
-                id: MASK_LAYER_ID,
+                id: CITY_HIGHLIGHT_LAYER_ID,
                 type: 'fill',
-                source: BOUNDARIES_SOURCE_ID, // On utilise notre nouvelle source
-                'source-layer': BOUNDARY_SOURCE_LAYER,
-                filter: ['==', ['get', 'level'], 3], // Cible les polygones de niveau 3 (communes)
-                paint: { 'fill-color': 'rgba(100, 100, 100, 0.45)' }
-            }, firstSymbolLayer ? firstSymbolLayer.id : undefined);
+                source: BOUNDARIES_SOURCE,
+                'source-layer': BOUNDARIES_SOURCE_LAYER,
+                paint: {
+                    'fill-color': 'rgba(4, 153, 153, 0.3)', // Couleur de coloration (turquoise semi-transparent)
+                    'fill-outline-color': 'rgba(4, 153, 153, 1)' // Bordure plus foncée
+                },
+                filter: ['==', ['get', CITY_NAME_FIELD], ''] // Filtre vide, la couche est invisible
+            }, firstSymbolLayer ? firstSymbolLayer.id : undefined); // On place la couche sous les labels
+            console.log('[MAP_SCRIPT] Couche de coloration des villes ajoutée.');
 
-            // 2. Contour pour les villes sélectionnées
-            map.addLayer({
-                id: CITY_OUTLINE_LAYER_ID,
-                type: 'line',
-                source: BOUNDARIES_SOURCE_ID, // On utilise notre nouvelle source
-                'source-layer': BOUNDARY_SOURCE_LAYER,
-                paint: { 'line-color': '#007cbf', 'line-width': 2.5 },
-                filter: ['==', ['get', CITY_NAME_FIELD], ''] // Filtre vide au départ
-            }, MASK_LAYER_ID);
-
-            // Événements
+            // --- Événements ---
             map.on('mouseenter', LAYER_ID_DOTS, handleDotHoverOrClick);
             map.on('click', LAYER_ID_DOTS, handleDotHoverOrClick);
             map.on('mouseleave', LAYER_ID_DOTS, () => { if(hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; } });
@@ -102,17 +88,19 @@ document.addEventListener('DOMContentLoaded', function() {
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
     }
 
-    // --- FONCTION DE MISE À JOUR (logique par filtres, inchangée) ---
-    function updateCityBoundaryLayer(selectedCities = []) {
-        if (!map || !map.isStyleLoaded() || !map.getLayer(CITY_OUTLINE_LAYER_ID)) {
-            setTimeout(() => updateCityBoundaryLayer(selectedCities), 200);
+    // --- FONCTION DE MISE À JOUR (TRÈS SIMPLIFIÉE) ---
+    function updateCityHighlight(selectedCities = []) {
+        if (!map || !map.isStyleLoaded() || !map.getLayer(CITY_HIGHLIGHT_LAYER_ID)) {
+            setTimeout(() => updateCityHighlight(selectedCities), 200);
             return;
         }
-        const hasSelection = selectedCities.length > 0;
-        const outlineFilter = hasSelection ? ['in', ['get', CITY_NAME_FIELD], ['literal', selectedCities]] : ['==', ['get', CITY_NAME_FIELD], ''];
-        map.setFilter(CITY_OUTLINE_LAYER_ID, outlineFilter);
-        const maskFilter = hasSelection ? ['all', ['==', ['get', 'level'], 3], ['!in', ['get', CITY_NAME_FIELD], ['literal', selectedCities]]] : ['==', ['get', 'level'], -1]; // Cache le masque par défaut
-        map.setFilter(MASK_LAYER_ID, maskFilter);
+
+        const filter = selectedCities.length > 0
+            ? ['in', ['get', CITY_NAME_FIELD], ['literal', selectedCities]]
+            : ['==', ['get', CITY_NAME_FIELD], '']; // Si aucune ville, le filtre ne correspond à rien
+
+        map.setFilter(CITY_HIGHLIGHT_LAYER_ID, filter);
+        console.log('[MAP_SCRIPT] Filtre de coloration mis à jour pour:', selectedCities);
     }
 
     // --- LE RESTE DU SCRIPT (inchangé) ---
