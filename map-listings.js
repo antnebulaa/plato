@@ -94,7 +94,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- FONCTION DE MISE À JOUR DES CONTOURS ET DU MASQUE ---
-    // REMPLACEZ CETTE FONCTION EN ENTIER
 function updateCityBoundaryLayer(selectedCities = []) {
     if (!map || !map.isStyleLoaded() || !map.getLayer(CITY_OUTLINE_LAYER_ID)) {
         setTimeout(() => updateCityBoundaryLayer(selectedCities), 200);
@@ -103,30 +102,45 @@ function updateCityBoundaryLayer(selectedCities = []) {
     const maskSource = map.getSource(MASK_SOURCE_ID);
 
     if (selectedCities.length === 0) {
-        // Filtre de réinitialisation simplifié
         map.setFilter(CITY_OUTLINE_LAYER_ID, ['==', CITY_NAME_FIELD, '']);
         if (maskSource) { maskSource.setData({ type: 'FeatureCollection', features: [] }); }
         return;
     }
 
-    // Filtre principal simplifié
     const outlineFilter = ['in', CITY_NAME_FIELD, ...selectedCities];
     map.setFilter(CITY_OUTLINE_LAYER_ID, outlineFilter);
 
-    // La logique du masque (qui utilise maintenant le filtre simplifié)
+    // --- DÉBUT DU BLOC DE DIAGNOSTIC ---
+    console.log('[DIAGNOSTIC] Filtre appliqué pour les contours :', JSON.stringify(outlineFilter));
+
     if (maskSource) {
+        // On interroge la source de données avec le filtre pour voir ce qu'elle trouve
         const allBoundaries = map.querySourceFeatures(MAPTILER_DATASOURCE, {
             sourceLayer: BOUNDARY_SOURCE_LAYER,
             filter: outlineFilter
         });
+
+        console.log(`[DIAGNOSTIC] Nombre de frontières trouvées par la requête : ${allBoundaries.length}`);
+
+        if (allBoundaries.length > 0) {
+            console.log('[DIAGNOSTIC] Propriétés de la première frontière trouvée :', allBoundaries[0].properties);
+            console.log('[DIAGNOSTIC] Type de géométrie :', allBoundaries[0].geometry.type);
+        }
+        // --- FIN DU BLOC DE DIAGNOSTIC ---
+
+
+        // Le reste de la logique pour créer le masque (inchangé)
         const cityGeometries = [];
         const seenCities = new Set();
         for (const feature of allBoundaries) {
             const cityName = feature.properties.name;
             if (!seenCities.has(cityName)) {
-                // On s'assure que la géométrie est bien de type 'Polygon'
-                if(feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') {
-                    cityGeometries.push(...feature.geometry.coordinates);
+                if(feature.geometry.type === 'Polygon') {
+                    cityGeometries.push(feature.geometry.coordinates); // Correction: Ne pas utiliser l'opérateur spread ici
+                    seenCities.add(cityName);
+                } else if (feature.geometry.type === 'MultiPolygon') {
+                     // Pour les MultiPolygon, on ajoute chaque polygone individuellement
+                    feature.geometry.coordinates.forEach(polygon => cityGeometries.push(polygon));
                     seenCities.add(cityName);
                 }
             }
