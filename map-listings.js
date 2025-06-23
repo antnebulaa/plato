@@ -117,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ],
         paint: {
   'fill-color'   : '#0269CC',
-  'fill-opacity' : 0.15,
+  'fill-opacity' : 0.08,
   'fill-outline-color': '#0269CC'
       }
       }, firstSymbolLayer?.id);
