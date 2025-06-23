@@ -19,9 +19,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const BOUNDARY_SOURCE_LAYER = 'boundary'; // La couche contenant les frontières dans la source
     const CITY_NAME_FIELD = 'name'; // Le champ contenant le nom de la ville
 
-    const MASK_LAYER_ID = 'mask-layer';
-    const MASK_SOURCE_ID = 'mask-source';
-
     // --- Variables globales ---
     let map = null;
     let allAnnouncements = [];
@@ -123,29 +120,6 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('[MAP_SCRIPT] Couche pour le contour des villes ajoutée et masquée.');
             // ▲▲▲ FIN DE LA NOUVELLE LOGIQUE ▲▲▲
 
-            // ▼▼▼ AJOUTEZ CE BLOC POUR LE MASQUE ▼▼▼
-console.log('[MAP_SCRIPT] Ajout de la couche pour le masque.');
-// 1. On crée une source de données vide pour le masque
-map.addSource(MASK_SOURCE_ID, {
-    type: 'geojson',
-    data: {
-        type: 'FeatureCollection',
-        features: []
-    }
-});
-
-// 2. On ajoute la couche qui va afficher le masque
-map.addLayer({
-    id: MASK_LAYER_ID,
-    type: 'fill',
-    source: MASK_SOURCE_ID,
-    paint: {
-        // Un gris semi-transparent
-        'fill-color': 'rgba(120, 120, 120, 0.5)'
-    }
-}, CITY_OUTLINE_LAYER_ID); // On place le masque juste en dessous des contours de ville
-// ▲▲▲ FIN DE L'AJOUT POUR LE MASQUE ▲▲▲
-
 
             // --- Logique pour les annonces (inchangée de votre version fonctionnelle) ---
             map.addImage('circle-background', createCircleSdf(64), { sdf: true });
@@ -167,75 +141,26 @@ map.addLayer({
     }
 
     // --- FONCTION DE MISE À JOUR DU CONTOUR ---
-function updateCityBoundaryLayer(selectedCities = []) {
-    if (!map || !map.isStyleLoaded() || !map.getLayer(CITY_OUTLINE_LAYER_ID)) {
-        setTimeout(() => updateCityBoundaryLayer(selectedCities), 200);
-        return;
-    }
-
-    const maskSource = map.getSource(MASK_SOURCE_ID);
-
-    if (selectedCities.length === 0) {
-        // Pas de ville : on cache le contour et le masque
-        map.setFilter(CITY_OUTLINE_LAYER_ID, ['all', ['>=', 'admin_level', 8], ['==', CITY_NAME_FIELD, '']]);
-        if (maskSource) {
-            maskSource.setData({ type: 'FeatureCollection', features: [] });
+    function updateCityBoundaryLayer(selectedCities = []) {
+        if (!map || !map.isStyleLoaded() || !map.getLayer(CITY_OUTLINE_LAYER_ID)) {
+            setTimeout(() => updateCityBoundaryLayer(selectedCities), 200);
+            return;
         }
-        return;
-    }
 
-    console.log(`[MAP_SCRIPT] Mise à jour du contour et du masque pour :`, selectedCities);
-
-    // Mise à jour du filtre pour le contour (comme avant)
-    const outlineFilter = ['all',
-        ['>=', 'admin_level', 8],
-        ['in', CITY_NAME_FIELD, ...selectedCities]
-    ];
-    map.setFilter(CITY_OUTLINE_LAYER_ID, outlineFilter);
-
-    // NOUVEAU : Logique pour créer et afficher le masque inversé
-    if (maskSource) {
-        // 1. On récupère les géométries des villes sélectionnées
-        const allBoundaries = map.querySourceFeatures(MAPTILER_DATASOURCE, {
-            sourceLayer: BOUNDARY_SOURCE_LAYER,
-            filter: outlineFilter
-        });
+        if (selectedCities.length === 0) {
+            map.setFilter(CITY_OUTLINE_LAYER_ID, ['all', ['>=', 'admin_level', 8], ['==', CITY_NAME_FIELD, '']]);
+            return;
+        }
         
-        // On ne garde qu'une seule géométrie par ville pour éviter les doublons
-        const cityGeometries = [];
-        const seenCities = new Set();
-        for (const feature of allBoundaries) {
-            const cityName = feature.properties.name;
-            if (!seenCities.has(cityName)) {
-                cityGeometries.push(feature.geometry.coordinates);
-                seenCities.add(cityName);
-            }
-        }
-
-        if (cityGeometries.length > 0) {
-            // 2. On crée le polygone du masque
-            // Le premier anneau est un grand carré qui couvre tout, les suivants sont les "trous"
-            const maskPolygon = {
-                type: 'Feature',
-                geometry: {
-                    type: 'Polygon',
-                    coordinates: [
-                        // Anneau extérieur (un grand carré qui couvre le monde)
-                        [
-                            [-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90]
-                        ],
-                        // Anneaux intérieurs (les "trous" pour nos villes)
-                        ...cityGeometries
-                    ]
-                }
-            };
-            maskSource.setData({
-                type: 'FeatureCollection',
-                features: [maskPolygon]
-            });
-        }
+        console.log(`[MAP_SCRIPT] Affichage du contour pour :`, selectedCities);
+        
+        const filter = ['all',
+            ['>=', 'admin_level', 8],
+            ['in', CITY_NAME_FIELD, ...selectedCities]
+        ];
+        
+        map.setFilter(CITY_OUTLINE_LAYER_ID, filter);
     }
-}
 
     // --- FONCTIONS UTILITAIRES (complètes et inchangées) ---
     const createCircleSdf = (size) => { const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size; const context = canvas.getContext('2d'); const radius = size / 2; context.beginPath(); context.arc(radius, radius, radius - 2, 0, 2 * Math.PI, false); context.fillStyle = 'white'; context.fill(); return context.getImageData(0, 0, size, size); };
@@ -313,29 +238,4 @@ function updateCityBoundaryLayer(selectedCities = []) {
     function closeMobileBottomSheet() { if (!mobileBottomSheet) return; mobileBottomSheet.classList.remove('visible'); setTimeout(() => { if (mobileBottomSheetContent) mobileBottomSheetContent.innerHTML = ''; }, 350); if (map && selectedPinId !== null) { map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false }); selectedPinId = null; } }
     
     if (isMobile && mobileToggleButton) { mobileToggleButton.addEventListener('click', () => { document.body.classList.toggle('map-is-active'); if (document.body.classList.contains('map-is-active')) { if (map) map.resize(); mobileToggleButton.textContent = `Voir la liste`; } else { if (listContainer) listContainer.scrollTo(0, 0); mobileToggleButton.textContent = `Afficher la carte`; } }); }
-
-    // DANS map-listings.js, À LA FIN DU FICHIER, JUSTE AVANT LA PARENTHÈSE FERMANTE });
-
-// ▼▼▼ AJOUTEZ CE BLOC POUR LE BOUTON 3D ▼▼▼
-const toggle3dButton = document.getElementById('toggle-3d-button');
-if (toggle3dButton) {
-    toggle3dButton.addEventListener('click', function() {
-        if (!map) return;
-
-        // On vérifie l'inclinaison actuelle de la carte
-        const currentPitch = map.getPitch();
-
-        if (currentPitch > 0) {
-            // Si la carte est en 3D, on la remet en 2D
-            map.easeTo({ pitch: 0, bearing: 0, duration: 1000 });
-            this.textContent = 'Vue 3D';
-        } else {
-            // Si la carte est en 2D, on la passe en 3D
-            map.easeTo({ pitch: 65, duration: 1000 }); // 65 degrés d'inclinaison
-            this.textContent = 'Vue 2D';
-        }
-    });
-}
-// ▲▲▲ FIN DE L'AJOUT POUR LE BOUTON 3D ▲▲▲
-
 });
