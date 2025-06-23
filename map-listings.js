@@ -157,8 +157,26 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
     // --- LE RESTE DU SCRIPT (inchangé) ---
-    const toggle3dButton = document.getElementById(BUTTON_3D_ID);
-    if (toggle3dButton) { toggle3dButton.addEventListener('click', function() { if (!map) return; const p = map.getPitch(); map.easeTo({ pitch: p > 0 ? 0 : 65, duration: 1000 }); this.textContent = p > 0 ? 'Vue 2D' : 'Vue 3D'; }); }
+    const toggle3dButton = document.getElementById('toggle-3d-button');
+if (toggle3dButton) {
+    toggle3dButton.addEventListener('click', function() {
+        if (!map) return;
+
+        // On vérifie l'inclinaison actuelle de la carte
+        const currentPitch = map.getPitch();
+
+        if (currentPitch > 0) {
+            // Si la carte est en 3D, on la remet en 2D
+            map.easeTo({ pitch: 0, bearing: 0, duration: 1000 });
+            this.textContent = '3D';
+        } else {
+            // Si la carte est en 2D, on la passe en 3D
+            map.easeTo({ pitch: 65, duration: 1000 }); // 65 degrés d'inclinaison
+            this.textContent = '2D';
+        }
+    });
+}
+// ▲▲▲ FIN DE L'AJOUT POUR LE BOUTON 3D ▲▲▲
     const createCircleSdf = (size) => { const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size; const context = canvas.getContext('2d'); const radius = size / 2; context.beginPath(); context.arc(radius, radius, radius - 2, 0, 2 * Math.PI, false); context.fillStyle = 'white'; context.fill(); return context.getImageData(0, 0, size, size); };
     function getNestedValue(obj, path) { if (!path) return undefined; return path.split('.').reduce((acc, part) => (acc && acc[part] !== undefined) ? (isNaN(parseInt(part, 10)) ? acc[part] : acc[parseInt(part, 10)]) : undefined, obj); }
     function convertAnnoncesToGeoJSON(annonces) { const features = annonces.map(annonce => { const lat = getNestedValue(annonce, 'geo_location.data.lat'); const lng = getNestedValue(annonce, 'geo_location.data.lng'); if (annonce.id === undefined || lat === undefined || lng === undefined) return null; let fId = parseInt(annonce.id, 10); if (isNaN(fId)) return null; return { type: 'Feature', id: fId, geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] }, properties: { id: fId, id_str: String(annonce.id), price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?', coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url'), house_type: getNestedValue(annonce, 'house_type'), city: getNestedValue(annonce, 'city'), rooms: getNestedValue(annonce, 'rooms'), bedrooms: getNestedValue(annonce, 'bedrooms'), area: getNestedValue(annonce, 'area') } }; }).filter(Boolean); return { type: 'FeatureCollection', features }; }
