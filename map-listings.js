@@ -313,4 +313,29 @@ function updateCityBoundaryLayer(selectedCities = []) {
     function closeMobileBottomSheet() { if (!mobileBottomSheet) return; mobileBottomSheet.classList.remove('visible'); setTimeout(() => { if (mobileBottomSheetContent) mobileBottomSheetContent.innerHTML = ''; }, 350); if (map && selectedPinId !== null) { map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false }); selectedPinId = null; } }
     
     if (isMobile && mobileToggleButton) { mobileToggleButton.addEventListener('click', () => { document.body.classList.toggle('map-is-active'); if (document.body.classList.contains('map-is-active')) { if (map) map.resize(); mobileToggleButton.textContent = `Voir la liste`; } else { if (listContainer) listContainer.scrollTo(0, 0); mobileToggleButton.textContent = `Afficher la carte`; } }); }
+
+    // DANS map-listings.js, À LA FIN DU FICHIER, JUSTE AVANT LA PARENTHÈSE FERMANTE });
+
+// ▼▼▼ AJOUTEZ CE BLOC POUR LE BOUTON 3D ▼▼▼
+const toggle3dButton = document.getElementById('toggle-3d-button');
+if (toggle3dButton) {
+    toggle3dButton.addEventListener('click', function() {
+        if (!map) return;
+
+        // On vérifie l'inclinaison actuelle de la carte
+        const currentPitch = map.getPitch();
+
+        if (currentPitch > 0) {
+            // Si la carte est en 3D, on la remet en 2D
+            map.easeTo({ pitch: 0, bearing: 0, duration: 1000 });
+            this.textContent = 'Vue 3D';
+        } else {
+            // Si la carte est en 2D, on la passe en 3D
+            map.easeTo({ pitch: 65, duration: 1000 }); // 65 degrés d'inclinaison
+            this.textContent = 'Vue 2D';
+        }
+    });
+}
+// ▲▲▲ FIN DE L'AJOUT POUR LE BOUTON 3D ▲▲▲
+
 });
