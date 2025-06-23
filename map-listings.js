@@ -77,77 +77,72 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // --- INITIALISATION DE LA CARTE ---
-    function initializeMap(initialGeoJSON) {
-        // On utilise l'URL de la nouvelle carte "Street Light"
-        map = new maplibregl.Map({
-            container: MAP_CONTAINER_ID,
-            style: `https://api.maptiler.com/maps/${MAP_ID}/style.json?key=${MAPTILER_API_KEY}`,
-            pitch: 0,
-            bearing: 0,
-            navigationControl: false,
-            renderWorldCopies: false
-        });
-        window.map = map;
-        
-        if (initialGeoJSON.features.length > 0) {
-            const bounds = getBounds(initialGeoJSON);
-            map.fitBounds(bounds, { padding: 80, duration: 0, maxZoom: 16 });
-        } else {
-            map.setCenter([2.3522, 48.8566]);
-            map.setZoom(11);
+  // REMPLACEZ VOTRE FONCTION initializeMap PAR CELLE-CI
+function initializeMap(initialGeoJSON) {
+    // On utilise l'URL de la nouvelle carte "Street Light"
+    map = new maplibregl.Map({
+        container: MAP_CONTAINER_ID,
+        style: `https://api.maptiler.com/maps/${MAP_ID}/style.json?key=${MAPTILER_API_KEY}`,
+        pitch: 0,
+        bearing: 0,
+        navigationControl: false,
+        renderWorldCopies: false
+    });
+    window.map = map;
+    
+    if (initialGeoJSON.features.length > 0) {
+        const bounds = getBounds(initialGeoJSON);
+        map.fitBounds(bounds, { padding: 80, duration: 0, maxZoom: 16 });
+    } else {
+        map.setCenter([2.3522, 48.8566]);
+        map.setZoom(11);
+    }
+
+    // NOUVELLE FONCTION INTERNE POUR GÉRER LE TIMING
+    const addCustomLayers = () => {
+        // On vérifie si la source est maintenant bien chargée
+        if (!map.getSource(MAPTILER_DATASOURCE)) {
+             // Si la source n'est toujours pas là, on attend un peu et on réessaie.
+            console.log(`[MAP_SCRIPT] La source '${MAPTILER_DATASOURCE}' n'est pas encore prête, on attend...`);
+            setTimeout(addCustomLayers, 200);
+            return;
         }
 
-        map.on('load', () => {
-            console.log('[MAP_SCRIPT] La carte "Street Light" est chargée.');
+        console.log(`[MAP_SCRIPT] La source '${MAPTILER_DATASOURCE}' est prête. Ajout des couches personnalisées.`);
+        
+        // On peut maintenant ajouter nos couches en toute sécurité
+        const firstSymbolLayer = map.getStyle().layers.find(layer => layer.type === 'symbol');
 
-            const firstSymbolLayer = map.getStyle().layers.find(layer => layer.type === 'symbol');
-
-            // ▼▼▼ NOUVELLE LOGIQUE POUR LE CONTOUR DES VILLES ▼▼▼
-            // On ajoute une couche de style qui utilise les données déjà présentes dans la carte.
+        // Ajout de la couche pour le contour des villes
+        if (!map.getLayer(CITY_OUTLINE_LAYER_ID)) {
             map.addLayer({
                 id: CITY_OUTLINE_LAYER_ID,
                 type: 'line',
                 source: MAPTILER_DATASOURCE,
                 'source-layer': BOUNDARY_SOURCE_LAYER,
-                paint: {
-                    'line-color': '#007cbf', // Une couleur bleue visible
-                    'line-width': 2.5,
-                    'line-opacity': 0.9
-                },
-                // On filtre pour cibler les villes et on le rend invisible au départ.
-                filter: ['all',
-                    ['>=', 'admin_level', 8],
-                    ['==', CITY_NAME_FIELD, '']
-                ]
-            }, firstSymbolLayer ? firstSymbolLayer.id : undefined); // On insère la couche sous les labels
-            console.log('[MAP_SCRIPT] Couche pour le contour des villes ajoutée et masquée.');
-            // ▲▲▲ FIN DE LA NOUVELLE LOGIQUE ▲▲▲
+                paint: { 'line-color': '#007cbf', 'line-width': 2.5, 'line-opacity': 0.9 },
+                filter: ['all', ['>=', 'admin_level', 8], ['==', CITY_NAME_FIELD, '']]
+            }, firstSymbolLayer ? firstSymbolLayer.id : undefined);
+        }
 
-            // ▼▼▼ AJOUTEZ CE BLOC POUR LE MASQUE ▼▼▼
-console.log('[MAP_SCRIPT] Ajout de la couche pour le masque.');
-// 1. On crée une source de données vide pour le masque
-map.addSource(MASK_SOURCE_ID, {
-    type: 'geojson',
-    data: {
-        type: 'FeatureCollection',
-        features: []
-    }
-});
+        // Ajout de la couche pour le masque
+        if (!map.getSource(MASK_SOURCE_ID)) {
+             map.addSource(MASK_SOURCE_ID, {
+                type: 'geojson',
+                data: { type: 'FeatureCollection', features: [] }
+            });
+        }
+        if (!map.getLayer(MASK_LAYER_ID)) {
+            map.addLayer({
+                id: MASK_LAYER_ID,
+                type: 'fill',
+                source: MASK_SOURCE_ID,
+                paint: { 'fill-color': 'rgba(120, 120, 120, 0.5)' }
+            }, CITY_OUTLINE_LAYER_ID);
+        }
 
-// 2. On ajoute la couche qui va afficher le masque
-map.addLayer({
-    id: MASK_LAYER_ID,
-    type: 'fill',
-    source: MASK_SOURCE_ID,
-    paint: {
-        // Un gris semi-transparent
-        'fill-color': 'rgba(120, 120, 120, 0.5)'
-    }
-}, CITY_OUTLINE_LAYER_ID); // On place le masque juste en dessous des contours de ville
-// ▲▲▲ FIN DE L'AJOUT POUR LE MASQUE ▲▲▲
-
-
-            // --- Logique pour les annonces (inchangée de votre version fonctionnelle) ---
+        // Le reste de la logique pour les annonces
+        if (!map.getSource(SOURCE_ID_ANNONCES)) {
             map.addImage('circle-background', createCircleSdf(64), { sdf: true });
             map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
             map.addLayer({ id: LAYER_ID_DOTS, type: 'circle', source: SOURCE_ID_ANNONCES, paint: { 'circle-radius': 5, 'circle-color': '#FFFFFF', 'circle-stroke-width': 1, 'circle-stroke-color': '#B4B4B4' } });
@@ -162,9 +157,16 @@ map.addLayer({
             map.on('click', LAYER_ID_PRICES, handlePriceBubbleClick);
             map.on('idle', updateVisibleList);
             map.on('moveend', updateVisibleList);
-        });
-        map.addControl(new maplibregl.NavigationControl(), 'top-right');
-    }
+        }
+    };
+
+    map.on('load', () => {
+        console.log('[MAP_SCRIPT] Événement "load" de la carte déclenché.');
+        addCustomLayers(); // On appelle notre nouvelle fonction sécurisée
+    });
+    
+    map.addControl(new maplibregl.NavigationControl(), 'top-right');
+}
 
     // --- FONCTION DE MISE À JOUR DU CONTOUR ---
 function updateCityBoundaryLayer(selectedCities = []) {
