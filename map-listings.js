@@ -77,9 +77,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // --- INITIALISATION DE LA CARTE ---
-  // REMPLACEZ VOTRE FONCTION initializeMap PAR CELLE-CI
+ // REMPLACEZ VOTRE FONCTION initializeMap PAR CELLE-CI (VERSION CORRIGÉE)
 function initializeMap(initialGeoJSON) {
-    // On utilise l'URL de la nouvelle carte "Street Light"
     map = new maplibregl.Map({
         container: MAP_CONTAINER_ID,
         style: `https://api.maptiler.com/maps/${MAP_ID}/style.json?key=${MAPTILER_API_KEY}`,
@@ -98,19 +97,16 @@ function initializeMap(initialGeoJSON) {
         map.setZoom(11);
     }
 
-    // NOUVELLE FONCTION INTERNE POUR GÉRER LE TIMING
-    const addCustomLayers = () => {
-        // On vérifie si la source est maintenant bien chargée
+    // Fonction séparée UNIQUEMENT pour les couches qui dépendent de 'maptiler-planet'
+    const addCityLayers = () => {
         if (!map.getSource(MAPTILER_DATASOURCE)) {
-             // Si la source n'est toujours pas là, on attend un peu et on réessaie.
             console.log(`[MAP_SCRIPT] La source '${MAPTILER_DATASOURCE}' n'est pas encore prête, on attend...`);
-            setTimeout(addCustomLayers, 200);
+            setTimeout(addCityLayers, 200);
             return;
         }
 
-        console.log(`[MAP_SCRIPT] La source '${MAPTILER_DATASOURCE}' est prête. Ajout des couches personnalisées.`);
+        console.log(`[MAP_SCRIPT] La source '${MAPTILER_DATASOURCE}' est prête. Ajout des couches de la ville.`);
         
-        // On peut maintenant ajouter nos couches en toute sécurité
         const firstSymbolLayer = map.getStyle().layers.find(layer => layer.type === 'symbol');
 
         // Ajout de la couche pour le contour des villes
@@ -140,29 +136,30 @@ function initializeMap(initialGeoJSON) {
                 paint: { 'fill-color': 'rgba(120, 120, 120, 0.5)' }
             }, CITY_OUTLINE_LAYER_ID);
         }
-
-        // Le reste de la logique pour les annonces
-        if (!map.getSource(SOURCE_ID_ANNONCES)) {
-            map.addImage('circle-background', createCircleSdf(64), { sdf: true });
-            map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
-            map.addLayer({ id: LAYER_ID_DOTS, type: 'circle', source: SOURCE_ID_ANNONCES, paint: { 'circle-radius': 5, 'circle-color': '#FFFFFF', 'circle-stroke-width': 1, 'circle-stroke-color': '#B4B4B4' } });
-            map.addLayer({ id: LAYER_ID_PRICES, type: 'symbol', source: SOURCE_ID_ANNONCES, layout: { 'icon-image': 'circle-background', 'icon-size': 0.9, 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14, 'icon-allow-overlap': false, 'text-allow-overlap': false, 'icon-anchor': 'center', 'text-anchor': 'center' }, paint: { 'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'], 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] } });
-            
-            map.on('mouseenter', LAYER_ID_DOTS, handleDotHoverOrClick);
-            map.on('click', LAYER_ID_DOTS, handleDotHoverOrClick);
-            map.on('mouseleave', LAYER_ID_DOTS, () => {
-                map.getCanvas().style.cursor = '';
-                if(hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; }
-            });
-            map.on('click', LAYER_ID_PRICES, handlePriceBubbleClick);
-            map.on('idle', updateVisibleList);
-            map.on('moveend', updateVisibleList);
-        }
     };
 
     map.on('load', () => {
         console.log('[MAP_SCRIPT] Événement "load" de la carte déclenché.');
-        addCustomLayers(); // On appelle notre nouvelle fonction sécurisée
+
+        // --- PARTIE 1 : ON AJOUTE LES ANNONCES IMMÉDIATEMENT (CORRECTION DU BUG) ---
+        console.log('[MAP_SCRIPT] Ajout de la source et des couches pour les annonces.');
+        map.addImage('circle-background', createCircleSdf(64), { sdf: true });
+        map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
+        map.addLayer({ id: LAYER_ID_DOTS, type: 'circle', source: SOURCE_ID_ANNONCES, paint: { 'circle-radius': 5, 'circle-color': '#FFFFFF', 'circle-stroke-width': 1, 'circle-stroke-color': '#B4B4B4' } });
+        map.addLayer({ id: LAYER_ID_PRICES, type: 'symbol', source: SOURCE_ID_ANNONCES, layout: { 'icon-image': 'circle-background', 'icon-size': 0.9, 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14, 'icon-allow-overlap': false, 'text-allow-overlap': false, 'icon-anchor': 'center', 'text-anchor': 'center' }, paint: { 'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'], 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] } });
+        
+        map.on('mouseenter', LAYER_ID_DOTS, handleDotHoverOrClick);
+        map.on('click', LAYER_ID_DOTS, handleDotHoverOrClick);
+        map.on('mouseleave', LAYER_ID_DOTS, () => {
+            map.getCanvas().style.cursor = '';
+            if(hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; }
+        });
+        map.on('click', LAYER_ID_PRICES, handlePriceBubbleClick);
+        map.on('idle', updateVisibleList);
+        map.on('moveend', updateVisibleList);
+
+        // --- PARTIE 2 : ON LANCE L'AJOUT DES COUCHES DE VILLE (QUI VA ATTENDRE SI NÉCESSAIRE) ---
+        addCityLayers(); 
     });
     
     map.addControl(new maplibregl.NavigationControl(), 'top-right');
