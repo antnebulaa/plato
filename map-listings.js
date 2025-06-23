@@ -116,9 +116,10 @@ document.addEventListener('DOMContentLoaded', () => {
           ['==', ['get', CITY_NAME_FIELD], '__none__']
         ],
         paint: {
-          'fill-color': 'rgba(4,153,153,0.35)',     // turquoise translucide
-          'fill-outline-color': 'rgba(4,153,153,1)'
-        }
+  'fill-color'   : '#0269CC',
+  'fill-opacity' : 0.25,
+  'fill-outline-color': '#0269CC'
+      }
       }, firstSymbolLayer?.id);
 
       console.log('[MAP_SCRIPT] Couche commune ajoutée');
