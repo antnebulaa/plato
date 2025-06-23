@@ -62,7 +62,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const addCityLayers = () => {
             if (!map.getSource(MAPTILER_DATASOURCE)) { setTimeout(addCityLayers, 200); return; }
             const firstSymbolLayer = map.getStyle().layers.find(layer => layer.type === 'symbol');
-            if (!map.getLayer(CITY_OUTLINE_LAYER_ID)) { map.addLayer({ id: CITY_OUTLINE_LAYER_ID, type: 'line', source: MAPTILER_DATASOURCE, 'source-layer': BOUNDARY_SOURCE_LAYER, paint: { 'line-color': '#007cbf', 'line-width': 2.5, 'line-opacity': 0.9 }, filter: ['all', ['>=', 'admin_level', 8], ['==', CITY_NAME_FIELD, '']] }, firstSymbolLayer ? firstSymbolLayer.id : undefined); }
+            if (!map.getLayer(CITY_OUTLINE_LAYER_ID)) {
+    map.addLayer({
+        id: CITY_OUTLINE_LAYER_ID,
+        type: 'line',
+        source: MAPTILER_DATASOURCE,
+        'source-layer': BOUNDARY_SOURCE_LAYER,
+        paint: { 'line-color': '#007cbf', 'line-width': 2.5, 'line-opacity': 0.9 },
+        // Filtre simplifié : on utilise uniquement le nom
+        filter: ['==', CITY_NAME_FIELD, '']
+    }, firstSymbolLayer ? firstSymbolLayer.id : undefined);
+}
             if (!map.getSource(MASK_SOURCE_ID)) { map.addSource(MASK_SOURCE_ID, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } }); }
             if (!map.getLayer(MASK_LAYER_ID)) { map.addLayer({ id: MASK_LAYER_ID, type: 'fill', source: MASK_SOURCE_ID, paint: { 'fill-color': 'rgba(120, 120, 120, 0.5)' } }, CITY_OUTLINE_LAYER_ID); }
         };
@@ -84,27 +94,58 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- FONCTION DE MISE À JOUR DES CONTOURS ET DU MASQUE ---
-    function updateCityBoundaryLayer(selectedCities = []) {
-        if (!map || !map.isStyleLoaded() || !map.getLayer(CITY_OUTLINE_LAYER_ID)) { setTimeout(() => updateCityBoundaryLayer(selectedCities), 200); return; }
-        const maskSource = map.getSource(MASK_SOURCE_ID);
-        if (selectedCities.length === 0) {
-            map.setFilter(CITY_OUTLINE_LAYER_ID, ['all', ['>=', 'admin_level', 8], ['==', CITY_NAME_FIELD, '']]);
-            if (maskSource) { maskSource.setData({ type: 'FeatureCollection', features: [] }); }
-            return;
-        }
-        const outlineFilter = ['all', ['>=', 'admin_level', 8], ['in', CITY_NAME_FIELD, ...selectedCities]];
-        map.setFilter(CITY_OUTLINE_LAYER_ID, outlineFilter);
-        if (maskSource) {
-            const allBoundaries = map.querySourceFeatures(MAPTILER_DATASOURCE, { sourceLayer: BOUNDARY_SOURCE_LAYER, filter: outlineFilter });
-            const cityGeometries = [];
-            const seenCities = new Set();
-            for (const feature of allBoundaries) { const cityName = feature.properties.name; if (!seenCities.has(cityName)) { cityGeometries.push(feature.geometry.coordinates); seenCities.add(cityName); } }
-            if (cityGeometries.length > 0) {
-                const maskPolygon = { type: 'Feature', geometry: { type: 'Polygon', coordinates: [ [ [-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90] ], ...cityGeometries ] } };
-                maskSource.setData({ type: 'FeatureCollection', features: [maskPolygon] });
+    // REMPLACEZ CETTE FONCTION EN ENTIER
+function updateCityBoundaryLayer(selectedCities = []) {
+    if (!map || !map.isStyleLoaded() || !map.getLayer(CITY_OUTLINE_LAYER_ID)) {
+        setTimeout(() => updateCityBoundaryLayer(selectedCities), 200);
+        return;
+    }
+    const maskSource = map.getSource(MASK_SOURCE_ID);
+
+    if (selectedCities.length === 0) {
+        // Filtre de réinitialisation simplifié
+        map.setFilter(CITY_OUTLINE_LAYER_ID, ['==', CITY_NAME_FIELD, '']);
+        if (maskSource) { maskSource.setData({ type: 'FeatureCollection', features: [] }); }
+        return;
+    }
+
+    // Filtre principal simplifié
+    const outlineFilter = ['in', CITY_NAME_FIELD, ...selectedCities];
+    map.setFilter(CITY_OUTLINE_LAYER_ID, outlineFilter);
+
+    // La logique du masque (qui utilise maintenant le filtre simplifié)
+    if (maskSource) {
+        const allBoundaries = map.querySourceFeatures(MAPTILER_DATASOURCE, {
+            sourceLayer: BOUNDARY_SOURCE_LAYER,
+            filter: outlineFilter
+        });
+        const cityGeometries = [];
+        const seenCities = new Set();
+        for (const feature of allBoundaries) {
+            const cityName = feature.properties.name;
+            if (!seenCities.has(cityName)) {
+                // On s'assure que la géométrie est bien de type 'Polygon'
+                if(feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') {
+                    cityGeometries.push(...feature.geometry.coordinates);
+                    seenCities.add(cityName);
+                }
             }
         }
+        if (cityGeometries.length > 0) {
+            const maskPolygon = {
+                type: 'Feature',
+                geometry: {
+                    type: 'Polygon',
+                    coordinates: [
+                        [[-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90]],
+                        ...cityGeometries
+                    ]
+                }
+            };
+            maskSource.setData({ type: 'FeatureCollection', features: [maskPolygon] });
+        }
     }
+}
 
     // --- BOUTON 3D ---
     const toggle3dButton = document.getElementById('toggle-3d-button');
