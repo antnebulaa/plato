@@ -1,107 +1,159 @@
-// map-listings.js - VERSION FINALE SIMPLIFIÉE (Coloration des villes sélectionnées)
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('[MAP_SCRIPT] Initialisation avec coloration des villes sélectionnées.');
+// map-listings.js – version corrigée (mise en avant ou grisage des villes sélectionnées)
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('[MAP_SCRIPT] Initialisation coloration communes 🇫🇷');
 
-    // --- Configuration ---
-    const MAPTILER_API_KEY = 'UsgTlLJiePXeSnyh57aL';
-    const MAP_ID = '019799fa-e40f-7af6-81a6-b6d1de969567';
-    const MAP_CONTAINER_ID = 'map-section';
-    
-    // Annonces
-    const SOURCE_ID_ANNONCES = 'annonces-source';
-    const LAYER_ID_DOTS = 'annonces-dots-layer';
-    const LAYER_ID_PRICES = 'annonces-prices-layer';
-    
-    // Couche de mise en avant des villes
-    const CITY_HIGHLIGHT_LAYER_ID = 'city-highlight-layer';
-    const BOUNDARIES_SOURCE = 'Countries';
-    const BOUNDARIES_SOURCE_LAYER = 'administrative';
-    const CITY_NAME_FIELD = 'name';
-    
-    // Bouton 3D
-    const BUTTON_3D_ID = 'toggle-3d-button';
+  /* ───────────────  CONFIG  ─────────────── */
+  const MAPTILER_API_KEY     = 'UsgTlLJiePXeSnyh57aL';
+  const MAP_ID               = '019799fa-e40f-7af6-81a6-b6d1de969567';
+  const MAP_CONTAINER_ID     = 'map-section';
 
-    // --- Variables globales ---
-    let map = null;
-    let allAnnouncements = [];
+  // Source / layer MapTiler dédiés aux limites administratives
+  const BOUNDARIES_SOURCE        = 'countries';      // ⚠︎ minuscule
+  const BOUNDARIES_SOURCE_LAYER  = 'administrative';
+  const CITY_LEVEL               = 3;                // communes
+  const CITY_NAME_FIELD          = 'name';
 
-    // --- ÉCOUTEUR PRINCIPAL (inchangé) ---
-    document.addEventListener('annoncesChargeesEtRendues', (event) => {
-        const annonces = event.detail.annonces;
-        const selectedCities = event.detail.cities || [];
-        if (!annonces) return;
-        allAnnouncements = annonces;
-        const geojsonData = convertAnnoncesToGeoJSON(allAnnouncements);
-        if (!map) {
-            initializeMap(geojsonData);
-        } else {
-            const source = map.getSource(SOURCE_ID_ANNONCES);
-            if (source) source.setData(geojsonData);
-            if (geojsonData.features.length > 0) {
-                const bounds = getBounds(geojsonData);
-                map.fitBounds(bounds, { padding: 80, maxZoom: 16 });
-            }
+  // ID de la couche qui coloriera les villes
+  const CITY_HIGHLIGHT_LAYER_ID  = 'city-highlight-layer';
+
+  // Annonces
+  const SOURCE_ID_ANNONCES = 'annonces-source';
+  const LAYER_ID_DOTS      = 'annonces-dots-layer';
+  const LAYER_ID_PRICES    = 'annonces-prices-layer';
+
+  // Bouton 3D
+  const BUTTON_3D_ID       = 'toggle-3d-button';
+
+  /* ───────────────  VARIABLES  ─────────────── */
+  let map = null;
+  let allAnnouncements = [];
+
+  /* ───────────────  ÉCOUTEUR PRINCIPAL  ─────────────── */
+  document.addEventListener('annoncesChargeesEtRendues', (event) => {
+    const annonces       = event.detail.annonces;
+    const selectedCities = event.detail.cities || [];
+
+    if (!annonces) return;
+
+    allAnnouncements = annonces;
+    const geojsonData = convertAnnoncesToGeoJSON(allAnnouncements);
+
+    if (!map) {
+      initializeMap(geojsonData, selectedCities);
+    } else {
+      const src = map.getSource(SOURCE_ID_ANNONCES);
+      if (src) src.setData(geojsonData);
+
+      if (geojsonData.features.length) {
+        map.fitBounds(getBounds(geojsonData), { padding: 80, maxZoom: 16 });
+      }
+      updateCityHighlight(selectedCities);
+    }
+  });
+
+  /* ───────────────  INITIALISATION  ─────────────── */
+  function initializeMap(initialGeoJSON, firstCityList) {
+    map = new maplibregl.Map({
+      container: MAP_CONTAINER_ID,
+      style:     `https://api.maptiler.com/maps/${MAP_ID}/style.json?key=${MAPTILER_API_KEY}`,
+      pitch: 0,
+      bearing: 0,
+      renderWorldCopies: false
+    });
+    window.map = map;
+
+    if (initialGeoJSON.features.length) {
+      map.fitBounds(getBounds(initialGeoJSON), { padding: 80, duration: 0, maxZoom: 16 });
+    }
+
+    map.on('load', () => {
+      console.log('[MAP_SCRIPT] Carte chargée');
+
+      /* -- Annonces (points + labels) -- */
+      map.addImage('circle-background', createCircleSdf(64), { sdf: true });
+      map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
+
+      map.addLayer({
+        id: LAYER_ID_DOTS,
+        type: 'circle',
+        source: SOURCE_ID_ANNONCES,
+        paint: {
+          'circle-radius': 5,
+          'circle-color': '#FFFFFF',
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#B4B4B4'
         }
-        updateCityHighlight(selectedCities);
+      });
+
+      map.addLayer({
+        id: LAYER_ID_PRICES,
+        type: 'symbol',
+        source: SOURCE_ID_ANNONCES,
+        layout: {
+          'icon-image': 'circle-background',
+          'icon-size': 0.9,
+          'text-field': ['concat', ['to-string', ['get', 'price']], '€'],
+          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+          'text-size': 14
+        },
+        paint: {
+          'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'],
+          'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333']
+        }
+      });
+
+      /* -- Couche de coloration des communes (invisible au départ) -- */
+      const firstSymbolLayer = map.getStyle().layers.find(l => l.type === 'symbol');
+
+      map.addLayer({
+        id: CITY_HIGHLIGHT_LAYER_ID,
+        type: 'fill',
+        source: BOUNDARIES_SOURCE,
+        'source-layer': BOUNDARIES_SOURCE_LAYER,
+        // uniquement les communes (level 3) et aucun nom (filtre vide)
+        filter: ['all',
+          ['==', ['get', 'level'], CITY_LEVEL],
+          ['==', ['get', CITY_NAME_FIELD], '__none__']
+        ],
+        paint: {
+          'fill-color': 'rgba(4,153,153,0.35)',     // turquoise translucide
+          'fill-outline-color': 'rgba(4,153,153,1)'
+        }
+      }, firstSymbolLayer?.id);
+
+      console.log('[MAP_SCRIPT] Couche commune ajoutée');
+
+      /* -- Events divers -- */
+      map.on('mouseenter', LAYER_ID_DOTS, handleDotHoverOrClick);
+      map.on('click',      LAYER_ID_DOTS, handleDotHoverOrClick);
+      map.on('mouseleave', LAYER_ID_DOTS, () => {
+        if (hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; }
+      });
+      map.on('click', LAYER_ID_PRICES, handlePriceBubbleClick);
+      map.on('idle',   updateVisibleList);
+      map.on('moveend', updateVisibleList);
+
+      // premier highlight (si une ville reçue à l'init)
+      updateCityHighlight(firstCityList);
     });
 
-    // --- INITIALISATION DE LA CARTE ---
-    function initializeMap(initialGeoJSON) {
-        map = new maplibregl.Map({ container: MAP_CONTAINER_ID, style: `https://api.maptiler.com/maps/${MAP_ID}/style.json?key=${MAPTILER_API_KEY}`, pitch: 0, bearing: 0, navigationControl: false, renderWorldCopies: false });
-        window.map = map;
-        if (initialGeoJSON.features.length > 0) { const bounds = getBounds(initialGeoJSON); map.fitBounds(bounds, { padding: 80, duration: 0, maxZoom: 16 }); }
+    map.addControl(new maplibregl.NavigationControl(), 'top-right');
+  }
 
-        map.on('load', () => {
-            console.log('[MAP_SCRIPT] Carte chargée.');
-            
-            // --- Annonces ---
-            map.addImage('circle-background', createCircleSdf(64), { sdf: true });
-            map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
-            map.addLayer({ id: LAYER_ID_DOTS, type: 'circle', source: SOURCE_ID_ANNONCES, paint: { 'circle-radius': 5, 'circle-color': '#FFFFFF', 'circle-stroke-width': 1, 'circle-stroke-color': '#B4B4B4' } });
-            map.addLayer({ id: LAYER_ID_PRICES, type: 'symbol', source: SOURCE_ID_ANNONCES, layout: { 'icon-image': 'circle-background', 'icon-size': 0.9, 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14 }, paint: { 'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'], 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] } });
+  /* ───────────────  MISE À JOUR DU HIGHLIGHT  ─────────────── */
+  function updateCityHighlight(selectedCities = []) {
+    if (!map?.isStyleLoaded() || !map.getLayer(CITY_HIGHLIGHT_LAYER_ID)) return;
 
-            const firstSymbolLayer = map.getStyle().layers.find(layer => layer.type === 'symbol');
+    const filter = selectedCities.length
+      ? ['all',
+          ['==', ['get', 'level'], CITY_LEVEL],
+          ['in', ['get', CITY_NAME_FIELD], ['literal', selectedCities]]
+        ]
+      : ['==', ['get', CITY_NAME_FIELD], '__none__'];  // masque invisible
 
-            // --- NOUVELLE LOGIQUE (SIMPLE) ---
-            // On ajoute une unique couche de coloration, invisible par défaut
-            map.addLayer({
-                id: CITY_HIGHLIGHT_LAYER_ID,
-                type: 'fill',
-                source: BOUNDARIES_SOURCE,
-                'source-layer': BOUNDARIES_SOURCE_LAYER,
-                paint: {
-                    'fill-color': 'rgba(4, 153, 153, 0.3)', // Couleur de coloration (turquoise semi-transparent)
-                    'fill-outline-color': 'rgba(4, 153, 153, 1)' // Bordure plus foncée
-                },
-                filter: ['==', ['get', CITY_NAME_FIELD], ''] // Filtre vide, la couche est invisible
-            }, firstSymbolLayer ? firstSymbolLayer.id : undefined); // On place la couche sous les labels
-            console.log('[MAP_SCRIPT] Couche de coloration des villes ajoutée.');
-
-            // --- Événements ---
-            map.on('mouseenter', LAYER_ID_DOTS, handleDotHoverOrClick);
-            map.on('click', LAYER_ID_DOTS, handleDotHoverOrClick);
-            map.on('mouseleave', LAYER_ID_DOTS, () => { if(hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; } });
-            map.on('click', LAYER_ID_PRICES, handlePriceBubbleClick);
-            map.on('idle', updateVisibleList);
-            map.on('moveend', updateVisibleList);
-        });
-        map.addControl(new maplibregl.NavigationControl(), 'top-right');
-    }
-
-    // --- FONCTION DE MISE À JOUR (TRÈS SIMPLIFIÉE) ---
-    function updateCityHighlight(selectedCities = []) {
-        if (!map || !map.isStyleLoaded() || !map.getLayer(CITY_HIGHLIGHT_LAYER_ID)) {
-            setTimeout(() => updateCityHighlight(selectedCities), 200);
-            return;
-        }
-
-        const filter = selectedCities.length > 0
-            ? ['in', ['get', CITY_NAME_FIELD], ['literal', selectedCities]]
-            : ['==', ['get', CITY_NAME_FIELD], '']; // Si aucune ville, le filtre ne correspond à rien
-
-        map.setFilter(CITY_HIGHLIGHT_LAYER_ID, filter);
-        console.log('[MAP_SCRIPT] Filtre de coloration mis à jour pour:', selectedCities);
-    }
+    map.setFilter(CITY_HIGHLIGHT_LAYER_ID, filter);
+    console.log('[MAP_SCRIPT] Communes colorées :', selectedCities);
+  }
 
     // --- LE RESTE DU SCRIPT (inchangé) ---
     const toggle3dButton = document.getElementById(BUTTON_3D_ID);
