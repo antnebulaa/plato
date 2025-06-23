@@ -328,11 +328,11 @@ if (toggle3dButton) {
         if (currentPitch > 0) {
             // Si la carte est en 3D, on la remet en 2D
             map.easeTo({ pitch: 0, bearing: 0, duration: 1000 });
-            this.textContent = 'Vue 3D';
+            this.textContent = '3D';
         } else {
             // Si la carte est en 2D, on la passe en 3D
             map.easeTo({ pitch: 65, duration: 1000 }); // 65 degrés d'inclinaison
-            this.textContent = 'Vue 2D';
+            this.textContent = '2D';
         }
     });
 }
