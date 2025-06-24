@@ -69,6 +69,15 @@ document.addEventListener('DOMContentLoaded', () => {
     map.on('load', () => {
       console.log('[MAP_SCRIPT] Carte chargée');
 
+      /* --- supprime les anciens calques ronds / prix --- */
+  if (map.getLayer('annonces-dots-layer'))   map.removeLayer('annonces-dots-layer');
+  if (map.getLayer('annonces-prices-layer')) map.removeLayer('annonces-prices-layer');
+
+  /* (option) si tu n’utilises plus la source d’annonces sous forme de cercles
+     tu peux aussi supprimer le symbole image - mais conserve la source GeoJSON */
+  if (map.hasImage('circle-background')) map.removeImage('circle-background');
+
+
       /* -- Annonces (points + labels) -- */
       map.addImage('circle-background', createCircleSdf(64), { sdf: true });
       map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
