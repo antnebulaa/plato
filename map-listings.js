@@ -69,14 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
     map.on('load', () => {
       console.log('[MAP_SCRIPT] Carte chargée');
 
-      /* --- supprime les anciens calques ronds / prix --- */
-  if (map.getLayer('annonces-dots-layer'))   map.removeLayer('annonces-dots-layer');
-  if (map.getLayer('annonces-prices-layer')) map.removeLayer('annonces-prices-layer');
-
-  /* (option) si tu n’utilises plus la source d’annonces sous forme de cercles
-     tu peux aussi supprimer le symbole image - mais conserve la source GeoJSON */
-  if (map.hasImage('circle-background')) map.removeImage('circle-background');
-
+     
 
       /* -- Annonces (points + labels) -- */
       map.addImage('circle-background', createCircleSdf(64), { sdf: true });
@@ -98,12 +91,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* ICI le décalage pour la petite “queue” */
     'text-offset': [
-      'case',
-      ['boolean', ['feature-state', 'selected'], false],
-      ['literal', [0, 0]],      // pastille centrée si sélectionnée
-      ['literal', [0, 0.15]]    // sinon on la remonte un peu
-    ]
+    'case',
+      ['boolean',['feature-state','selected'],false],
+      ['literal',[0,0]],
+      ['literal',[0,0.15]]
+  ]
+  /* petit décalage fixe pour la “queue” (facultatif) */
+  'text-offset': [0, 0.15]
   },
+        
   paint: {
     /* halo = bord noir (non sélectionné) */
     'text-halo-color': '#000000',
@@ -124,6 +120,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+map.removeLayer('annonces-dots-layer');
+map.removeLayer('annonces-prices-layer');
+if (map.hasImage('circle-background')) map.removeImage('circle-background');
+
+/* et dans updateVisibleList()  — remplace */
+const vis = new Set(
+  map.queryRenderedFeatures({ layers: ['price-pill'] })
+     .map(f => String(f.properties.id))
+);
+      
 
       map.addLayer({
         id: LAYER_ID_PRICES,
