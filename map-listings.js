@@ -1,28 +1,24 @@
-// map-listings.js – version corrigée (mise en avant ou grisage des villes sélectionnées)
+// map-listings.js - VERSION FINALE INTÉGRÉE (basée sur la solution fonctionnelle)
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('[MAP_SCRIPT] Initialisation coloration communes 🇫🇷');
+  console.log('[MAP_SCRIPT] Initialisation du script final intégré.');
 
   /* ───────────────  CONFIG  ─────────────── */
-  const MAPTILER_API_KEY     = 'UsgTlLJiePXeSnyh57aL';
-  const MAP_ID               = '019799fa-e40f-7af6-81a6-b6d1de969567';
-  const MAP_CONTAINER_ID     = 'map-section';
+  const MAPTILER_API_KEY      = 'UsgTlLJiePXeSnyh57aL';
+  const MAP_ID                = '019799fa-e40f-7af6-81a6-b6d1de969567';
+  const MAP_CONTAINER_ID      = 'map-section';
 
-  // Source / layer MapTiler dédiés aux limites administratives
-  const BOUNDARIES_SOURCE        = 'countries';      // ⚠︎ minuscule
-  const BOUNDARIES_SOURCE_LAYER  = 'administrative';
-  const CITY_LEVEL               = 3;                // communes
-  const CITY_NAME_FIELD          = 'name';
-
-  // ID de la couche qui coloriera les villes
-  const CITY_HIGHLIGHT_LAYER_ID  = 'city-highlight-layer';
+  // Source de données pour les frontières que nous ajoutons nous-mêmes
+  const BOUNDARIES_SOURCE       = 'countries';
+  const BOUNDARIES_SOURCE_LAYER = 'administrative';
+  const CITY_LEVEL              = 3;
+  const CITY_NAME_FIELD         = 'name';
+  const CITY_HIGHLIGHT_LAYER_ID = 'city-highlight-layer';
 
   // Annonces
-  const SOURCE_ID_ANNONCES = 'annonces-source';
-  const LAYER_ID_DOTS      = 'annonces-dots-layer';
-  const LAYER_ID_PRICES    = 'annonces-prices-layer';
-
-  // Bouton 3D
-  const BUTTON_3D_ID       = 'toggle-3d-button';
+  const SOURCE_ID_ANNONCES  = 'annonces-source';
+  const LAYER_ID_DOTS       = 'annonces-dots-layer';
+  const LAYER_ID_PRICES     = 'annonces-prices-layer';
+  const BUTTON_3D_ID        = 'toggle-3d-button';
 
   /* ───────────────  VARIABLES  ─────────────── */
   let map = null;
@@ -32,7 +28,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('annoncesChargeesEtRendues', (event) => {
     const annonces       = event.detail.annonces;
     const selectedCities = event.detail.cities || [];
-
     if (!annonces) return;
 
     allAnnouncements = annonces;
@@ -43,7 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       const src = map.getSource(SOURCE_ID_ANNONCES);
       if (src) src.setData(geojsonData);
-
       if (geojsonData.features.length) {
         map.fitBounds(getBounds(geojsonData), { padding: 80, maxZoom: 16 });
       }
@@ -51,14 +45,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  /* ───────────────  INITIALISATION  ─────────────── */
+  /* ───────────────  INITIALISATION DE LA CARTE  ─────────────── */
   function initializeMap(initialGeoJSON, firstCityList) {
     map = new maplibregl.Map({
       container: MAP_CONTAINER_ID,
       style:     `https://api.maptiler.com/maps/${MAP_ID}/style.json?key=${MAPTILER_API_KEY}`,
-      pitch: 0,
-      bearing: 0,
-      renderWorldCopies: false
+      pitch: 0, bearing: 0, renderWorldCopies: false
     });
     window.map = map;
 
@@ -67,74 +59,48 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     map.on('load', () => {
-      console.log('[MAP_SCRIPT] Carte chargée');
+      console.log('[MAP_SCRIPT] Carte chargée.');
 
-      /* -- Annonces (points + labels) -- */
+      // --- 1. Ajout de la source de données pour les frontières ---
+      if (!map.getSource(BOUNDARIES_SOURCE)) {
+        map.addSource(BOUNDARIES_SOURCE, {
+          type: 'vector',
+          url : `https://api.maptiler.com/tiles/countries/{z}/{x}/{y}.pbf?key=${MAPTILER_API_KEY}`
+        });
+        console.log('[MAP_SCRIPT] Source de données "countries" ajoutée.');
+      }
+
+      // --- 2. Ajout des couches pour les annonces (inchangé) ---
       map.addImage('circle-background', createCircleSdf(64), { sdf: true });
       map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
+      map.addLayer({ id: LAYER_ID_DOTS, type: 'circle', source: SOURCE_ID_ANNONCES, paint: { 'circle-radius': 5, 'circle-color': '#FFFFFF', 'circle-stroke-width': 1, 'circle-stroke-color': '#B4B4B4' } });
+      map.addLayer({ id: LAYER_ID_PRICES, type: 'symbol', source: SOURCE_ID_ANNONCES, layout: { 'icon-image': 'circle-background', 'icon-size': 0.9, 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14 }, paint: { 'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'], 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] } });
 
-      map.addLayer({
-        id: LAYER_ID_DOTS,
-        type: 'circle',
-        source: SOURCE_ID_ANNONCES,
-        paint: {
-          'circle-radius': 5,
-          'circle-color': '#FFFFFF',
-          'circle-stroke-width': 1,
-          'circle-stroke-color': '#B4B4B4'
-        }
-      });
-
-      map.addLayer({
-        id: LAYER_ID_PRICES,
-        type: 'symbol',
-        source: SOURCE_ID_ANNONCES,
-        layout: {
-          'icon-image': 'circle-background',
-          'icon-size': 0.9,
-          'text-field': ['concat', ['to-string', ['get', 'price']], '€'],
-          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-          'text-size': 14
-        },
-        paint: {
-          'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'],
-          'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333']
-        }
-      });
-
-      /* -- Couche de coloration des communes (invisible au départ) -- */
+      // --- 3. Ajout de la couche de coloration des communes ---
       const firstSymbolLayer = map.getStyle().layers.find(l => l.type === 'symbol');
-
       map.addLayer({
         id: CITY_HIGHLIGHT_LAYER_ID,
         type: 'fill',
         source: BOUNDARIES_SOURCE,
         'source-layer': BOUNDARIES_SOURCE_LAYER,
-        // uniquement les communes (level 3) et aucun nom (filtre vide)
-        filter: ['all',
-          ['==', ['get', 'level'], CITY_LEVEL],
-          ['==', ['get', CITY_NAME_FIELD], '__none__']
-        ],
+        filter: ['==', ['get', NAME_FIELD], '__none__'], // Invisible au départ
         paint: {
-  'fill-color'   : '#0269CC',
-  'fill-opacity' : 0.08,
-  'fill-outline-color': '#0269CC'
-      }
+          'fill-color'         : '#0269CC',
+          'fill-opacity'       : 0.15,
+          'fill-outline-color' : '#0269CC'
+        }
       }, firstSymbolLayer?.id);
+      console.log('[MAP_SCRIPT] Couche de coloration ajoutée.');
 
-      console.log('[MAP_SCRIPT] Couche commune ajoutée');
-
-      /* -- Events divers -- */
+      // --- 4. Événements de la carte (inchangé) ---
       map.on('mouseenter', LAYER_ID_DOTS, handleDotHoverOrClick);
-      map.on('click',      LAYER_ID_DOTS, handleDotHoverOrClick);
-      map.on('mouseleave', LAYER_ID_DOTS, () => {
-        if (hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; }
-      });
+      map.on('click', LAYER_ID_DOTS, handleDotHoverOrClick);
+      map.on('mouseleave', LAYER_ID_DOTS, () => { if (hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; } });
       map.on('click', LAYER_ID_PRICES, handlePriceBubbleClick);
-      map.on('idle',   updateVisibleList);
+      map.on('idle', updateVisibleList);
       map.on('moveend', updateVisibleList);
 
-      // premier highlight (si une ville reçue à l'init)
+      // On applique le premier highlight si nécessaire
       updateCityHighlight(firstCityList);
     });
 
@@ -143,40 +109,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* ───────────────  MISE À JOUR DU HIGHLIGHT  ─────────────── */
   function updateCityHighlight(selectedCities = []) {
-    if (!map?.isStyleLoaded() || !map.getLayer(CITY_HIGHLIGHT_LAYER_ID)) return;
+    if (!map?.isStyleLoaded() || !map.getLayer(CITY_HIGHLIGHT_LAYER_ID)) {
+      setTimeout(() => updateCityHighlight(selectedCities), 200); // Attente si la couche n'est pas prête
+      return;
+    }
 
     const filter = selectedCities.length
       ? ['all',
           ['==', ['get', 'level'], CITY_LEVEL],
           ['in', ['get', CITY_NAME_FIELD], ['literal', selectedCities]]
         ]
-      : ['==', ['get', CITY_NAME_FIELD], '__none__'];  // masque invisible
+      : ['==', ['get', NAME_FIELD], '__none__'];
 
     map.setFilter(CITY_HIGHLIGHT_LAYER_ID, filter);
-    console.log('[MAP_SCRIPT] Communes colorées :', selectedCities);
+    console.log('[Highlight] Communes colorées :', selectedCities);
   }
 
-    // --- LE RESTE DU SCRIPT (inchangé) ---
-    const toggle3dButton = document.getElementById('toggle-3d-button');
-if (toggle3dButton) {
-    toggle3dButton.addEventListener('click', function() {
-        if (!map) return;
-
-        // On vérifie l'inclinaison actuelle de la carte
-        const currentPitch = map.getPitch();
-
-        if (currentPitch > 0) {
-            // Si la carte est en 3D, on la remet en 2D
-            map.easeTo({ pitch: 0, bearing: 0, duration: 1000 });
-            this.textContent = '3D';
-        } else {
-            // Si la carte est en 2D, on la passe en 3D
-            map.easeTo({ pitch: 65, duration: 1000 }); // 65 degrés d'inclinaison
-            this.textContent = '2D';
-        }
-    });
-}
-// ▲▲▲ FIN DE L'AJOUT POUR LE BOUTON 3D ▲▲▲
+    // --- LE RESTE DU SCRIPT (FONCTIONS UTILITAIRES, INCHANGÉES) ---
+    const toggle3dButton = document.getElementById(BUTTON_3D_ID);
+    if (toggle3dButton) { toggle3dButton.addEventListener('click', function() { if (!map) return; const p = map.getPitch(); map.easeTo({ pitch: p > 0 ? 0 : 65, duration: 1000 }); this.textContent = p > 0 ? 'Vue 2D' : 'Vue 3D'; }); }
     const createCircleSdf = (size) => { const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size; const context = canvas.getContext('2d'); const radius = size / 2; context.beginPath(); context.arc(radius, radius, radius - 2, 0, 2 * Math.PI, false); context.fillStyle = 'white'; context.fill(); return context.getImageData(0, 0, size, size); };
     function getNestedValue(obj, path) { if (!path) return undefined; return path.split('.').reduce((acc, part) => (acc && acc[part] !== undefined) ? (isNaN(parseInt(part, 10)) ? acc[part] : acc[parseInt(part, 10)]) : undefined, obj); }
     function convertAnnoncesToGeoJSON(annonces) { const features = annonces.map(annonce => { const lat = getNestedValue(annonce, 'geo_location.data.lat'); const lng = getNestedValue(annonce, 'geo_location.data.lng'); if (annonce.id === undefined || lat === undefined || lng === undefined) return null; let fId = parseInt(annonce.id, 10); if (isNaN(fId)) return null; return { type: 'Feature', id: fId, geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] }, properties: { id: fId, id_str: String(annonce.id), price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?', coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url'), house_type: getNestedValue(annonce, 'house_type'), city: getNestedValue(annonce, 'city'), rooms: getNestedValue(annonce, 'rooms'), bedrooms: getNestedValue(annonce, 'bedrooms'), area: getNestedValue(annonce, 'area') } }; }).filter(Boolean); return { type: 'FeatureCollection', features }; }
