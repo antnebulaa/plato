@@ -120,15 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-map.removeLayer('annonces-dots-layer');
-map.removeLayer('annonces-prices-layer');
-if (map.hasImage('circle-background')) map.removeImage('circle-background');
 
-/* et dans updateVisibleList()  — remplace */
-const vis = new Set(
-  map.queryRenderedFeatures({ layers: ['price-pill'] })
-     .map(f => String(f.properties.id))
-);
       
 
       map.addLayer({
