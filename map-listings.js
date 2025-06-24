@@ -53,18 +53,14 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   /* ───────────────  INITIALISATION  ─────────────── */
-  /*  CONSTANTE pour le nouveau layer  */
 const LAYER_ID_PILLS = 'price-pill';
 
-/* ------------------------------------------------------------- */
-/*  initializeMap : carte + pastilles + communes colorées        */
-/* ------------------------------------------------------------- */
 function initializeMap(initialGeoJSON, firstCityList) {
   map = new maplibregl.Map({
-    container : MAP_CONTAINER_ID,
-    style     : `https://api.maptiler.com/maps/${MAP_ID}/style.json?key=${MAPTILER_API_KEY}`,
-    pitch     : 0,
-    bearing   : 0,
+    container: MAP_CONTAINER_ID,
+    style:     `https://api.maptiler.com/maps/${MAP_ID}/style.json?key=${MAPTILER_API_KEY}`,
+    pitch: 0,
+    bearing: 0,
     renderWorldCopies: false
   });
   window.map = map;
@@ -74,107 +70,91 @@ function initializeMap(initialGeoJSON, firstCityList) {
   }
 
   map.on('load', () => {
-    console.log('[MAP] chargée');
-
-    /* 0) Nettoyage des anciens ronds/icons -------------------- */
-    ['annonces-dots-layer', 'annonces-prices-layer'].forEach(id=>{
+    /* 0. Nettoyage ancien */
+    ['annonces-dots-layer','annonces-prices-layer'].forEach(id=>{
       if (map.getLayer(id)) map.removeLayer(id);
     });
     if (map.hasImage('circle-background')) map.removeImage('circle-background');
 
-    /* 1) Source GeoJSON des annonces -------------------------- */
-    map.addSource(SOURCE_ID_ANNONCES, {
-      type: 'geojson',
-      data: initialGeoJSON,
-      promoteId: 'id'
-    });
+    /* 1. Source GeoJSON annonces */
+    map.addSource(SOURCE_ID_ANNONCES, { type:'geojson', data:initialGeoJSON, promoteId:'id' });
 
-    /* 2) Icône SVG (pilule) encodée en base64 ----------------- */
-    const pillSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="27" height="27" viewBox="0 0 27 27">
-      <rect x="0.5" y="0.5" width="26" height="26" rx="12" ry="12"
-            fill="#ffffff" stroke="#bbbbbb" stroke-width="1"/>
-    </svg>`;
-    const pillUrl = 'data:image/svg+xml;base64,' + btoa(pillSvg);
+    /* 2. Fabrique l’icône pilule en Canvas */
+    const sz = 27;
+    const cvs = document.createElement('canvas');
+    cvs.width = cvs.height = sz;
+    const ctx = cvs.getContext('2d');
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#BBBBBB';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(0.5,0.5, sz-1, sz-1, 12);   // coins radius 12
+    ctx.fill(); ctx.stroke();
+    if (!map.hasImage('pill-bg')) map.addImage('pill-bg', cvs, { sdf:false, pixelRatio:1 });
 
-    /* 3) Charge l’icône puis crée le layer pastille ------------ */
-    map.loadImage(pillUrl, (err, img) => {
-      if (err) { console.error('loadImage pill', err); return; }
-      if (!map.hasImage('pill-bg')) map.addImage('pill-bg', img, { sdf: true });
+    /* 3. Ajoute la couche pastille */
+    const firstSymbol = map.getStyle().layers.find(l=>l.type==='symbol');
+    map.addLayer({
+      id: LAYER_ID_PILLS,
+      type:'symbol',
+      source: SOURCE_ID_ANNONCES,
+      layout:{
+        'text-field': ['concat',['to-string',['get','price']],' €'],
+        'text-font' : ['Open Sans Bold'],
+        'text-size' : 13,
+        'icon-image': 'pill-bg',
+        'icon-text-fit':'both',
+        'icon-text-fit-padding':[2,6,2,6],
+        'text-allow-overlap':true,
+        'icon-allow-overlap':true
+      },
+      paint:{
+        'text-color':[
+          'case',['boolean',['feature-state','selected'],false],
+          '#FFFFFF','#000000'
+        ],
+        'icon-color':[
+          'case',['boolean',['feature-state','selected'],false],
+          '#000000','#FFFFFF'
+        ],
+        'icon-halo-color':[
+          'case',['boolean',['feature-state','selected'],false],
+          '#000000','#BBBBBB'
+        ],
+        'icon-halo-width':1
+      }
+    }, firstSymbol?.id);
 
-      const firstSymbol = map.getStyle().layers.find(l => l.type === 'symbol');
+    /* 4. Événements */
+    map.on('mouseenter',LAYER_ID_PILLS,handleDotHoverOrClick);
+    map.on('click',     LAYER_ID_PILLS,handleDotHoverOrClick);
+    map.on('mouseleave',LAYER_ID_PILLS,()=>{ if(hoverTooltip){hoverTooltip.remove();hoverTooltip=null;}});
+    map.on('click',     LAYER_ID_PILLS,handlePriceBubbleClick);
 
-      map.addLayer({
-        id   : LAYER_ID_PILLS,
-        type : 'symbol',
-        source: SOURCE_ID_ANNONCES,
-
-        layout: {
-          'text-field' : ['concat', ['to-string', ['get','price']], ' €'],
-          'text-font'  : ['Open Sans Bold'],
-          'text-size'  : 13,
-          'icon-image' : 'pill-bg',
-          'icon-text-fit' : 'both',
-          'icon-text-fit-padding': [2,6,2,6],
-          'text-allow-overlap': true,
-          'icon-allow-overlap': true
-        },
-        paint: {
-          'text-color': [
-            'case', ['boolean',['feature-state','selected'],false],
-            '#ffffff', '#000000'
-          ],
-          'icon-color': [
-            'case', ['boolean',['feature-state','selected'],false],
-            '#000000', '#ffffff'
-          ],
-          'icon-halo-color': [
-            'case', ['boolean',['feature-state','selected'],false],
-            '#000000', '#bbbbbb'
-          ],
-          'icon-halo-width': 1
-        }
-      }, firstSymbol ? firstSymbol.id : undefined);
-
-      /* 3-bis) Événements sur la nouvelle couche  */
-      map.on('mouseenter', LAYER_ID_PILLS, handleDotHoverOrClick);
-      map.on('click',      LAYER_ID_PILLS, handleDotHoverOrClick);
-      map.on('mouseleave', LAYER_ID_PILLS, () => {
-        if (hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; }
-      });
-      map.on('click',      LAYER_ID_PILLS, handlePriceBubbleClick);
-
-      /* 4) Met à jour la liste visible une première fois */
-      updateVisibleList();
-    });
-
-    /* 5) Couche de coloration des communes -------------------- */
-    const firstSymbolLayer = map.getStyle().layers.find(l => l.type === 'symbol');
+    /* 5. Couche communes */
+    const firstSymbol2 = map.getStyle().layers.find(l=>l.type==='symbol');
     map.addLayer({
       id: CITY_HIGHLIGHT_LAYER_ID,
-      type: 'fill',
+      type:'fill',
       source: BOUNDARIES_SOURCE,
       'source-layer': BOUNDARIES_SOURCE_LAYER,
-      filter: ['all',
-        ['==', ['get','level'], CITY_LEVEL],
-        ['==', ['get',CITY_NAME_FIELD], '__none__']
-      ],
-      paint: {
-        'fill-color' : '#0269CC',
-        'fill-opacity': 0.08,
-        'fill-outline-color': '#0269CC'
+      filter:['==',['get',CITY_NAME_FIELD],'__none__'],
+      paint:{
+        'fill-color':'#0269CC',
+        'fill-opacity':0.08,
+        'fill-outline-color':'#0269CC'
       }
-    }, firstSymbolLayer ? firstSymbolLayer.id : undefined);
+    }, firstSymbol2?.id);
 
-    /* 6) Listeners globaux ------------------------------------ */
+    /* 6. Listeners globaux */
     map.on('idle',   updateVisibleList);
-    map.on('moveend', updateVisibleList);
+    map.on('moveend',updateVisibleList);
 
-    /* 7) Premier highlight ville + liste ---------------------- */
+    /* 7. Premier highlight */
     updateCityHighlight(firstCityList);
   });
 
-  /* Zoom / rotation standard */
-  map.addControl(new maplibregl.NavigationControl(), 'top-right');
+  map.addControl(new maplibregl.NavigationControl(),'top-right');
 }
 
   
@@ -222,7 +202,37 @@ if (toggle3dButton) {
     function handlePriceBubbleClick(e) { if (hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; } if (e.features && e.features.length > 0) { const f = e.features[0]; const p = f.properties; const cId = f.id; const d = allAnnouncements.find(a => a.id === cId); if (d) sessionStorage.setItem('selected_property_details', JSON.stringify(d)); if (selectedPinId !== null) map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false }); map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: cId }, { selected: true }); selectedPinId = cId; if (isMobile) { if (currentPopup) currentPopup.remove(); openMobileBottomSheet(p); } else { if (currentPopup) currentPopup.remove(); const h = createPopupHTML(p); currentPopup = new maplibregl.Popup({ offset: 25, className: 'airbnb-style-popup' }).setLngLat(f.geometry.coordinates.slice()).setHTML(h).addTo(map); currentPopup.on('close', () => { if (selectedPinId === cId) { map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false }); selectedPinId = null; } currentPopup = null; }); } } }
     function createPopupHTML(p) { const i = 'https://via.placeholder.com/280x150/cccccc/969696?text=Image'; const c = p.coverPhoto || i; const h = (p.house_type || 'Logement').replace(/^\w/, c => c.toUpperCase()); const t = `${h} à ${p.city || 'ville'}`; const d = []; if (p.rooms) d.push(`${p.rooms} p.`); if (p.bedrooms) d.push(`${p.bedrooms} ch.`); if (p.area) d.push(`${p.area}m²`); const dH = d.length > 0 ? `<p class="popup-description">${d.join(' • ')}</p>` : ''; const pH = `<p class="popup-price">${p.price || '?'}€ <span class="popup-price-period">/ mois</span></p>`; const l = `annonce?id=${p.id_str}`; return `<div><a href="${l}" class="popup-container-link" target="_blank"><div class="map-custom-popup"><img src="${c}" alt="${t}" class="popup-image" onerror="this.src='${i}'"><div class="popup-info"><h4 class="popup-title">${t}</h4>${dH}${pH}</div></div></a></div>`; }
     const listContainer = document.getElementById('annonces-wrapper'), mobileToggleButton = document.getElementById('mobile-map-toggle');
-    function updateVisibleList() { if (!map || !map.isStyleLoaded() || !listContainer) return; const vis = new Set(map.queryRenderedFeatures({ layers: [LAYER_ID_PILLS] }).map(f => String(f.properties.id))); listContainer.querySelectorAll('[data-property-id]').forEach(el => { const a = el.parentElement; if (!a || a.tagName !== 'A') { el.style.display = vis.has(el.dataset.propertyId) ? '' : 'none'; return; } a.classList.toggle('annonce-list-item-hidden', !vis.has(el.dataset.propertyId)); }); if (isMobile && mobileToggleButton) mobileToggleButton.textContent = `Voir les ${vis.size} logements`; }
+    function updateVisibleList() {
+  // 1) carte, style, conteneur OK ?
+  if (!map || !map.isStyleLoaded() || !listContainer) return;
+
+  // 2) la couche pastille est-elle déjà là ?
+  if (!map.getLayer(LAYER_ID_PILLS)) return;             // ← garde-fou clé
+
+  // 3) on récupère les features visibles
+  const vis = new Set(
+    map.queryRenderedFeatures({ layers: [LAYER_ID_PILLS] })
+       .map(f => String(f.properties.id))
+  );
+
+  // 4) affichage / masquage dans la liste
+  listContainer.querySelectorAll('[data-property-id]').forEach(el => {
+    const anchor = el.parentElement;           // <a> entourant l’annonce
+    const isVisible = vis.has(el.dataset.propertyId);
+
+    if (!anchor || anchor.tagName !== 'A') {
+      el.style.display = isVisible ? '' : 'none';
+      return;
+    }
+    anchor.classList.toggle('annonce-list-item-hidden', !isVisible);
+  });
+
+  // 5) compteur mobile
+  if (isMobile && mobileToggleButton) {
+    mobileToggleButton.textContent = `Voir les ${vis.size} logements`;
+  }
+}
+
     function getBounds(g) { const b = new maplibregl.LngLatBounds(); g.features.forEach(f => b.extend(f.geometry.coordinates)); return b; }
     const mobileBottomSheet = document.getElementById('mobile-bottom-sheet'), mobileBottomSheetContent = document.getElementById('mobile-bottom-sheet-content'), bottomSheetCloseButton = document.getElementById('bottom-sheet-close-button');
     function openMobileBottomSheet(p) { if (!mobileBottomSheet || !mobileBottomSheetContent) return; mobileBottomSheetContent.innerHTML = createPopupHTML(p); mobileBottomSheet.classList.add('visible'); }
