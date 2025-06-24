@@ -18,8 +18,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Annonces
   const SOURCE_ID_ANNONCES = 'annonces-source';
-  const LAYER_ID_DOTS      = 'annonces-dots-layer';
-  const LAYER_ID_PRICES    = 'annonces-prices-layer';
+  // const LAYER_ID_DOTS  = 'annonces-dots-layer';   // plus utilisé
+  // const LAYER_ID_PRICES = 'annonces-prices-layer'; // plus utilisé
+  const LAYER_ID_PILLS = 'price-pill';   // ← ajouté
 
   // Bouton 3D
   const BUTTON_3D_ID       = 'toggle-3d-button';
@@ -76,40 +77,56 @@ document.addEventListener('DOMContentLoaded', () => {
       map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
 
       map.addLayer({
-  id: 'price-pill',
-  type: 'symbol',
+  id   : 'price-pill',
+  type : 'symbol',
   source: SOURCE_ID_ANNONCES,
-  minzoom: 0,
-  layout: {
-    'text-field': ['concat', ['get', 'price'], ' €'],
-    'text-font' : ['Open Sans Regular','Arial Unicode MS Regular'],
-    'text-size' : 13,
-    'text-padding': 4,
-    'text-justify': 'center',
-    'text-letter-spacing': 0.05,
-    'text-allow-overlap': true,
 
+  layout: {
+    /* -------------- texte -------------- */
+    'text-field'        : ['concat', ['to-string', ['get','price']], ' €'],
+    'text-font'         : ['Open Sans Bold'],
+    'text-size'         : 13,
+    'text-letter-spacing': 0.05,
+    'text-justify'      : 'center',
+
+    /* -------------- icône -------------- */
+    'icon-image'        : 'pill-bg',
+    'icon-size'         : 1,
+    'icon-anchor'       : 'center',
+    /* magie : étire l’icône autour du texte */
+    'icon-text-fit'     : 'both',            // ← clé
+    'icon-text-fit-padding': [2, 6, 2, 6],   // top, right, bottom, left (px)
+
+    /* chevauchement ok */
+    'text-allow-overlap': true,
+    'icon-allow-overlap': true
   },
-        
+
   paint: {
-    /* halo = bord noir (non sélectionné) */
-    'text-halo-color': '#000000',
-    'text-halo-width': [
-      'case',
-      ['boolean', ['feature-state','selected'], false],
-      2,     // halo plus épais quand sélectionné
-      1.2
-    ],
-    /* remplit le “fond” en trichant avec halo-blur */
-    'text-halo-blur': 1,
+    /* texte */
     'text-color': [
       'case',
       ['boolean', ['feature-state','selected'], false],
-      '#FFFFFF',  // texte blanc sur halo noir
+      '#FFFFFF',
       '#000000'
-    ]
+    ],
+    /* bord + fond de la pastille */
+    'icon-color': [
+      'case',
+      ['boolean', ['feature-state','selected'], false],
+      '#000000',   // sélection → pastille noire
+      '#FFFFFF'    // sinon blanche
+    ],
+    'icon-halo-color': [
+      'case',
+      ['boolean', ['feature-state','selected'], false],
+      '#000000',
+      '#BBBBBB'    // petit contour gris
+    ],
+    'icon-halo-width': 1
   }
-});
+}, 'road-label');
+
 
 
       
@@ -154,9 +171,9 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('[MAP_SCRIPT] Couche commune ajoutée');
 
       /* -- Events divers -- */
-      map.on('mouseenter', LAYER_ID_DOTS, handleDotHoverOrClick);
-      map.on('click',      LAYER_ID_DOTS, handleDotHoverOrClick);
-      map.on('mouseleave', LAYER_ID_DOTS, () => {
+      map.on('mouseenter', LAYER_ID_PILLS, handleDotHoverOrClick);
+      map.on('click',      LAYER_ID_PILLS, handleDotHoverOrClick);
+      map.on('mouseleave', LAYER_ID_PILLS, () => {
         if (hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; }
       });
       map.on('click', LAYER_ID_PRICES, handlePriceBubbleClick);
@@ -214,7 +231,7 @@ if (toggle3dButton) {
     function handlePriceBubbleClick(e) { if (hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; } if (e.features && e.features.length > 0) { const f = e.features[0]; const p = f.properties; const cId = f.id; const d = allAnnouncements.find(a => a.id === cId); if (d) sessionStorage.setItem('selected_property_details', JSON.stringify(d)); if (selectedPinId !== null) map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false }); map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: cId }, { selected: true }); selectedPinId = cId; if (isMobile) { if (currentPopup) currentPopup.remove(); openMobileBottomSheet(p); } else { if (currentPopup) currentPopup.remove(); const h = createPopupHTML(p); currentPopup = new maplibregl.Popup({ offset: 25, className: 'airbnb-style-popup' }).setLngLat(f.geometry.coordinates.slice()).setHTML(h).addTo(map); currentPopup.on('close', () => { if (selectedPinId === cId) { map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false }); selectedPinId = null; } currentPopup = null; }); } } }
     function createPopupHTML(p) { const i = 'https://via.placeholder.com/280x150/cccccc/969696?text=Image'; const c = p.coverPhoto || i; const h = (p.house_type || 'Logement').replace(/^\w/, c => c.toUpperCase()); const t = `${h} à ${p.city || 'ville'}`; const d = []; if (p.rooms) d.push(`${p.rooms} p.`); if (p.bedrooms) d.push(`${p.bedrooms} ch.`); if (p.area) d.push(`${p.area}m²`); const dH = d.length > 0 ? `<p class="popup-description">${d.join(' • ')}</p>` : ''; const pH = `<p class="popup-price">${p.price || '?'}€ <span class="popup-price-period">/ mois</span></p>`; const l = `annonce?id=${p.id_str}`; return `<div><a href="${l}" class="popup-container-link" target="_blank"><div class="map-custom-popup"><img src="${c}" alt="${t}" class="popup-image" onerror="this.src='${i}'"><div class="popup-info"><h4 class="popup-title">${t}</h4>${dH}${pH}</div></div></a></div>`; }
     const listContainer = document.getElementById('annonces-wrapper'), mobileToggleButton = document.getElementById('mobile-map-toggle');
-    function updateVisibleList() { if (!map || !map.isStyleLoaded() || !listContainer) return; const vis = new Set(map.queryRenderedFeatures({ layers: [LAYER_ID_DOTS] }).map(f => String(f.properties.id))); listContainer.querySelectorAll('[data-property-id]').forEach(el => { const a = el.parentElement; if (!a || a.tagName !== 'A') { el.style.display = vis.has(el.dataset.propertyId) ? '' : 'none'; return; } a.classList.toggle('annonce-list-item-hidden', !vis.has(el.dataset.propertyId)); }); if (isMobile && mobileToggleButton) mobileToggleButton.textContent = `Voir les ${vis.size} logements`; }
+    function updateVisibleList() { if (!map || !map.isStyleLoaded() || !listContainer) return; const vis = new Set(map.queryRenderedFeatures({ layers: [LAYER_ID_PILLS] }).map(f => String(f.properties.id))); listContainer.querySelectorAll('[data-property-id]').forEach(el => { const a = el.parentElement; if (!a || a.tagName !== 'A') { el.style.display = vis.has(el.dataset.propertyId) ? '' : 'none'; return; } a.classList.toggle('annonce-list-item-hidden', !vis.has(el.dataset.propertyId)); }); if (isMobile && mobileToggleButton) mobileToggleButton.textContent = `Voir les ${vis.size} logements`; }
     function getBounds(g) { const b = new maplibregl.LngLatBounds(); g.features.forEach(f => b.extend(f.geometry.coordinates)); return b; }
     const mobileBottomSheet = document.getElementById('mobile-bottom-sheet'), mobileBottomSheetContent = document.getElementById('mobile-bottom-sheet-content'), bottomSheetCloseButton = document.getElementById('bottom-sheet-close-button');
     function openMobileBottomSheet(p) { if (!mobileBottomSheet || !mobileBottomSheetContent) return; mobileBottomSheetContent.innerHTML = createPopupHTML(p); mobileBottomSheet.classList.add('visible'); }
