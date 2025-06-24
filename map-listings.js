@@ -190,6 +190,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // REMPLACEZ LE BLOC À LA FIN DE VOTRE FICHIER PAR CELUI-CI
+
     function getBounds(g) { const b = new maplibregl.LngLatBounds(); g.features.forEach(f => b.extend(f.geometry.coordinates)); return b; }
     
     // --- GESTION DU PANNEAU MOBILE (BOTTOM SHEET) ---
@@ -203,12 +205,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- GESTION DU BOUTON MOBILE CARTE/LISTE (LOGIQUE UNIFIÉE ET CORRIGÉE) ---
-    const mobileToggleButton = document.getElementById('mobile-map-toggle');
-    const mobileToggleText = document.getElementById('mobile-map-toggle-text'); // Cible le <span> pour le texte
+    // Note : mobileToggleButton est déjà déclaré plus haut, on ne le redéclare pas ici.
+    const mobileToggleText = document.getElementById('mobile-map-toggle-text');
     const mapIcon = document.getElementById('mobile-map-icon-map');
     const listIcon = document.getElementById('mobile-map-icon-list');
 
-    // On s'assure que tous les éléments existent avant d'attacher l'écouteur
+    // On utilise `mobileToggleButton` qui est déjà déclaré
     if (isMobile && mobileToggleButton && mobileToggleText && mapIcon && listIcon) {
         
         // On s'assure que l'état initial est correct (Vue Liste)
@@ -217,28 +219,23 @@ document.addEventListener('DOMContentLoaded', () => {
         listIcon.style.display = 'none';
 
         mobileToggleButton.addEventListener('click', () => {
-            // On bascule la classe sur le body et on vérifie le nouvel état
             const isMapNowActive = document.body.classList.toggle('map-is-active');
 
             if (isMapNowActive) {
                 // --- On vient d'afficher la VUE CARTE ---
                 if (map) {
                     map.resize();
-                    // updateVisibleList mettra à jour le texte avec le décompte
-                    // On l'appelle après un petit délai pour que la carte ait le temps de calculer les pins visibles
                     setTimeout(() => {
                         updateVisibleList();
                     }, 300); 
                 }
-                // On met le texte et les icônes pour l'action "aller à la liste"
-                mobileToggleText.textContent = 'Liste'; // Texte par défaut si aucun pin n'est visible
+                mobileToggleText.textContent = 'Liste';
                 mapIcon.style.display = 'none';
                 listIcon.style.display = 'inline-block';
             } else {
                 // --- On vient d'afficher la VUE LISTE ---
                 if (listContainer) listContainer.scrollTo(0, 0);
                 
-                // On met le texte et les icônes pour l'action "aller à la carte"
                 mobileToggleText.textContent = 'Carte';
                 mapIcon.style.display = 'inline-block';
                 listIcon.style.display = 'none';
