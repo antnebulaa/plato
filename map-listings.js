@@ -74,16 +74,47 @@ document.addEventListener('DOMContentLoaded', () => {
       map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
 
       map.addLayer({
-        id: LAYER_ID_DOTS,
-        type: 'circle',
-        source: SOURCE_ID_ANNONCES,
-        paint: {
-          'circle-radius': 5,
-          'circle-color': '#FFFFFF',
-          'circle-stroke-width': 1,
-          'circle-stroke-color': '#B4B4B4'
-        }
-      });
+  id: 'price-pill',
+  type: 'symbol',
+  source: SRC_ANNONCES,
+  minzoom: 0,
+  layout: {
+    'text-field': ['concat', ['get', 'price'], ' €'],
+    'text-font' : ['Open Sans Regular','Arial Unicode MS Regular'],
+    'text-size' : 13,
+    'text-padding': 4,
+    'text-justify': 'center',
+    'text-letter-spacing': 0.05,
+    'text-allow-overlap': true,
+
+    /* ICI le décalage pour la petite “queue” */
+    'text-offset': [
+      'case',
+      ['boolean', ['feature-state', 'selected'], false],
+      ['literal', [0, 0]],      // pastille centrée si sélectionnée
+      ['literal', [0, 0.15]]    // sinon on la remonte un peu
+    ]
+  },
+  paint: {
+    /* halo = bord noir (non sélectionné) */
+    'text-halo-color': '#000000',
+    'text-halo-width': [
+      'case',
+      ['boolean', ['feature-state','selected'], false],
+      2,     // halo plus épais quand sélectionné
+      1.2
+    ],
+    /* remplit le “fond” en trichant avec halo-blur */
+    'text-halo-blur': 1,
+    'text-color': [
+      'case',
+      ['boolean', ['feature-state','selected'], false],
+      '#FFFFFF',  // texte blanc sur halo noir
+      '#000000'
+    ]
+  }
+});
+
 
       map.addLayer({
         id: LAYER_ID_PRICES,
