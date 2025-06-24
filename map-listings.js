@@ -78,73 +78,70 @@ document.addEventListener('DOMContentLoaded', () => {
   if (map.hasImage('circle-background')) map.removeImage('circle-background');
 
 
-      /* -- Annonces (points + labels) -- */
-      map.addImage('circle-background', createCircleSdf(64), { sdf: true });
-      map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
+/* ──── ICÔNE + LAYER PASTILLE ───────────────────────────────────────── */
+(function addPricePill() {
+  // 1) icône SVG en data-URL
+  const pillSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="27" height="27" viewBox="0 0 27 27">
+    <rect x="0.5" y="0.5" width="26" height="26" rx="12" ry="12"
+          fill="#ffffff" stroke="#bbbbbb" stroke-width="1"/>
+  </svg>`;
+  const pillUrl = 'data:image/svg+xml;base64,' + btoa(pillSvg);
 
-      const firstSymbol = map.getStyle().layers.find(l => l.type === 'symbol');
+  // 2) charge l’image puis ajoute le layer
+  map.loadImage(pillUrl, (err, img) => {
+    if (err) { console.error('loadImage', err); return; }
+    if (!map.hasImage('pill-bg')) map.addImage('pill-bg', img, { sdf: true });
 
-      map.loadImage('/assets/pill-bg.svg', (err, img) => {
-  if (err) throw err;
-  if (!map.hasImage('pill-bg')) {
-    map.addImage('pill-bg', img, { sdf: true });  // svg → SDF = recolorable
-  }
+    const firstSymbol = map.getStyle().layers.find(l => l.type === 'symbol');
+
+    // 3) layer pastille
+    map.addLayer({
+      id: 'price-pill',
+      type: 'symbol',
+      source: SOURCE_ID_ANNONCES,
+
+      layout: {
+        'text-field' : ['concat', ['to-string', ['get','price']], ' €'],
+        'text-font'  : ['Open Sans Bold'],
+        'text-size'  : 13,
+        'icon-image' : 'pill-bg',
+        'icon-text-fit': 'both',
+        'icon-text-fit-padding': [2,6,2,6],
+        'text-allow-overlap': true,
+        'icon-allow-overlap': true
+      },
+      paint: {
+        'text-color': [
+          'case', ['boolean',['feature-state','selected'],false],
+          '#ffffff', '#000000'
+        ],
+        'icon-color': [
+          'case', ['boolean',['feature-state','selected'],false],
+          '#000000', '#ffffff'
+        ],
+        'icon-halo-color': [
+          'case', ['boolean',['feature-state','selected'],false],
+          '#000000', '#bbbbbb'
+        ],
+        'icon-halo-width': 1
+      }
+    }, firstSymbol ? firstSymbol.id : undefined);
+
+    /* 4) rebrancher les événements sur le nouveau layer */
+    map.on('mouseenter', 'price-pill', handleDotHoverOrClick);
+    map.on('click',      'price-pill', handleDotHoverOrClick);
+    map.on('mouseleave', 'price-pill', () => {
+      if (hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; }
+    });
+    map.on('click',      'price-pill', handlePriceBubbleClick);
+  });
+})();
+
+
+    
 });
 
-      map.addLayer({
-  id   : 'price-pill',
-  type : 'symbol',
-  source: SOURCE_ID_ANNONCES,
 
-  layout: {
-    /* -------------- texte -------------- */
-    'text-field'        : ['concat', ['to-string', ['get','price']], ' €'],
-    'text-font'         : ['Open Sans Bold'],
-    'text-size'         : 13,
-    'text-letter-spacing': 0.05,
-    'text-justify'      : 'center',
-
-    /* -------------- icône -------------- */
-    'icon-image'        : 'pill-bg',
-    'icon-size'         : 1,
-    'icon-anchor'       : 'center',
-    /* magie : étire l’icône autour du texte */
-    'icon-text-fit'     : 'both',            // ← clé
-    'icon-text-fit-padding': [2, 6, 2, 6],   // top, right, bottom, left (px)
-
-    /* chevauchement ok */
-    'text-allow-overlap': true,
-    'icon-allow-overlap': true
-  },
-
-  paint: {
-    /* texte */
-    'text-color': [
-      'case',
-      ['boolean', ['feature-state','selected'], false],
-      '#FFFFFF',
-      '#000000'
-    ],
-    /* bord + fond de la pastille */
-    'icon-color': [
-      'case',
-      ['boolean', ['feature-state','selected'], false],
-      '#000000',   // sélection → pastille noire
-      '#FFFFFF'    // sinon blanche
-    ],
-    'icon-halo-color': [
-      'case',
-      ['boolean', ['feature-state','selected'], false],
-      '#000000',
-      '#BBBBBB'    // petit contour gris
-    ],
-    'icon-halo-width': 1
-  }
-}, firstSymbol ? firstSymbol.id : undefined);
-
-
-
-      
 
       map.addLayer({
         id: LAYER_ID_PRICES,
