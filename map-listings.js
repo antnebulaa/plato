@@ -18,9 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Annonces
   const SOURCE_ID_ANNONCES = 'annonces-source';
-  // const LAYER_ID_DOTS  = 'annonces-dots-layer';   // plus utilisé
-  // const LAYER_ID_PRICES = 'annonces-prices-layer'; // plus utilisé
-
+  const LAYER_ID_DOTS      = 'annonces-dots-layer';
+  const LAYER_ID_PRICES    = 'annonces-prices-layer';
 
   // Bouton 3D
   const BUTTON_3D_ID       = 'toggle-3d-button';
@@ -53,111 +52,95 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   /* ───────────────  INITIALISATION  ─────────────── */
-const LAYER_ID_PILLS = 'price-pill';
+  function initializeMap(initialGeoJSON, firstCityList) {
+    map = new maplibregl.Map({
+      container: MAP_CONTAINER_ID,
+      style:     `https://api.maptiler.com/maps/${MAP_ID}/style.json?key=${MAPTILER_API_KEY}`,
+      pitch: 0,
+      bearing: 0,
+      renderWorldCopies: false
+    });
+    window.map = map;
 
-function initializeMap(initialGeoJSON, firstCityList) {
-  map = new maplibregl.Map({
-    container: MAP_CONTAINER_ID,
-    style:     `https://api.maptiler.com/maps/${MAP_ID}/style.json?key=${MAPTILER_API_KEY}`,
-    pitch: 0,
-    bearing: 0,
-    renderWorldCopies: false
-  });
-  window.map = map;
+    if (initialGeoJSON.features.length) {
+      map.fitBounds(getBounds(initialGeoJSON), { padding: 80, duration: 0, maxZoom: 16 });
+    }
 
-  if (initialGeoJSON.features.length) {
-    map.fitBounds(getBounds(initialGeoJSON), { padding: 80, duration: 0, maxZoom: 16 });
+    map.on('load', () => {
+      console.log('[MAP_SCRIPT] Carte chargée');
+
+      /* -- Annonces (points + labels) -- */
+      map.addImage('circle-background', createCircleSdf(64), { sdf: true });
+      map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
+
+      map.addLayer({
+        id: LAYER_ID_DOTS,
+        type: 'circle',
+        source: SOURCE_ID_ANNONCES,
+        paint: {
+          'circle-radius': 5,
+          'circle-color': '#FFFFFF',
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#B4B4B4'
+        }
+      });
+
+      map.addLayer({
+        id: LAYER_ID_PRICES,
+        type: 'symbol',
+        source: SOURCE_ID_ANNONCES,
+        layout: {
+          'icon-image': 'circle-background',
+          'icon-size': 0.9,
+          'text-field': ['concat', ['to-string', ['get', 'price']], '€'],
+          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+          'text-size': 14
+        },
+        paint: {
+          'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'],
+          'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333']
+        }
+      });
+
+      /* -- Couche de coloration des communes (invisible au départ) -- */
+      const firstSymbolLayer = map.getStyle().layers.find(l => l.type === 'symbol');
+
+      map.addLayer({
+        id: CITY_HIGHLIGHT_LAYER_ID,
+        type: 'fill',
+        source: BOUNDARIES_SOURCE,
+        'source-layer': BOUNDARIES_SOURCE_LAYER,
+        // uniquement les communes (level 3) et aucun nom (filtre vide)
+        filter: ['all',
+          ['==', ['get', 'level'], CITY_LEVEL],
+          ['==', ['get', CITY_NAME_FIELD], '__none__']
+        ],
+        paint: {
+  'fill-color'   : '#0269CC',
+  'fill-opacity' : 0.08,
+  'fill-outline-color': '#0269CC'
+      }
+      }, firstSymbolLayer?.id);
+
+      console.log('[MAP_SCRIPT] Couche commune ajoutée');
+
+      /* -- Events divers -- */
+      map.on('mouseenter', LAYER_ID_DOTS, handleDotHoverOrClick);
+      map.on('click',      LAYER_ID_DOTS, handleDotHoverOrClick);
+      map.on('mouseleave', LAYER_ID_DOTS, () => {
+        if (hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; }
+      });
+      map.on('click', LAYER_ID_PRICES, handlePriceBubbleClick);
+      map.on('idle',   updateVisibleList);
+      map.on('moveend', updateVisibleList);
+
+      // premier highlight (si une ville reçue à l'init)
+      updateCityHighlight(firstCityList);
+    });
+
+    map.addControl(new maplibregl.NavigationControl(), 'top-right');
   }
 
-  map.on('load', () => {
-    /* 0. Nettoyage ancien */
-    ['annonces-dots-layer','annonces-prices-layer'].forEach(id=>{
-      if (map.getLayer(id)) map.removeLayer(id);
-    });
-    if (map.hasImage('circle-background')) map.removeImage('circle-background');
-
-    /* 1. Source GeoJSON annonces */
-    map.addSource(SOURCE_ID_ANNONCES, { type:'geojson', data:initialGeoJSON, promoteId:'id' });
-
-    /* 2. Fabrique l’icône pilule en Canvas */
-    const sz = 27;
-    const cvs = document.createElement('canvas');
-    cvs.width = cvs.height = sz;
-    const ctx = cvs.getContext('2d');
-    ctx.fillStyle = '#FFFFFF';
-    ctx.strokeStyle = '#BBBBBB';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(0.5,0.5, sz-1, sz-1, 12);   // coins radius 12
-    ctx.fill(); ctx.stroke();
-    if (!map.hasImage('pill-bg')) map.addImage('pill-bg', cvs, { sdf:false, pixelRatio:1 });
-
-    /* 3. Ajoute la couche pastille */
-    const firstSymbol = map.getStyle().layers.find(l=>l.type==='symbol');
-    map.addLayer({
-      id: LAYER_ID_PILLS,
-      type:'symbol',
-      source: SOURCE_ID_ANNONCES,
-      layout:{
-        'text-field': ['concat',['to-string',['get','price']],' €'],
-        'text-font' : ['Open Sans Bold'],
-        'text-size' : 13,
-        'icon-image': 'pill-bg',
-        'icon-text-fit':'both',
-        'icon-text-fit-padding':[2,6,2,6],
-        'text-allow-overlap':true,
-        'icon-allow-overlap':true
-      },
-      paint:{
-        'text-color':[
-          'case',['boolean',['feature-state','selected'],false],
-          '#FFFFFF','#000000'
-        ],
-        'icon-color':[
-          'case',['boolean',['feature-state','selected'],false],
-          '#000000','#FFFFFF'
-        ],
-        'icon-halo-color':[
-          'case',['boolean',['feature-state','selected'],false],
-          '#000000','#BBBBBB'
-        ],
-        'icon-halo-width':1
-      }
-    }, firstSymbol?.id);
-
-    /* 4. Événements */
-    map.on('mouseenter',LAYER_ID_PILLS,handleDotHoverOrClick);
-    map.on('click',     LAYER_ID_PILLS,handleDotHoverOrClick);
-    map.on('mouseleave',LAYER_ID_PILLS,()=>{ if(hoverTooltip){hoverTooltip.remove();hoverTooltip=null;}});
-    map.on('click',     LAYER_ID_PILLS,handlePriceBubbleClick);
-
-    /* 5. Couche communes */
-    const firstSymbol2 = map.getStyle().layers.find(l=>l.type==='symbol');
-    map.addLayer({
-      id: CITY_HIGHLIGHT_LAYER_ID,
-      type:'fill',
-      source: BOUNDARIES_SOURCE,
-      'source-layer': BOUNDARIES_SOURCE_LAYER,
-      filter:['==',['get',CITY_NAME_FIELD],'__none__'],
-      paint:{
-        'fill-color':'#0269CC',
-        'fill-opacity':0.08,
-        'fill-outline-color':'#0269CC'
-      }
-    }, firstSymbol2?.id);
-
-    /* 6. Listeners globaux */
-    map.on('idle',   updateVisibleList);
-    map.on('moveend',updateVisibleList);
-
-    /* 7. Premier highlight */
-    updateCityHighlight(firstCityList);
-  });
-
-  map.addControl(new maplibregl.NavigationControl(),'top-right');
-}
-
-  
   /* ───────────────  MISE À JOUR DU HIGHLIGHT  ─────────────── */
   function updateCityHighlight(selectedCities = []) {
     if (!map?.isStyleLoaded() || !map.getLayer(CITY_HIGHLIGHT_LAYER_ID)) return;
@@ -198,41 +181,11 @@ if (toggle3dButton) {
     function getNestedValue(obj, path) { if (!path) return undefined; return path.split('.').reduce((acc, part) => (acc && acc[part] !== undefined) ? (isNaN(parseInt(part, 10)) ? acc[part] : acc[parseInt(part, 10)]) : undefined, obj); }
     function convertAnnoncesToGeoJSON(annonces) { const features = annonces.map(annonce => { const lat = getNestedValue(annonce, 'geo_location.data.lat'); const lng = getNestedValue(annonce, 'geo_location.data.lng'); if (annonce.id === undefined || lat === undefined || lng === undefined) return null; let fId = parseInt(annonce.id, 10); if (isNaN(fId)) return null; return { type: 'Feature', id: fId, geometry: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] }, properties: { id: fId, id_str: String(annonce.id), price: getNestedValue(annonce, '_property_lease_of_property.0.loyer') || '?', coverPhoto: getNestedValue(annonce, '_property_photos.0.images.0.url'), house_type: getNestedValue(annonce, 'house_type'), city: getNestedValue(annonce, 'city'), rooms: getNestedValue(annonce, 'rooms'), bedrooms: getNestedValue(annonce, 'bedrooms'), area: getNestedValue(annonce, 'area') } }; }).filter(Boolean); return { type: 'FeatureCollection', features }; }
     let currentPopup = null, selectedPinId = null, isMobile = window.innerWidth < 768, hoverTooltip = null;
-    function handleDotHoverOrClick(e) { if (map.queryRenderedFeatures(e.point, { layers: [LAYER_ID_PILLS] }).length > 0) return; if (e.features.length > 0) { map.getCanvas().style.cursor = 'pointer'; if (hoverTooltip) hoverTooltip.remove(); const p = e.features[0].properties; const c = e.features[0].geometry.coordinates.slice(); hoverTooltip = new maplibregl.Popup({ closeButton: false, offset: 10, anchor: 'bottom', className: 'hover-popup' }).setLngLat(c).setHTML(`<div class="hover-popup-content">${p.price}€</div>`).addTo(map); } }
+    function handleDotHoverOrClick(e) { if (map.queryRenderedFeatures(e.point, { layers: [LAYER_ID_PRICES] }).length > 0) return; if (e.features.length > 0) { map.getCanvas().style.cursor = 'pointer'; if (hoverTooltip) hoverTooltip.remove(); const p = e.features[0].properties; const c = e.features[0].geometry.coordinates.slice(); hoverTooltip = new maplibregl.Popup({ closeButton: false, offset: 10, anchor: 'bottom', className: 'hover-popup' }).setLngLat(c).setHTML(`<div class="hover-popup-content">${p.price}€</div>`).addTo(map); } }
     function handlePriceBubbleClick(e) { if (hoverTooltip) { hoverTooltip.remove(); hoverTooltip = null; } if (e.features && e.features.length > 0) { const f = e.features[0]; const p = f.properties; const cId = f.id; const d = allAnnouncements.find(a => a.id === cId); if (d) sessionStorage.setItem('selected_property_details', JSON.stringify(d)); if (selectedPinId !== null) map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false }); map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: cId }, { selected: true }); selectedPinId = cId; if (isMobile) { if (currentPopup) currentPopup.remove(); openMobileBottomSheet(p); } else { if (currentPopup) currentPopup.remove(); const h = createPopupHTML(p); currentPopup = new maplibregl.Popup({ offset: 25, className: 'airbnb-style-popup' }).setLngLat(f.geometry.coordinates.slice()).setHTML(h).addTo(map); currentPopup.on('close', () => { if (selectedPinId === cId) { map.setFeatureState({ source: SOURCE_ID_ANNONCES, id: selectedPinId }, { selected: false }); selectedPinId = null; } currentPopup = null; }); } } }
     function createPopupHTML(p) { const i = 'https://via.placeholder.com/280x150/cccccc/969696?text=Image'; const c = p.coverPhoto || i; const h = (p.house_type || 'Logement').replace(/^\w/, c => c.toUpperCase()); const t = `${h} à ${p.city || 'ville'}`; const d = []; if (p.rooms) d.push(`${p.rooms} p.`); if (p.bedrooms) d.push(`${p.bedrooms} ch.`); if (p.area) d.push(`${p.area}m²`); const dH = d.length > 0 ? `<p class="popup-description">${d.join(' • ')}</p>` : ''; const pH = `<p class="popup-price">${p.price || '?'}€ <span class="popup-price-period">/ mois</span></p>`; const l = `annonce?id=${p.id_str}`; return `<div><a href="${l}" class="popup-container-link" target="_blank"><div class="map-custom-popup"><img src="${c}" alt="${t}" class="popup-image" onerror="this.src='${i}'"><div class="popup-info"><h4 class="popup-title">${t}</h4>${dH}${pH}</div></div></a></div>`; }
     const listContainer = document.getElementById('annonces-wrapper'), mobileToggleButton = document.getElementById('mobile-map-toggle');
-    function updateVisibleList() {
-  // 1) carte, style, conteneur OK ?
-  if (!map || !map.isStyleLoaded() || !listContainer) return;
-
-  // 2) la couche pastille est-elle déjà là ?
-  if (!map.getLayer(LAYER_ID_PILLS)) return;             // ← garde-fou clé
-
-  // 3) on récupère les features visibles
-  const vis = new Set(
-    map.queryRenderedFeatures({ layers: [LAYER_ID_PILLS] })
-       .map(f => String(f.properties.id))
-  );
-
-  // 4) affichage / masquage dans la liste
-  listContainer.querySelectorAll('[data-property-id]').forEach(el => {
-    const anchor = el.parentElement;           // <a> entourant l’annonce
-    const isVisible = vis.has(el.dataset.propertyId);
-
-    if (!anchor || anchor.tagName !== 'A') {
-      el.style.display = isVisible ? '' : 'none';
-      return;
-    }
-    anchor.classList.toggle('annonce-list-item-hidden', !isVisible);
-  });
-
-  // 5) compteur mobile
-  if (isMobile && mobileToggleButton) {
-    mobileToggleButton.textContent = `Voir les ${vis.size} logements`;
-  }
-}
-
+    function updateVisibleList() { if (!map || !map.isStyleLoaded() || !listContainer) return; const vis = new Set(map.queryRenderedFeatures({ layers: [LAYER_ID_DOTS] }).map(f => String(f.properties.id))); listContainer.querySelectorAll('[data-property-id]').forEach(el => { const a = el.parentElement; if (!a || a.tagName !== 'A') { el.style.display = vis.has(el.dataset.propertyId) ? '' : 'none'; return; } a.classList.toggle('annonce-list-item-hidden', !vis.has(el.dataset.propertyId)); }); if (isMobile && mobileToggleButton) mobileToggleButton.textContent = `Voir les ${vis.size} logements`; }
     function getBounds(g) { const b = new maplibregl.LngLatBounds(); g.features.forEach(f => b.extend(f.geometry.coordinates)); return b; }
     const mobileBottomSheet = document.getElementById('mobile-bottom-sheet'), mobileBottomSheetContent = document.getElementById('mobile-bottom-sheet-content'), bottomSheetCloseButton = document.getElementById('bottom-sheet-close-button');
     function openMobileBottomSheet(p) { if (!mobileBottomSheet || !mobileBottomSheetContent) return; mobileBottomSheetContent.innerHTML = createPopupHTML(p); mobileBottomSheet.classList.add('visible'); }
