@@ -177,9 +177,7 @@ function initializeMap(initialGeoJSON, firstCityList) {
   map.addControl(new maplibregl.NavigationControl(), 'top-right');
 }
 
-    map.addControl(new maplibregl.NavigationControl(), 'top-right');
-  }
-
+  
   /* ───────────────  MISE À JOUR DU HIGHLIGHT  ─────────────── */
   function updateCityHighlight(selectedCities = []) {
     if (!map?.isStyleLoaded() || !map.getLayer(CITY_HIGHLIGHT_LAYER_ID)) return;
