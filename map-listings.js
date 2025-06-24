@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
       map.addLayer({
   id: 'price-pill',
   type: 'symbol',
-  source: SRC_ANNONCES,
+  source: SOURCE_ID_ANNONCES,
   minzoom: 0,
   layout: {
     'text-field': ['concat', ['get', 'price'], ' €'],
