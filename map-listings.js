@@ -106,7 +106,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 id: LAYER_ID_PRICES,
                 type: 'symbol',
                 source: SOURCE_ID_ANNONCES,
-                layout: { 'icon-image': 'circle-background', 'icon-size': 0.9, 'text-field': ['concat', ['to-string', ['get', 'price']], '€'], 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14 },
+                layout: {
+    'icon-image': 'circle-background',
+    'icon-size': 0.9,
+    'text-field': ['concat', ['to-string', ['get', 'price']], '€'],
+    'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+    'text-size': 14,
+    'icon-allow-overlap': false, // Restauré
+    'text-allow-overlap': false, // Restauré
+    'icon-anchor': 'center',     // Restauré
+    'text-anchor': 'center'      // Restauré
+},
                 paint: { 'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'], 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] }
             }, firstSymbolLayer?.id);
             
