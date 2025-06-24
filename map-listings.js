@@ -71,56 +71,60 @@ document.addEventListener('DOMContentLoaded', () => {
                     url: `https://api.maptiler.com/tiles/countries/{z}/{x}/{y}.pbf?key=${MAPTILER_API_KEY}`
                 });
             }
-            // Source pour les annonces
-            map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
-            map.addImage('circle-background', createCircleSdf(64), { sdf: true });
+            /* -- Annonces (points + labels) -- */
+      map.addImage('circle-background', createCircleSdf(64), { sdf: true });
+      map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
 
-            // On trouve une couche de référence (un label) pour insérer nos couches en dessous
-            const firstSymbolLayer = map.getStyle().layers.find(l => l.type === 'symbol');
+      map.addLayer({
+        id: LAYER_ID_DOTS,
+        type: 'circle',
+        source: SOURCE_ID_ANNONCES,
+        paint: {
+          'circle-radius': 5,
+          'circle-color': '#FFFFFF',
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#B4B4B4'
+        }
+      });
 
-            // --- 2. Ajout des couches DANS LE BON ORDRE (du bas vers le haut) ---
+      map.addLayer({
+        id: LAYER_ID_PRICES,
+        type: 'symbol',
+        source: SOURCE_ID_ANNONCES,
+        layout: {
+          'icon-image': 'circle-background',
+          'icon-size': 0.9,
+          'text-field': ['concat', ['to-string', ['get', 'price']], '€'],
+          'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+          'text-size': 14
+        },
+        paint: {
+          'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'],
+          'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333']
+        }
+      });
 
-            // A. Couche de coloration des villes (tout en bas)
-            map.addLayer({
-                id: CITY_HIGHLIGHT_LAYER_ID,
-                type: 'fill',
-                source: BOUNDARIES_SOURCE,
-                'source-layer': BOUNDARIES_SOURCE_LAYER,
-                filter: ['==', ['get', CITY_NAME_FIELD], '__none__'], // Invisible
-                paint: {
-                    'fill-color': '#0269CC',
-                    'fill-opacity': 0.15,
-                    'fill-outline-color': '#0269CC'
-                }
-            }, firstSymbolLayer?.id);
+      /* -- Couche de coloration des communes (invisible au départ) -- */
+      const firstSymbolLayer = map.getStyle().layers.find(l => l.type === 'symbol');
 
-            // B. Couches des annonces (par-dessus la coloration)
-            map.addLayer({
-                id: LAYER_ID_DOTS,
-                type: 'circle',
-                source: SOURCE_ID_ANNONCES,
-                paint: { 'circle-radius': 5, 'circle-color': '#FFFFFF', 'circle-stroke-width': 1, 'circle-stroke-color': '#B4B4B4' }
-            }, firstSymbolLayer?.id);
+      map.addLayer({
+        id: CITY_HIGHLIGHT_LAYER_ID,
+        type: 'fill',
+        source: BOUNDARIES_SOURCE,
+        'source-layer': BOUNDARIES_SOURCE_LAYER,
+        // uniquement les communes (level 3) et aucun nom (filtre vide)
+        filter: ['all',
+          ['==', ['get', 'level'], CITY_LEVEL],
+          ['==', ['get', CITY_NAME_FIELD], '__none__']
+        ],
+        paint: {
+  'fill-color'   : '#0269CC',
+  'fill-opacity' : 0.08,
+  'fill-outline-color': '#0269CC'
+      }
+      }, firstSymbolLayer?.id);
 
-            map.addLayer({
-                id: LAYER_ID_PRICES,
-                type: 'symbol',
-                source: SOURCE_ID_ANNONCES,
-                layout: {
-    'icon-image': 'circle-background',
-    'icon-size': 0.9,
-    'text-field': ['concat', ['to-string', ['get', 'price']], '€'],
-    'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-    'text-size': 14,
-    'icon-allow-overlap': false, // Restauré
-    'text-allow-overlap': false, // Restauré
-    'icon-anchor': 'center',     // Restauré
-    'text-anchor': 'center'      // Restauré
-},
-                paint: { 'icon-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#000000', '#FFFFFF'], 'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FFFFFF', '#333333'] }
-            }, firstSymbolLayer?.id);
-            
-            console.log('[MAP_SCRIPT] Toutes les couches ont été ajoutées.');
+      console.log('[MAP_SCRIPT] Couche commune ajoutée');
 
             // --- 3. Événements de la carte ---
             map.on('mouseenter', LAYER_ID_DOTS, handleDotHoverOrClick);
