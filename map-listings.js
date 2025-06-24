@@ -69,12 +69,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     map.on('load', () => {
       console.log('[MAP_SCRIPT] Carte chargée');
+      
 
-     
+     /* ——— supprimer proprement les anciens cercles ——— */
+  ['annonces-dots-layer', 'annonces-prices-layer'].forEach(id => {
+    if (map.getLayer(id))   map.removeLayer(id);
+  });
+  if (map.hasImage('circle-background')) map.removeImage('circle-background');
+
 
       /* -- Annonces (points + labels) -- */
       map.addImage('circle-background', createCircleSdf(64), { sdf: true });
       map.addSource(SOURCE_ID_ANNONCES, { type: 'geojson', data: initialGeoJSON, promoteId: 'id' });
+
+      const firstSymbol = map.getStyle().layers.find(l => l.type === 'symbol');
+
+      map.loadImage('/assets/pill-bg.svg', (err, img) => {
+  if (err) throw err;
+  if (!map.hasImage('pill-bg')) {
+    map.addImage('pill-bg', img, { sdf: true });  // svg → SDF = recolorable
+  }
+});
 
       map.addLayer({
   id   : 'price-pill',
@@ -125,7 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ],
     'icon-halo-width': 1
   }
-}, 'road-label');
+}, firstSymbol ? firstSymbol.id : undefined);
 
 
 
