@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const SOURCE_ID_ANNONCES = 'annonces-source';
   // const LAYER_ID_DOTS  = 'annonces-dots-layer';   // plus utilisé
   // const LAYER_ID_PRICES = 'annonces-prices-layer'; // plus utilisé
-  const LAYER_ID_PILLS = 'price-pill';   // ← ajouté
+
 
   // Bouton 3D
   const BUTTON_3D_ID       = 'toggle-3d-button';
