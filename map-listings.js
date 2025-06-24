@@ -89,14 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
     'text-letter-spacing': 0.05,
     'text-allow-overlap': true,
 
-    /* ICI le décalage pour la petite “queue” */
-    'text-offset': [
-    'case',
-      ['boolean',['feature-state','selected'],false],
-      ['literal',[0,0]],
-      ['literal',[0,0.15]]
-  ]
-  
   },
         
   paint: {
