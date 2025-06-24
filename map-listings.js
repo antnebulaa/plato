@@ -96,8 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ['literal',[0,0]],
       ['literal',[0,0.15]]
   ]
-  /* petit décalage fixe pour la “queue” (facultatif) */
-  'text-offset': [0, 0.15]
+  
   },
         
   paint: {
