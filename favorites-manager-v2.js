@@ -484,8 +484,8 @@ document.addEventListener('DOMContentLoaded', function () {
             textAlign: 'center',
             boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
             opacity: '1', 
-            transform: 'translateY(-200%)', 
-            transition: 'opacity 0.3s ease-in-out, transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)' 
+            transform: 'translateY(-200%)' 
+            // transition: 'opacity 0.3s ease-in-out, transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)' //
         });
 
         animationElement.textContent = message; //
